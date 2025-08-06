@@ -1,0 +1,73 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+	  <UseWindowsForms>true</UseWindowsForms>
+	  <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+
+	  <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+	  <ApplicationIcon>icon\GRPSEND.ico</ApplicationIcon>
+	  
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="FNT\IRANYekanFN.TTF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <COMReference Include="TINYLib">
+      <WrapperTool>tlbimp</WrapperTool>
+      <VersionMinor>0</VersionMinor>
+      <VersionMajor>1</VersionMajor>
+      <Guid>df1d4b1e-d56e-4a40-ba98-2cc06080e796</Guid>
+      <Lcid>0</Lcid>
+      <Isolated>false</Isolated>
+      <EmbedInteropTypes>true</EmbedInteropTypes>
+    </COMReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="icon\GRPSEND.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
+    <PackageReference Include="syncfusion.ui.wpf.net" Version="20.4.0.48" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Prg_Graphicy\Prg_Graphicy.csproj" />
+    <ProjectReference Include="..\Prg_Moadian\Prg_Moadian.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="FNT\IRANYekanFN.TTF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="DLLS\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="AxInterop.TINYLib">
+      <HintPath>DLLS\AxInterop.TINYLib.dll</HintPath>
+    </Reference>
+    <Reference Include="Syncfusion.Data.WPF">
+      <HintPath>DLLS\Syncfusion.Data.WPF.dll</HintPath>
+    </Reference>
+    <Reference Include="Syncfusion.SfChart.WPF">
+      <HintPath>DLLS\Syncfusion.SfChart.WPF.dll</HintPath>
+    </Reference>
+    <Reference Include="Syncfusion.SfGrid.WPF">
+      <HintPath>DLLS\Syncfusion.SfGrid.WPF.dll</HintPath>
+    </Reference>
+    <Reference Include="Syncfusion.Shared.WPF">
+      <HintPath>DLLS\Syncfusion.Shared.WPF.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

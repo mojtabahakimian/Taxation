@@ -1,0 +1,364 @@
+﻿<Window x:Class="Prg_TrackSentInvoice.FactorManagement_WIN"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Prg_TrackSentInvoice"
+        mc:Ignorable="d"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        FontFamily="pack://application:,,,/Prg_Graphicy;component/UIY/FNT/#IRANYekanFN"
+        WindowStartupLocation="CenterScreen"
+        Title="فاکتور برگشت فروش آزاد" Height="550" Width="1024" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered" Closing="Window_Closing">
+    <Window.Resources>
+        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="BorderBrush" Value="{Binding RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}, Path=HorizontalGridLinesBrush}" />
+            <Setter Property="BorderThickness" Value="0.7" />
+        </Style>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Tag="0" Height="64*"/>
+            <!-- Row for TextBoxes and Button -->
+            <RowDefinition Tag="1" Height="150*"/>
+            <RowDefinition Tag="2" Height="Auto" MinHeight="5"/>
+            <RowDefinition Tag="3" Height="232*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel FlowDirection="RightToLeft" Visibility="Collapsed" Orientation="Horizontal" VerticalAlignment="Center" Height="94" Margin="10,0,10,0">
+            <StackPanel Orientation="Horizontal"  Height="40" FlowDirection="RightToLeft">
+                <Label Content="شماره منحصر به فرد مالیاتی:" VerticalAlignment="Center" FlowDirection="RightToLeft" />
+                <TextBox x:Name="SEARCH_Taxid" Width="200" FlowDirection="LeftToRight" Height="30" Margin="3,0,0,0"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal"  Height="40" FlowDirection="RightToLeft">
+                <Label Content="شماره فاکتور داخلی:" VerticalAlignment="Center" FlowDirection="RightToLeft" />
+                <TextBox x:Name="SEARCH_Inno"  Width="100" Height="30" Margin="3,0,0,0"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal"  Height="40" FlowDirection="RightToLeft">
+                <Label Content="شماره صورتحساب مرجع:" VerticalAlignment="Center" FlowDirection="RightToLeft" />
+                <TextBox x:Name="SEARCH_Irtaxid"  Width="200" Height="30" Margin="3,0,0,0"/>
+            </StackPanel>
+
+            <UniformGrid Rows="1" Columns="2" Height="74" Margin="10,0,0,0" Width="82">
+                <Button x:Name="SEARCH_BTN" Click="SEARCH_BTN_Click"  Width="auto" Padding="5" Foreground="#DDFFFFFF" FontSize="12" Margin="0,-2,5,-2"  >
+                    <Viewbox>
+                        <materialDesign:PackIcon  Kind="Search" />
+                    </Viewbox>
+                </Button>
+                <Button x:Name="CLEAR_BTN" Click="CLEAR_BTN_Click"  Width="auto" Padding="5" Foreground="#DDFFFFFF" FontSize="12" Margin="5,0,0,0"  >
+                    <Viewbox>
+                        <materialDesign:PackIcon  Kind="ClearCircleOutline" />
+                    </Viewbox>
+                </Button>
+            </UniformGrid>
+
+
+        </StackPanel>
+
+        <UniformGrid Margin="5,5,10,5">
+            <Button x:Name="SendToMoadian_BTN"  Width="auto" Padding="5" Foreground="#DDFFFFFF" FontSize="12" Margin="5,0,0,0" Click="SendToMoadian_BTN_Click"  >
+                <StackPanel Orientation="Horizontal">
+                    <Viewbox Width="18" Margin="5,1,5,5" Height="18">
+                        <materialDesign:PackIcon  Kind="Send" />
+                    </Viewbox>
+                    <Label Content="ارسال به سامانه مودیان" Foreground="#DDFFFFFF" Padding="4,0,4,4"/>
+                </StackPanel>
+            </Button>
+        </UniformGrid>
+
+        <DataGrid x:Name="INVOICE_HEADER" Grid.Row="1" CanUserAddRows="False" CanUserDeleteRows="False"  AutoGenerateColumns="False" Margin="10,10,10,10" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Visible"  SelectionMode="Single" SelectionUnit="FullRow" SelectionChanged="INVOICE_HEADER_SelectionChanged">
+            <DataGrid.Columns>
+
+                <DataGridTextColumn x:Name="rownumberColumn"  IsReadOnly="True" Binding="{Binding ROWNUMBER}" Visibility="Hidden" Header="ردیف" Width="auto"/>
+                <!--<DataGridTemplateColumn Header="">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button x:Name="SEND_BTN" Click="SEND_BTN_Click" Width="auto" Padding="5" Foreground="#DDFFFFFF" FontSize="12" Tag="{Binding}" >
+                                <Viewbox>
+                                    <materialDesign:PackIcon  Kind="Send" />
+                                </Viewbox>
+                            </Button>
+
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>-->
+
+                <DataGridTextColumn x:Name="taxidColumn"  IsReadOnly="True" Binding="{Binding Taxid}" Header="شماره منحصر به فرد مالیاتی" Width="auto"/>
+                <DataGridTextColumn x:Name="innoColumn"  IsReadOnly="True" Binding="{Binding Inno}" Header="شماره فاکتور (حواله) داخلی" Width="auto"/>
+
+                <DataGridTemplateColumn Header="نوع صورتحساب"  IsReadOnly="True" Width="auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Inty}" Value="1">
+                                                <Setter Property="Text" Value="نوع اول" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Inty}" Value="2">
+                                                <Setter Property="Text" Value="نوع دوم" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Inty}" Value="3">
+                                                <Setter Property="Text" Value="نوع سوم" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="الگوی صورتحساب" IsReadOnly="True"  Width="auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Inp}" Value="1">
+                                                <Setter Property="Text" Value="فروش" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Inp}" Value="2">
+                                                <Setter Property="Text" Value="فروش ارزی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Inp}" Value="3">
+                                                <Setter Property="Text" Value="صورت حساب طلا , جواهر و پلاتین" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Inp}" Value="4">
+                                                <Setter Property="Text" Value="پیمانکاری" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Inp}" Value="5">
+                                                <Setter Property="Text" Value="قبوض خدماتی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Inp}" Value="6">
+                                                <Setter Property="Text" Value="هواپیما" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Inp}" Value="7">
+                                                <Setter Property="Text" Value="صادرات" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="موضوع صورت حساب" IsReadOnly="True"  Width="auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Ins}" Value="1">
+                                                <Setter Property="Text" Value="اصلی (فروش)" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Ins}" Value="2">
+                                                <Setter Property="Text" Value="اصلاحی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Ins}" Value="3">
+                                                <Setter Property="Text" Value="ابطالی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Ins}" Value="4">
+                                                <Setter Property="Text" Value="برگشت فروش" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn x:Name="iDDColumn" IsReadOnly="True"  Binding="{Binding IDD}" Header="IDD" Visibility="Hidden" Width="auto"/>
+                <DataGridTextColumn x:Name="theStatusColumn" IsReadOnly="True"  Binding="{Binding TheStatus}" Visibility="Hidden" Header="STATE" Width="auto"/>
+                <DataGridTemplateColumn Header="وضعیت" IsReadOnly="True"  Width="auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding TheStatus}" Value="FAILED">
+                                                <Setter Property="Text" Value="ناموفق" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding TheStatus}" Value="PENDING">
+                                                <Setter Property="Text" Value="در انتظار" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding TheStatus}" Value="SUCCESS">
+                                                <Setter Property="Text" Value="موفق" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding TheStatus}" Value="EXPIRED">
+                                                <Setter Property="Text" Value="منقضی شده" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn x:Name="irtaxidColumn" IsReadOnly="True"  Binding="{Binding Irtaxid}" Header="شماره منحصر به فرد مالیاتی صورتحساب مرجع" Width="SizeToHeader"/>
+                <DataGridTextColumn x:Name="SentTaxMemoryColumn" IsReadOnly="True"  Binding="{Binding SentTaxMemory}" Header="حافظه مالیاتی ارسالی" Width="auto"/>
+                <DataGridTemplateColumn Header="ارسال شده به سامانه" IsReadOnly="True"  Width="auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ApiTypeSent}" Value="0">
+                                                <Setter Property="Text" Value="آزمایشی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ApiTypeSent}" Value="1">
+                                                <Setter Property="Text" Value="اصلی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ApiTypeSent}" Value="False">
+                                                <Setter Property="Text" Value="آزمایشی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ApiTypeSent}" Value="True">
+                                                <Setter Property="Text" Value="اصلی" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="نوع شخص خریدار" IsReadOnly="True"  Width="auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Tob}" Value="1">
+                                                <Setter Property="Text" Value="حقیقی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Tob}" Value="2">
+                                                <Setter Property="Text" Value="حقوقی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Tob}" Value="3">
+                                                <Setter Property="Text" Value="مشارکت مدنی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Tob}" Value="4">
+                                                <Setter Property="Text" Value="اتباع غیر ایرانی" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Tob}" Value="5">
+                                                <Setter Property="Text" Value="مصرف کننده نهایی" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn x:Name="CrtColumn" IsReadOnly="True"  Binding="{Binding CRT}" Header="تاریخ ارسال میلادی" Width="auto"/>
+                <DataGridTextColumn x:Name="PersianCrtColumn"  IsReadOnly="True" Binding="{Binding PersianCRT}" Header="تاریخ ارسال شمسی" Width="auto"/>
+
+                <DataGridTextColumn x:Name="cdcdColumn" IsReadOnly="True"  Binding="{Binding Cdcd}" Header="تاریخ کوتاژ اظهارنامه گمرکی" Width="auto"/>
+                <DataGridTextColumn x:Name="bpnColumn"  IsReadOnly="True" Binding="{Binding Bpn}" Header="شماره گذرنامه خریدار" Width="SizeToHeader"/>
+                <DataGridTextColumn x:Name="sclnColumn"  IsReadOnly="True" Binding="{Binding Scln}" Header=" شماره پروانه گمركی " Width="SizeToHeader"/>
+                <DataGridTextColumn x:Name="sccColumn" IsReadOnly="True"  Binding="{Binding Scc}" Header="كد گمرک محل اظهار" Width="SizeToHeader"/>
+
+                <DataGridTemplateColumn Header="روش تسویه" IsReadOnly="True" Width="auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Setm}" Value="1">
+                                                <Setter Property="Text" Value="نقد" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Setm}" Value="2">
+                                                <Setter Property="Text" Value="نسیه" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Setm}" Value="3">
+                                                <Setter Property="Text" Value="نقد/نسیه" />
+                                            </DataTrigger>
+
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- GridSplitter allows resizing between the two DataGrids -->
+        <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="#FF1F1F1F"/>
+
+        <DataGrid x:Name="INVOICE_BODY" ItemsSource="{Binding BODY_DATA_INVOICE}" Grid.Row="3" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" AutoGenerateColumns="False" Margin="10,10,10,10" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Visible"  SelectionMode="Single" SelectionUnit="FullRow" PreviewMouseDoubleClick="INVOICE_BODY_PreviewMouseDoubleClick" LostFocus="INVOICE_BODY_LostFocus" >
+
+            <DataGrid.Columns>
+
+                <DataGridTextColumn x:Name="rownumberColumn_body" Binding="{Binding IDD}" Header="ردیف" Width="auto"/>
+                <DataGridTextColumn x:Name="ssttColumn" Binding="{Binding Sstt}" Header=" شرح كالا/خدمت" Width="auto"/>
+                <DataGridTextColumn x:Name="sstidColumn" Binding="{Binding Sstid}" Header="شناسه كالا/خدمت" Width="auto"/>
+                <DataGridTextColumn x:Name="amColumn" Binding="{Binding Am,StringFormat=\{0:N\}}" Header="تعداد/مقدار" Width="auto"/>
+                <DataGridTextColumn  Binding="{Binding NAME_VAHED}" Header="واحد" Width="auto"/>
+                <DataGridTextColumn x:Name="muColumn" Binding="{Binding Mu}" Header="واحد کالا مودیان" Visibility="Hidden"/>
+                <DataGridTextColumn x:Name="feeColumn" Binding="{Binding Fee, StringFormat='{}{0:#,#.}'}" Header="مبلغ واحد" Width="auto"/>
+                <DataGridTextColumn x:Name="tsstamColumn" Binding="{Binding Tsstam,StringFormat='{}{0:#,#.}'}" Header="مبلغ كل كالا/خدمت" Width="auto"/>
+
+                <DataGridTextColumn x:Name="prdisColumn" Binding="{Binding Prdis,StringFormat='{}{0:#,#.}'}" Header=" مبلغ قبل از تخفیف" Width="auto"/>
+                <DataGridTextColumn x:Name="tprdisColumn" Binding="{Binding Tprdis,StringFormat='{}{0:#,#.}'}" Header="مجموع مبلغ قبل از كسر تخفیف" Width="auto"/>
+                <DataGridTextColumn x:Name="disColumn" Binding="{Binding Dis,StringFormat='{}{0:#,#.}'}" Header=" مبلغ تخفیف" Width="auto"/>
+                <DataGridTextColumn x:Name="tdisColumn" Binding="{Binding Tdis,StringFormat='{}{0:#,#.}'}" Header="مجموع تخفیفات" Width="auto"/>
+                <DataGridTextColumn x:Name="adisColumn" Binding="{Binding Adis,StringFormat='{}{0:#,#.}'}" Header=" مبلغ بعد از تخفیف" Width="auto"/>
+                <DataGridTextColumn x:Name="tadisColumn" Binding="{Binding Tadis,StringFormat='{}{0:#,#.}'}" Header="مجموع مبلغ پس از كسر تخفیف" Width="auto"/>
+                <DataGridTextColumn x:Name="vraColumn" Binding="{Binding Vra}" Header="نرخ مالیات بر ارزش افزوده" Width="auto"/>
+                <DataGridTextColumn x:Name="vamColumn" Binding="{Binding Vam,StringFormat='{}{0:#,#.}'}" Header="مبلغ مالیات بر ارزش افزوده" Width="auto"/>
+                <DataGridTextColumn x:Name="tvamColumn" Binding="{Binding Tvam,StringFormat='{}{0:#,#.}'}" Header="مجموع مالیات بر ارزش افزوده" Width="auto"/>
+                <DataGridTextColumn x:Name="tbillColumn" Binding="{Binding Tbill,StringFormat='{}{0:#,#.}'}" Header="مجموع صورتحساب" Width="auto"/>
+
+
+                <DataGridTextColumn x:Name="exrColumn" Binding="{Binding Exr}" Header="نرخ برابری ارز با ریال" Width="auto"/>
+                <DataGridTextColumn x:Name="torvColumn" Binding="{Binding Torv}" Header="مجموع ارزش ریالی" Width="auto"/>
+                <DataGridTextColumn x:Name="tocvColumn" Binding="{Binding Tocv}" Header="مجموع ارزش ارزی" Width="auto"/>
+                <DataGridTextColumn x:Name="nwColumn" Binding="{Binding Nw}" Header="وزن خالص" Width="auto"/>
+                <DataGridTextColumn x:Name="ssrvColumn" Binding="{Binding Ssrv}" Header="ارزش ریالی کالا" Width="auto"/>
+                <DataGridTextColumn x:Name="sscvColumn" Binding="{Binding Sscv}" Header="ارزش ارزی کالا" Width="auto"/>
+                <DataGridTextColumn x:Name="tonwColumn" Binding="{Binding Tonw}" Header="مجموع وزن خالص" Width="auto"/>
+
+                <DataGridTextColumn x:Name="capColumn" Binding="{Binding Cap}" Header="مبلغ پرداختی نقدی" Width="auto"/>
+                <DataGridTextColumn x:Name="inspColumn" Binding="{Binding Insp}" Header="مبلغ پرداختی نسیه" Width="auto"/>
+                <DataGridTextColumn x:Name="todamColumn" Binding="{Binding Todam}" Header="مجموع سایر مالیات، عوارض و وجوه قانونی" Width="auto"/>
+                <DataGridTextColumn x:Name="tvopColumn" Binding="{Binding Tvop}" Header="مجموع سهم مالیات بر ارزش افزوده از پرداخت" Width="auto"/>
+                <DataGridTextColumn x:Name="cfeeColumn" Binding="{Binding Cfee}" Header="میزان ارز" Width="auto"/>
+                <DataGridTextColumn x:Name="cutColumn" Binding="{Binding Cut}" Header="نوع ارز" Width="auto"/>
+                <DataGridTextColumn x:Name="odtColumn" Binding="{Binding Odt}" Header="موضوع سایرمالیات و عوارض" Width="auto"/>
+                <DataGridTextColumn x:Name="odrColumn" Binding="{Binding Odr}" Header="نرخ سایرمالیات و عوارض" Width="auto"/>
+                <DataGridTextColumn x:Name="odamColumn" Binding="{Binding Odam}" Header="مبلغ سایرمالیات و عوارض" Width="auto"/>
+                <DataGridTextColumn x:Name="oltColumn" Binding="{Binding Olt}" Header="موضوع سایر وجوه قانونی" Width="auto"/>
+                <DataGridTextColumn x:Name="olrColumn" Binding="{Binding Olr}" Header=" نرخ سایر وجوه قانونی" Width="auto"/>
+                <DataGridTextColumn x:Name="olamColumn" Binding="{Binding Olam}" Header="مبلغ سایر وجوه قانونی" Width="auto"/>
+                <DataGridTextColumn x:Name="consfeeColumn" Binding="{Binding Consfee}" Header="اجرت ساخت" Width="auto"/>
+                <DataGridTextColumn x:Name="sproColumn" Binding="{Binding Spro}" Header=" سود فروشنده" Width="auto"/>
+                <DataGridTextColumn x:Name="brosColumn" Binding="{Binding Bros}" Header="حق العمل" Width="auto"/>
+                <DataGridTextColumn x:Name="tcpbsColumn" Binding="{Binding Tcpbs}" Header="جمع كل اجرت، حق-العمل و سود" Width="auto"/>
+                <DataGridTextColumn x:Name="copColumn" Binding="{Binding Cop}" Header="سهم نقدی از پرداخت" Width="auto"/>
+                <DataGridTextColumn x:Name="vopColumn" Binding="{Binding Vop}" Header="سهم ارزش افزوده از پرداخت" Width="auto"/>
+                <DataGridTextColumn x:Name="bsrnColumn" Binding="{Binding Bsrn}" Header="شناسه یکتای ثبت قرارداد حق العملکاری" Width="auto"/>
+                <DataGridTextColumn x:Name="iinnColumn" Binding="{Binding Iinn}" Header="شماره سوییچ پرداخت" Width="auto"/>
+                <DataGridTextColumn x:Name="acnColumn" Binding="{Binding Acn}" Header="شماره پذیرنده فروشگاهی" Width="auto"/>
+                <DataGridTextColumn x:Name="trmnColumn" Binding="{Binding Trmn}" Header=" شماره پایانه" Width="auto"/>
+                <DataGridTextColumn x:Name="trnColumn" Binding="{Binding Trn}" Header="شماره پیگیری" Width="auto"/>
+                <DataGridTextColumn x:Name="pcnColumn" Binding="{Binding Pcn}" Header="شماره كارت پرداخت كننده صورتحساب" Width="auto"/>
+                <DataGridTextColumn x:Name="pidColumn" Binding="{Binding Pid}" Header="شماره/شناسه ملی/كد فراگیر اتباع غیر ایرانی پرداخت كننده صورتحساب" Width="auto"/>
+                <DataGridTextColumn x:Name="pdtColumn" Binding="{Binding Pdt}" Header="تاریخ و زمان پرداخت صورتحساب" Width="auto"/>
+                <DataGridTextColumn x:Name="cdcnColumn" Binding="{Binding Cdcn}" Header="Cdcn" Width="auto"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</Window>

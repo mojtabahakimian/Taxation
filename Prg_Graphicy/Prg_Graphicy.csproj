@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+
+	  <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="ADDON\Preloader.exe" />
+    <None Remove="UIY\FNT\IranYekanRG.TTF" />
+    <None Remove="UIY\IMGS\ICN.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ADDON\Preloader.exe" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.0.143" />
+    <PackageReference Include="MaterialDesignThemes" Version="4.9.0" />
+    <PackageReference Include="Serilog" Version="3.0.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="UIY\FNT\IranYekanRG.TTF" />
+    <Resource Include="UIY\IMGS\ICN.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="UC\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Prg_Moadian\Prg_Moadian.csproj" />
+  </ItemGroup>
+
+</Project>

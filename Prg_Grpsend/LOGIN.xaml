@@ -1,0 +1,59 @@
+﻿<Window x:Class="Prg_Grpsend.LOGIN"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Prg_Grpsend"
+        mc:Ignorable="d"
+        FontFamily="{StaticResource IRANYEKAN}" WindowStartupLocation="CenterScreen"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes" Loaded="Window_Loaded" PreviewKeyDown="Window_PreviewKeyDown"
+        Title="ورود کاربری" Height="450" Width="800">
+    <Grid>
+        <materialDesign:Card UniformCornerRadius="10" Margin="25" Padding="32"  materialDesign:ElevationAssist.Elevation="Dp4" Background="{DynamicResource MaterialDesignPaper}">
+            <StackPanel>
+                <TextBlock Text="ورود به سیستم"
+                           FontSize="28" FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource PrimaryHueMidBrush}"
+                           Margin="0 0 0 20"/>
+
+                <TextBox x:Name="TxtUsername"
+                         materialDesign:TextFieldAssist.HasClearButton="True"
+                         Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                         Margin="0 8 0 8"
+                         FontSize="16">
+                    <materialDesign:HintAssist.Hint>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Account" VerticalAlignment="Center" Margin="0 0 5 0"/>
+                            <TextBlock Text="نام کاربری"/>
+                        </StackPanel>
+                    </materialDesign:HintAssist.Hint>
+                </TextBox>
+
+                <PasswordBox x:Name="TxtPassword"
+                             materialDesign:HintAssist.Hint="رمز عبور"
+                             materialDesign:TextFieldAssist.HasClearButton="True"
+                             Style="{StaticResource MaterialDesignFloatingHintPasswordBox}"
+                             Margin="0 8 0 20"
+                             FontSize="16">
+                </PasswordBox>
+
+                <Button x:Name="BtnLogin" IsDefault="True"
+                        Content="ورود"
+                        Style="{StaticResource MaterialDesignRaisedButton}"
+                        materialDesign:ButtonAssist.CornerRadius="5"
+                        ToolTip="برای ورود کلیک کنید"
+                        Margin="0 16 0 0"
+                        Height="45"
+                        FontSize="18"
+                        materialDesign:ElevationAssist.Elevation="Dp2"
+                        Click="BtnLogin_Click" Background="{x:Null}">
+                </Button>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0"/>
+
+            </StackPanel>
+        </materialDesign:Card>
+
+    </Grid>
+</Window>

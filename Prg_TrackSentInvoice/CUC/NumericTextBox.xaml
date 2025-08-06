@@ -1,0 +1,26 @@
+﻿<UserControl x:Class="Prg_TrackSentInvoice.CUC.NumericTextBox"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Prg_TrackSentInvoice.CUC"
+             mc:Ignorable="d"
+             IsTabStop="False"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <TextBox x:Name="TXB0" 
+           Style="{StaticResource MaterialDesignOutlinedTextBox}"
+           Padding="3"
+           HorizontalAlignment="Stretch" 
+           VerticalAlignment="Center"
+           PreviewTextInput="TXB0_PreviewTextInput"
+           LostFocus="TXB0_LostFocus"
+           DataObject.Pasting="TXB0_Pasting"
+           PreviewKeyDown="TXB0_PreviewKeyDown"
+           Text="{Binding Text, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}" 
+           AllowDrop="False" 
+           VerticalContentAlignment="Center"
+           TextChanged="TXB0_TextChanged"
+           TextAlignment="Right"
+           >
+    </TextBox>
+</UserControl>

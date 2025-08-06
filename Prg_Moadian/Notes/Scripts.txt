@@ -1,0 +1,79 @@
+﻿Indatim	                    bigint	
+Indati2m	                bigint	
+Bbc                         nvarchar(10)
+Mu			                nvarchar(50)
+Tinb	                    nvarchar(14)
+RefrenceNumber	            nvarchar(100)
+UID	                        nvarchar(100)	
+TheConfirmationReferenceId	nvarchar(100)
+TheError	                nvarchar(4000)
+TheStatus	                nvarchar(50)
+TheSuccess	                bit	Checked
+TheWarning	                nvarchar(4000)
+
+Trmn = Should be NUllable
+//Indatim = src_Indatim, //Error   CS0029  Cannot implicitly convert type 'long' to 'System.DateTime?'
+-------------1
+ALTER VIEW dbo.CUST_HESAB as SELECT        RTRIM(CAST(N_KOL AS nvarchar)) + '-' + RTRIM(CAST(NUMBER AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER AS nvarchar)) AS hes, NAME, ADDRESS, TEL, CODE_E, ECODE, PCODE, IYALAT, CITY, MCODEM, TOZIH, 
+                         CUST_COD, MOBILE, Longitude, Latitude, ROUTE_NAME, OSTANID, SHAHRID,tob
+FROM            dbo.TDETA_HES
+UNION
+SELECT        RTRIM(CAST(N_KOL AS nvarchar)) + '-' + RTRIM(CAST(NUMBER AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER2 AS nvarchar)) AS hes, NAME, ADDRESS, TEL, CODE_E, ECODE, 
+                         PCODE, IYALAT, CITY, MCODEM, TOZIH, CUST_COD, MOBILE, Longitude, Latitude, ROUTE_NAME, OSTANID, SHAHRID,tob
+
+FROM            dbo.TDETA_HES2
+UNION
+SELECT        RTRIM(CAST(N_KOL AS nvarchar)) + '-' + RTRIM(CAST(NUMBER AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER2 AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER3 AS nvarchar)) 
+                         AS hes, NAME, ADDRESS, TEL, CODE_E, ECODE, PCODE, IYALAT, CITY, MCODEM, TOZIH, CUST_COD, MOBILE, Longitude, Latitude, ROUTE_NAME, OSTANID, SHAHRID,tob
+
+FROM            dbo.TDETA_HES3
+UNION
+SELECT        RTRIM(CAST(N_KOL AS nvarchar)) + '-' + RTRIM(CAST(NUMBER AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER2 AS nvarchar)) + '-' + RTRIM(CAST(TNUMBER3 AS nvarchar)) 
+                         + '-' + RTRIM(CAST(TNUMBER4 AS nvarchar)) AS hes, NAME, ADDRESS, TEL, CODE_E, ECODE, PCODE, IYALAT, CITY, MCODEM, TOZIH, CUST_COD, MOBILE, Longitude, Latitude, ROUTE_NAME, OSTANID, SHAHRID,tob
+
+FROM            dbo.TDETA_HES4
+GO
+-------------
+
+-------------2
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER VIEW [dbo].[CUST_HESAB]
+AS
+SELECT RTRIM(CAST(N_KOL AS NVARCHAR))+'-'+RTRIM(CAST(NUMBER AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER AS NVARCHAR)) AS hes, NAME, ADDRESS, TEL, CODE_E, ECODE, PCODE, IYALAT, CITY, MCODEM, TOZIH, CUST_COD, MOBILE, Longitude, Latitude, ROUTE_NAME, OSTANID, SHAHRID,tob
+FROM dbo.TDETA_HES
+UNION
+SELECT RTRIM(CAST(N_KOL AS NVARCHAR))+'-'+RTRIM(CAST(NUMBER AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER2 AS NVARCHAR)) AS hes, NAME, ADDRESS, TEL, CODE_E, ECODE, PCODE, IYALAT, CITY, MCODEM, TOZIH, CUST_COD, MOBILE, Longitude, Latitude, ROUTE_NAME, OSTANID, SHAHRID,tob
+FROM dbo.TDETA_HES2
+UNION
+SELECT RTRIM(CAST(N_KOL AS NVARCHAR))+'-'+RTRIM(CAST(NUMBER AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER2 AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER3 AS NVARCHAR)) AS hes, NAME, ADDRESS, TEL, CODE_E, ECODE, PCODE, IYALAT, CITY, MCODEM, TOZIH, CUST_COD, MOBILE, Longitude, Latitude, ROUTE_NAME, OSTANID, SHAHRID,tob
+FROM dbo.TDETA_HES3
+UNION
+SELECT RTRIM(CAST(N_KOL AS NVARCHAR))+'-'+RTRIM(CAST(NUMBER AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER2 AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER3 AS NVARCHAR))+'-'+RTRIM(CAST(TNUMBER4 AS NVARCHAR)) AS hes, NAME, ADDRESS, TEL, CODE_E, ECODE, PCODE, IYALAT, CITY, MCODEM, TOZIH, CUST_COD, MOBILE, Longitude, Latitude, ROUTE_NAME, OSTANID, SHAHRID,tob
+FROM dbo.TDETA_HES4
+GO
+-------------
+ALTER TABLE dbo.STUF_DEF 
+ADD sstid nvarchar(13)
+------------------------
+ALTER TABLE dbo.STUF_DEF 
+ADD mu int
+------------------------
+ALTER TABLE TAXDTL ALTER COLUMN Indatim BIGINT NOT NULL
+ALTER TABLE TAXDTL ALTER COLUMN Indati2m BIGINT NOT NULL
+ALTER TABLE TAXDTL ALTER COLUMN Mu nvarchar(50) NOT NULL
+ALTER TABLE TAXDTL ALTER COLUMN Tinb NVARCHAR(14) NOT NULL
+ALTER TABLE TAXDTL ALTER COLUMN RefrenceNumber nvarchar(100) NOT NULL
+ALTER TABLE TAXDTL ALTER COLUMN UID nvarchar(100) NULL
+ALTER TABLE TAXDTL ALTER COLUMN TheConfirmationReferenceId	nvarchar(100)
+ALTER TABLE TAXDTL ALTER COLUMN TheError nvarchar(4000) NULL
+ALTER TABLE TAXDTL ALTER COLUMN TheStatus nvarchar(50) NULL
+ALTER TABLE TAXDTL ALTER COLUMN TheSuccess bit	NULL
+ALTER TABLE TAXDTL ALTER COLUMN TheWarning nvarchar(4000)
+
+ALTER TABLE TAXDTL ALTER COLUMN Tins nvarchar(14)
+
+-------------------
+ALTER TABLE TAXDTL ADD ApiTypeSent bit	NULL -- برای مشخص کردن اینکه به کدام سامانه ارسال شده

@@ -1,0 +1,58 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <Description>MrCorrect - Bill inquiry</Description>
+    <Copyright>MrCorrect Software Group</Copyright>
+    <PackageProjectUrl>https://mr-correct.com/</PackageProjectUrl>
+    <ApplicationIcon>TrackSentInvoiceICO.ico</ApplicationIcon>
+	<ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+
+	  <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="ADDON\Preloader.exe" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="TrackSentInvoiceICO.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ADDON\Preloader.exe" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
+    <PackageReference Include="NPOI" Version="2.6.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Prg_Graphicy\Prg_Graphicy.csproj" />
+    <ProjectReference Include="..\Prg_Moadian\Prg_Moadian.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="LMODELS\" />
+  </ItemGroup>
+
+</Project>

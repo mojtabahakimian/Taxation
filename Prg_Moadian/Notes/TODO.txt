@@ -1,0 +1,5 @@
+﻿1- GetNewIDD()  =>  CL_CCNNMANAGER dbms = new CL_CCNNMANAGER(); باید Dispose بشه 
+
+2- CL_FUNTIONS باید Dispose بشه 
+
+3- نباید هنگام ارسال صورت حساب به وی پی ان وصل باشند
