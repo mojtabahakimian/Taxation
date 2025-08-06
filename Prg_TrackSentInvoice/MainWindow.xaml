@@ -9,7 +9,7 @@
         mc:Ignorable="d"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         WindowStartupLocation="CenterScreen"
-        Title="استعلام صورت حساب ها" Height="700" Width="1240" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered">
+        Title="استعلام صورت حساب ها" Height="700" Width="1250" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered">
     <Grid x:Name="grid">
 
         <tb:TaskbarIcon x:Name="NotifyIcon" ToolTipText="استعلام صورت حساب ها">
