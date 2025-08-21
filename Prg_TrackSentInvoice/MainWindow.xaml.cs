@@ -586,7 +586,7 @@ namespace Prg_TrackSentInvoice
                 {
                     new MsgListwin(false, Functions.GetNormilizedMsg(_msgitem.TheError)).ShowDialog();
                 }
-                else if (_msgitem.TheStatus is "SUCCESS" && (_msgitem.Ins is 4 || _msgitem.Ins is 1)) //اصلی یا برگشتی
+                else if (_msgitem.TheStatus is "SUCCESS" && (_msgitem.Ins is 1)) //اصلی
                 {
                     if (!string.IsNullOrEmpty(_msgitem?.Taxid))
                     {

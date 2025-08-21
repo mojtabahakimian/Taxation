@@ -35,9 +35,9 @@
                 <cnc:NumericTextBox  CustomUpdateSourceTrigger="PropertyChanged"   DoesAcceptDouble="True" DigitGroupOnEnter="True" IsDigitGroupActive="True"  Text="{Binding Am,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" MinWidth="50"  Width="auto" UserControlLostFocus="AmOnLeave" />
             </StackPanel>
 
-            <StackPanel  Height="30" Margin="6"   Orientation="Horizontal"   FlowDirection="RightToLeft" >
+            <StackPanel  Height="30" Margin="6"   Orientation="Horizontal"   FlowDirection="RightToLeft">
                 <Label  Content="مبلغ واحد" Foreground="#DD08B923" />
-                <cnc:NumericTextBox  CustomUpdateSourceTrigger="PropertyChanged"    DigitGroupOnEnter="True" IsDigitGroupActive="True"  Text="{Binding Fee,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" MinWidth="70"  IsReadOnly="False" Width="auto" UserControlLostFocus="FeeOnLeave" />
+                <cnc:NumericTextBox  CustomUpdateSourceTrigger="PropertyChanged"  DigitGroupOnEnter="True" IsDigitGroupActive="True"  Text="{Binding Fee,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" MinWidth="70"  IsReadOnly="False" Width="auto" UserControlLostFocus="FeeOnLeave" />
             </StackPanel>
 
             <!-- disColumn Column -->

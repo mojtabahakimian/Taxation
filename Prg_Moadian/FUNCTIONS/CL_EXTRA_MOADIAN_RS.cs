@@ -4,6 +4,7 @@ using Prg_Moadian.Service;
 using Prg_Moadian.SQLMODELS;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -90,7 +91,7 @@ namespace Prg_Moadian.FUNCTIONS
             foreach (var item in RS_ROW)
             {
                 item.Ins = 4; //از نوع برگشتی است
-                item.Mu = Convert.ToString(Convert.ToInt64(item.Mu));
+                item.Mu = decimal.Truncate(decimal.Parse(item.Mu, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
             }
 
             var src_taxid = taxService.RequestTaxId(MemoryID, dt); //A114K804C0B000AB33C0A7

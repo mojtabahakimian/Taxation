@@ -19,6 +19,8 @@ using static Prg_Moadian.Generaly.CL_Generaly;
 using System.Windows.Forms;
 using System.Data.SqlClient;
 using Dapper;
+using System.Reflection;
+using NPOI.SS.Formula.Functions;
 
 namespace Prg_TrackSentInvoice
 {
@@ -282,6 +284,12 @@ namespace Prg_TrackSentInvoice
         }
         private void SendToMoadian_BTN_Click(object sender, RoutedEventArgs e)
         {
+            if (!BODY_DATA_INVOICE.Any() || !BODY_DATA_INVOICE.Any(x => x?.Am > 0))
+            {
+                new Msgwin(false, "آیتمی برای ارسال وجود ندارد").Show();
+                return;
+            }
+
             try
             {
                 using (var db = new SqlConnection(CL_CCNNMANAGER.CONNECTION_STR))
@@ -433,6 +441,44 @@ namespace Prg_TrackSentInvoice
                 CL_INDICATOR.Dispose();
                 ClearTempTable();
                 System.Environment.Exit(0);
+            }
+        }
+
+        private void INVOICE_BODY_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (BODY_DATA_INVOICE.Count > 0)
+            {
+                if (e.Key == Key.Delete)
+                {
+                    e.Handled = true;
+
+                    if (!(INVOICE_BODY.SelectedItems is null))
+                    {
+                        Msgwin msgwin = new Msgwin(true, "آیا مایل به حذف هستید ؟"); msgwin.ShowDialog();
+                        if (msgwin.DialogResult == true)
+                        {
+                            for (int i = 0; i < INVOICE_BODY.SelectedItems.Count; i++)
+                            {
+                                var item = INVOICE_BODY.SelectedItems[i];
+
+                                var _IDD_ = item.GetType().GetProperty("IDD").GetValue(item);
+
+                                if (_IDD_ != null)
+                                {
+                                    dbms.DoExecuteSQL($@"DELETE FROM {RSDTL_TMP_NAME} WHERE IDD = {_IDD_}");
+                                }
+                            }
+
+                            BodyreGetData();
+                        }
+                        else
+                        {
+                            e.Handled = true; //اجازه نده از دیتاگرید چیزی حذف بشه
+                        }
+                    }
+                }
+
+
             }
         }
 
