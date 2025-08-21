@@ -30,7 +30,7 @@ namespace Prg_Graphicy
 
             //string[] defaultargs = new string[] { "default_value" };
             //args = args.Length > 0 ? args : defaultargs;
-            //args[0] = "4978_2_m"; //شماره حواله
+            //args[0] = "2145_2_m"; //شماره حواله
 
             #region Prepair_Get_Input_Text_Passed_And+
             if (args.Length > 0)

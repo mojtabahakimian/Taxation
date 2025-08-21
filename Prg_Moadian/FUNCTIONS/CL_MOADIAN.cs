@@ -129,7 +129,6 @@ namespace Prg_Moadian.FUNCTIONS
 
             ////TheFunctions.SendSampleInvoiceTest1(MemoryID, privateKey, TaxURL);////return; //Just Test and Get Back--------------------------------------------------------------------------|
 
-
             #region TTTTEEEESSSSTTTT
             //TaxApiService.Instance.Init(MemoryID, new SignatoryConfig(privateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxURL);
             //ServerInformationModel serverInformationModel = TaxApiService.Instance.TaxApis.GetServerInformation();
@@ -386,13 +385,15 @@ namespace Prg_Moadian.FUNCTIONS
                                                                //2- TAKHFIF Cutter
                 item.N_MOIN = Math.Truncate((decimal)item.N_MOIN); //مبلغ تخفیف
 
-                item.MEGHk = Math.Round((decimal)item.MEGHk, 4);
-
                 if (_HEAD_EXTENDED.ins == 4)   //اگر از نوع برگشتی است
                 {
                     item.MEGH_MAR = Math.Round((decimal)item.MEGH_MAR, 4);
 
-                    item.MEGHk = item.MEGHk - item.MEGH_MAR; // مقدار کل کالا منهای مقدار کل مرجوعی = مقدار کل
+                    item.MEGHk = item.MEGH_MAR; //مقدار مرجوعی رو میذاریم جای مقدار کالا
+                }
+                else
+                {
+                    item.MEGHk = Math.Round((decimal)item.MEGHk, 4);
                 }
 
                 //3-MABL_K Calcute and Cut
@@ -433,7 +434,6 @@ namespace Prg_Moadian.FUNCTIONS
                     throw new NullyExceptiony($"صورت حساب برگشتی با شماره {NUMBER} شامل هیچ کالایی جهت ارسال نمی باشد.");
                 }
             }
-
 
             var src_Sum_MABL_K = L_DRV_TBL_US.Sum(x => x.MABL_K);
             var src_Sum_N_MOIN = L_DRV_TBL_US.Sum(x => x.N_MOIN);
@@ -757,7 +757,7 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                         src_item.Indati2m_Sec,
                         src_item.Inty,
                         Inno = SafeString(src_item.Inno, 10),
-                        Irtaxid = SafeString(src_item.Irtaxid, 22),
+                        Irtaxid = SafeString(irtaxid_RefNum_cancel, 22), //src_item.Irtaxid
                         src_item.Inp,
                         src_item.Ins,
                         Tins = SafeString(src_item.Tins, 14),
