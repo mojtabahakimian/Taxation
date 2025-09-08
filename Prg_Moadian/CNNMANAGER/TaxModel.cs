@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Prg_Moadian.CNNMANAGER
+﻿namespace Prg_Moadian.CNNMANAGER
 {
     public class TaxModel
     {

@@ -24,6 +24,15 @@ using TaxCollectData.Library.Dto.Config;
 using TaxCollectData.Library.Dto.Properties;
 using TaxCollectData.Library.Enums;
 using System.Windows.Documents;
+using System.Threading.Tasks;
+using Prg_Moadian.Service;
+using static Prg_Moadian.CNNMANAGER.TaxModel;
+using NPOI.Util;
+using System.Globalization;
+using System.Net.Sockets;
+using System.Net;
+using System.Data.SqlClient;
+using Dapper;
 
 namespace Prg_TrackSentInvoice
 {
@@ -1044,5 +1053,439 @@ namespace Prg_TrackSentInvoice
                 new Msgwin(false, "مقدار شماره شروع فاکتور ذخیره شد.").ShowDialog();
             }
         }
+
+        #region ReSend
+        private string TruncateString(string input, int maxLength)
+        {
+            if (string.IsNullOrEmpty(input) || maxLength <= 0)
+                return string.Empty;
+
+            // Check if the string needs truncation
+            if (input.Length > maxLength)
+            {
+                return input.Substring(0, maxLength);
+            }
+
+            // No truncation needed
+            return input;
+        }
+        private void INVOCIE_DTGR_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!NowIsReady || RESEND_BTN == null) return;
+
+            if (INVOCIE_DTGR.SelectedItems.Count <= 0) { return; }
+
+            var selectedItems = INVOCIE_DTGR.SelectedItems.Cast<TRACK_TAXDTL>().ToList();
+
+            if (selectedItems.Count > 0)
+            {
+                bool allPendingOrInProgress = selectedItems.All(item =>
+                    item.TheStatus?.ToUpper() == "PENDING" || item.TheStatus?.ToUpper() == "IN_PROGRESS");
+
+                RESEND_BTN.IsEnabled = allPendingOrInProgress;
+            }
+            else
+            {
+                RESEND_BTN.IsEnabled = false;
+            }
+        }
+        private void RESEND_BTN_Click(object sender, RoutedEventArgs e)
+        {
+            if (!RESEND_BTN.IsEnabled) return;
+
+            var selectedItems = INVOCIE_DTGR.SelectedItems.Cast<TRACK_TAXDTL>().ToList();
+            if (!selectedItems.Any())
+            {
+                new Msgwin(false, "لطفا ابتدا یک یا چند فاکتور را برای ارسال مجدد انتخاب کنید.").ShowDialog();
+                return;
+            }
+
+            var uniqueTaxids = selectedItems.Select(i => i.Taxid).Distinct().ToList();
+            Msgwin msgwin = new Msgwin(true,
+                $"⚠️ توجه: تاریخ فاکتورهای ارسالی مجدد، تاریخ امروز در نظر گرفته خواهد شد.\n\n" +
+                $"✅ تعداد {uniqueTaxids.Count} فاکتور برای ارسال مجدد انتخاب شده است.\n\n" +
+                $"ℹ️ نکته مهم: اگر وضعیت صورتحساب‌های شما همچنان «در انتظار» یا «در حال انجام» است، " +
+                $"پیشنهاد می‌شود قبل از ادامه، کارپوشه خود را بررسی کنید و از عدم وجود آن صورتحساب‌ها مطمئن شوید.\n\n" +
+                $"آیا از ارسال مجدد اطمینان دارید؟");
+            msgwin.Height = msgwin.Height + 50;
+            msgwin.ShowDialog();
+
+            if (msgwin.DialogResult != true)
+            {
+                return;
+            }
+
+
+            #region LOG
+            try
+            {
+                using (var db = new SqlConnection(CL_CCNNMANAGER.CONNECTION_STR))
+                {
+                    db.Open();
+
+                    var windowsUser = Environment.UserName; // Windows username
+
+                    // Get local IPv4 address (skip loopback)
+                    string ipAddress = Dns.GetHostEntry(Dns.GetHostName())
+                        .AddressList
+                        .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a))
+                        ?.ToString() ?? "UnknownIP";
+
+                    // Combine into username field
+                    string username = $"{windowsUser} | {ipAddress}";
+
+                    string _FRM_ = this.GetType().Name;
+
+                    var sql = @"
+                            INSERT INTO AMALIAT
+                                (USERID, USERNAME, ADATE, AMALID)
+                            VALUES
+                                (@UserId, @Username, GETDATE(), @AmalId)";
+                    var parameters = new
+                    {
+                        UserId = 0,
+                        Username = TruncateString(username, 49),
+                        AmalId = TruncateString(_FRM_, 49)
+                    };
+                    db.Execute(sql, parameters);
+                }
+            }
+            catch { }
+            #endregion
+
+            STATUS_LABEL.Content = "در حال آماده سازی برای ارسال مجدد...";
+            STATUS_LABEL.Visibility = Visibility.Visible;
+            IsOtherProccessingNow = true;
+            int successCount = 0;
+            int failCount = 0;
+
+            try
+            {
+                var sazmanInfo = dbms.DoGetDataSQL<SAZMAN>("SELECT MEMORYID, MEMORYIDsand, PRIVIATEKEY FROM dbo.SAZMAN").FirstOrDefault();
+                if (sazmanInfo == null)
+                {
+                    throw new Exception("اطلاعات سازمان در دیتابیس یافت نشد.");
+                }
+
+                var privateKey = sazmanInfo.PRIVIATEKEY.Replace("-----BEGIN PRIVATE KEY-----\r\n", "").Replace("\r\n-----END PRIVATE KEY-----\r\n", "").Trim();
+                string memoryId;
+                bool isMainApi;
+
+                if (RD_MAINTAX.IsChecked ?? false)
+                {
+                    memoryId = sazmanInfo.MEMORYID.Trim();
+                    isMainApi = true;
+                }
+                else
+                {
+                    memoryId = sazmanInfo.MEMORYIDsand.Trim();
+                    isMainApi = false;
+                }
+
+                var taxService = new TaxService(memoryId, privateKey, TaxURL);
+                taxService.RequestToken();
+
+                foreach (var taxid in uniqueTaxids)
+                {
+                    try
+                    {
+                        Dispatcher.Invoke(() => STATUS_LABEL.Content = $"در حال پردازش فاکتور با شماره مالیاتی: {taxid}");
+
+                        // ۱) UID نسخهٔ پایه (اولین ارسالِ غیر ResendDuplicate) را بگیر
+                        var baseUid = dbms.DoGetDataSQL<string>(@"
+                                                SELECT TOP (1) Uid
+                                                FROM dbo.TAXDTL
+                                                WHERE Taxid = @taxid AND ApiTypeSent = @api
+                                                  AND ISNULL(REMARKS,'') <> 'ResendDuplicate'
+                                                ORDER BY CRT ASC
+                                            ", new { taxid, api = Convert.ToInt32(isMainApi) }).FirstOrDefault();
+
+                        // اگر به هر دلیل چیزی برنگشت، بیفت روی اولین UID موجود (fallback بی‌خطر)
+                        if (string.IsNullOrEmpty(baseUid))
+                        {
+                            baseUid = dbms.DoGetDataSQL<string>(@"
+                                                    SELECT TOP (1) Uid
+                                                    FROM dbo.TAXDTL
+                                                    WHERE Taxid = @taxid AND ApiTypeSent = @api
+                                                    ORDER BY CRT ASC
+                                                ", new { taxid, api = Convert.ToInt32(isMainApi) }).FirstOrDefault();
+                        }
+
+                        // ۲) کل ردیف‌های همان گروه را بگیر (و ترتیب ثابت بده)
+                        var originalInvoiceRows = dbms.DoGetDataSQL<FULL_TAXDTL>(@"
+                                                SELECT *
+                                                FROM dbo.TAXDTL
+                                                WHERE Taxid = @taxid AND ApiTypeSent = @api AND Uid = @baseUid
+                                                ORDER BY CRT, IDD
+                                            ", new { taxid, api = Convert.ToInt32(isMainApi), baseUid });
+
+
+                        if (!originalInvoiceRows.Any())
+                        {
+                            CL_Generaly.DoWritePRGLOG($"Skipping TaxID {taxid} as no records were found in TAXDTL.", null);
+                            failCount++;
+                            continue;
+                        }
+
+                        var header = CreateHeaderFromFullTaxDtl(originalInvoiceRows.First());
+                        var bodies = CreateBodyListFromFullTaxDtl((List<FULL_TAXDTL>)originalInvoiceRows);
+                        var payments = new List<InvoiceModel.Payment>();
+
+
+                        #region JSON_LOG
+                        try
+                        {
+                            string directoryPath = @"C:\CORRECT\SENTS";
+                            if (!Directory.Exists(directoryPath))
+                            {
+                                Directory.CreateDirectory(directoryPath);
+                            }
+                            // Create a custom JSON object to hold header, bodies, and payments
+                            var jsonObject = new
+                            {
+                                Header = header,
+                                Bodies = bodies,
+                                Payments = payments
+                            };
+
+                            // Serialize the custom JSON object to JSON
+                            string jsonData = System.Text.Json.JsonSerializer.Serialize(jsonObject);
+                            // Define the file path for the combined JSON file
+                            string combinedFilePath = Path.Combine(directoryPath, $"{DateTime.Now.ToString("yyyy-mm-dd-ss-fff")}-Combined.json");
+
+                            File.WriteAllText(combinedFilePath, jsonData);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("Error: " + ex.Message);
+                        }
+                        #endregion
+
+                        var sendResult = taxService.SendInvoices(header, bodies, payments);
+
+                        foreach (var originalRow in originalInvoiceRows)
+                        {
+                            var newLogRow = (FULL_TAXDTL)originalRow.Clone();
+                            newLogRow.IDD = Functions.GetNewIDD();
+                            newLogRow.RefrenceNumber = sendResult.ReferenceNumber;
+                            newLogRow.UID = sendResult.Uid;
+                            newLogRow.CRT = DateTime.Now;
+                            newLogRow.TheStatus = "PENDING";
+                            newLogRow.ApiTypeSent = isMainApi;
+                            newLogRow.TheError = null;
+                            newLogRow.TheConfirmationReferenceId = null;
+                            newLogRow.TheSuccess = false;
+                            newLogRow.REMARKS = "ResendDuplicate";
+
+                            InsertNewTaxDtlRecord(newLogRow);
+                        }
+                        successCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failCount++;
+                        CL_Generaly.DoWritePRGLOG($"Failed to resend invoice with TaxID {taxid}", ex);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                new Msgwin(false, $"خطای کلی در فرآیند ارسال مجدد: {ex.Message}").ShowDialog();
+                CL_Generaly.DoWritePRGLOG("General error in ResendButton_Click", ex);
+            }
+            finally
+            {
+                STATUS_LABEL.Visibility = Visibility.Hidden;
+                IsOtherProccessingNow = false;
+                RefGetData();
+                new Msgwin(false, $"عملیات ارسال مجدد تکمیل شد.\nموفق: {successCount}\nناموفق: {failCount}").ShowDialog();
+            }
+        }
+
+        private void InsertNewTaxDtlRecord(FULL_TAXDTL src_item)
+        {
+            const string insertSql = @"INSERT INTO dbo.TAXDTL (
+            Taxid, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory,DATE_N, REMARKS, CRT)
+            VALUES (@Taxid, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @DATE_N , @REMARKS ,@CRT);";
+
+            var p = new
+            {
+                src_item.Taxid,
+                src_item.Indatim_Sec,
+                src_item.Indati2m_Sec,
+                src_item.Inty,
+                src_item.Inno,
+                src_item.Irtaxid,
+                src_item.Inp,
+                src_item.Ins,
+                src_item.Tins,
+                src_item.Tob,
+                src_item.Bid,
+                src_item.Tinb,
+                src_item.Sbc,
+                src_item.Bpc,
+                src_item.Ft,
+                src_item.Bpn,
+                src_item.Scln,
+                src_item.Scc,
+                src_item.Crn,
+                src_item.Billid,
+                src_item.Tprdis,
+                src_item.Tdis,
+                src_item.Tadis,
+                src_item.Tvam,
+                src_item.Todam,
+                src_item.Tbill,
+                src_item.Setm,
+                src_item.Cap,
+                src_item.Insp,
+                src_item.Tvop,
+                src_item.Tax17,
+                src_item.Cdcd,
+                src_item.Tonw,
+                src_item.Torv,
+                src_item.Tocv,
+                src_item.Sstid,
+                src_item.Sstt,
+                src_item.Mu,
+                src_item.Am,
+                src_item.Fee,
+                src_item.Cfee,
+                src_item.Cut,
+                src_item.Exr,
+                src_item.Prdis,
+                src_item.Dis,
+                src_item.Adis,
+                src_item.Vra,
+                src_item.Vam,
+                src_item.Odt,
+                src_item.Odr,
+                src_item.Odam,
+                src_item.Olt,
+                src_item.Olr,
+                src_item.Olam,
+                src_item.Consfee,
+                src_item.Spro,
+                src_item.Bros,
+                src_item.Tcpbs,
+                src_item.Cop,
+                src_item.Vop,
+                src_item.Bsrn,
+                src_item.Tsstam,
+                src_item.Nw,
+                src_item.Ssrv,
+                src_item.Sscv,
+                src_item.IDD,
+                src_item.UID,
+                src_item.RefrenceNumber,
+                src_item.TheStatus,
+                src_item.ApiTypeSent,
+                src_item.SentTaxMemory,
+                src_item.DATE_N,
+                src_item.REMARKS,
+                src_item.CRT
+            };
+            dbms.DoExecuteSQL(insertSql, p);
+        }
+        private long GetCurrentDateLong()
+        {
+            var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+            var DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, iranTZ);
+            return TaxService.ConvertDateToLong(DtNowBase);
+        }
+        public InvoiceModel.Header CreateHeaderFromFullTaxDtl(FULL_TAXDTL row)
+        {
+            var h = new InvoiceModel.Header();
+
+            h.Taxid = row.Taxid; //شماره منحصر به فرد مالیاتی
+            h.Indatim = (long)row.Indatim_Sec; //تاریخ و زمان صدور صورت حساب - میلادی
+            h.Indati2m = (long)row.Indati2m_Sec; //تاریخ و زمان ایجاد صورتحساب - میلادی
+
+            if (row.Inty != null) h.Inty = row.Inty.Value; //نوع صورت حساب // نوع اول , دوم , سوم
+            if (row.Inno != null) h.Inno = row.Inno; // سریال صورت حساب
+            if (row.Irtaxid != null) h.Irtaxid = row.Irtaxid; //شماره منحصر به فرد مالیاتی صورتحساب مرجع - برای اصلاح , ابطال , برگشت
+            if (row.Inp != null) h.Inp = row.Inp.Value; //الگوی صورتحساب // الگوی:1 فروش الگوی:2 فروش ارزی الگوی:3 صورتحساب طلا، جواهر و پالتین
+            if (row.Ins != null) h.Ins = row.Ins.Value; //موضوع صورتحساب //ابطالی , اصلاحی 
+            if (row.Tins != null) h.Tins = row.Tins;/*"10840014242"*/ //WAS "MCODE" BEFORE //شماره اقتصادی فروشنده //توی نرم افزار شماره ثبت هم در درباره تهیه کنندگان زده
+            if (row.Tob != null) h.Tob = row.Tob.Value; //نوع شخص خریدار
+            if (row.Bid != null) h.Bid = row.Bid;/*item.MCODEM*/ //شناسه ملی/ شماره ملی/ شناسه مشارکت مدنی/ کد فراگیر اتباع غیر ایرانی خریدار
+            if (row.Tinb != null) h.Tinb = row.Tinb;/*item.MCODEM*/ // شماره اقتصادی خریدار
+            if (row.Sbc != null) h.Sbc = row.Sbc; //کد شعبه فروشنده
+            if (!string.IsNullOrEmpty(row.Bbc)) h.Bbc = row.Bbc; //کد شعبه خریدار
+            if (!string.IsNullOrEmpty(row.Bpc)) h.Bpc = row.Bpc; //کد پستی خریدار
+            if (row.Ft != null) h.Ft = row.Ft.Value; //نوع پرواز
+            if (row.Bpn != null) h.Bpn = row.Bpn; //شماره گذرنامه خریدار
+            if (row.Scln != null) h.Scln = row.Scln; //شماره پروانه گمرکی
+            if (row.Scc != null) h.Scc = row.Scc; //کد گمرک محل اظهار فروشنده
+            if (row.Crn != null) h.Crn = row.Crn; //شناسه یکتای ثبت قرار داد فروشنده
+            if (row.Billid != null) h.Billid = row.Billid; //شماره اشتراک/ شناسه قبض بهرهبردار
+            if (row.Tprdis != null) h.Tprdis = row.Tprdis.Value; //مجموع مبلغ قبل از کسر تخفیف
+            if (row.Tdis != null) h.Tdis = row.Tdis.Value; //مجموع تخفیفات
+            if (row.Tadis != null) h.Tadis = row.Tadis.Value; // مجموع مبلغ پس از کسر تخفیف
+            if (row.Tvam != null) h.Tvam = row.Tvam.Value; // مجموع مالیات بر ارزش افزوده
+            if (row.Todam != null) h.Todam = row.Todam.Value; // مجموع سایر مالیات، عوارض و وجوه قانونی
+            if (row.Tbill != null) h.Tbill = row.Tbill.Value; //مجموع صورتحساب
+            if (row.Setm != null) h.Setm = (int)row.Setm.Value; //روش تسویه
+            if (row.Cap != null) h.Cap = row.Cap.Value; //مبلغ پرداختی نقدی
+            if (row.Insp != null) h.Insp = row.Insp.Value; //مبلغ نسیه
+            if (row.Tvop != null) h.Tvop = row.Tvop.Value; // مجموع سهم مالیات بر ارزش افزوده از پرداخت
+            if (row.Tax17 != null) h.Tax17 = row.Tax17.Value;
+
+            if (row.Cdcd.HasValue) h.Cdcd = row.Cdcd.Value; // تاریخ کوتاژ اظهارنامه گمرکی
+            if (row.Tonw.HasValue) h.Tonw = row.Tonw.Value; //مجموع وزن خالص
+            if (row.Torv.HasValue) h.Torv = row.Torv.Value; //مجموع ارزش ریالی
+            if (row.Tocv.HasValue) h.Tocv = row.Tocv.Value; //مجموع ارزش ارزی
+
+            return h;
+        }
+        public List<InvoiceModel.Body> CreateBodyListFromFullTaxDtl(List<FULL_TAXDTL> rows)
+        {
+            var bodies = new List<InvoiceModel.Body>();
+
+            foreach (var row in rows)
+            {
+                var b = new InvoiceModel.Body();
+
+                if (row.Sstid != null) b.Sstid = row.Sstid; //شناسه کالا/خدمت //CODE	STUF_DEF      
+                if (row.Sstt != null) b.Sstt = row.Sstt;  //شرح کالا/خدمت //NAME	STUF_DEF
+
+                if (!string.IsNullOrEmpty(row.Mu))
+                    b.Mu = decimal.Truncate(decimal.Parse(row.Mu, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture); //واحد اندازه گیری //VNAMES	TCOD_VAHEDS
+
+                if (row.Am != null) b.Am = row.Am.Value;   //تعداد/مقدار //MEGH	INVO_LST
+                if (row.Fee != null) b.Fee = row.Fee.Value;  //مبلغ واحد //MABL	INVO_LST
+                b.Cfee = 0; //میزان ارز
+                if (row.Prdis != null) b.Prdis = row.Prdis.Value; //مبلغ قبل از تخفیف //MABL_K	INVO_LST
+                if (row.Dis != null) b.Dis = row.Dis.Value;  //مبلغ تخفیف //N_MOIN	INVO_LST
+                if (row.Adis != null) b.Adis = row.Adis.Value; //مبلغ بعد از تخفیف //Sum(INVO_LST.MABL_K - INVO_LST.N_MOIN AS mabkbt)	INVO_LST
+                if (row.Vra != null) b.Vra = row.Vra.Value;  //نرخ مالیات بر ارزش افزوده
+                if (row.Vam != null) b.Vam = row.Vam.Value;  //مبلغ مالیات بر ارزش افزوده //IMBAA	 INVO_LST
+                b.Odt = "0"; //موضوع سایر مالیات و عوارض
+                b.Odr = 0; //نرخ سایر مالیات و عوارض
+                b.Odam = 0; //مبلغ سایر مالیات و عوارض
+                b.Olt = "0"; //موضوع سایر وجوه قانونی
+                b.Olr = 0; //نرخ سایر وجوه قانونی
+                b.Olam = 0; //مبلغ سایر وجوه قانونی
+                b.Consfee = 0; //اجرت ساخت
+                b.Spro = 0; //سود فروشنده
+                b.Bros = 0; //حق العمل
+                b.Tcpbs = 0; //جمع کل اجرت , حق العمل و سود
+                b.Cop = 0; //سهم نقدی از پرداخت
+                b.Vop = 0; //سهم ارزش افزوده از پرداخت
+                b.Bsrn = null; //شناسه یکتای ثبت قرارداد حق العملکاری
+                if (row.Tsstam != null) b.Tsstam = row.Tsstam.Value; //مبلغ کل کالا/خدمت //MABL_K	INVO_LST
+                b.Nw = 0; //وزن خالص
+                b.Ssrv = 0; //ارزش ریالی کالا
+                b.Sscv = 0; //ارزش ارزی کالا
+
+                if (row.Exr.HasValue) b.Exr = row.Exr.Value; //نرخ برابری ارز با ریال
+
+                bodies.Add(b);
+            }
+
+            return bodies;
+        }
+
+        #endregion
     }
 }
