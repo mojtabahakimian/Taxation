@@ -49,6 +49,9 @@ namespace Prg_Moadian.SQLMODELS
         private string? _tins;
         public string? Tins { get => _tins; set { if (_tins == value) return; _tins = value; OnPropertyChanged("Tins"); } }
 
+        private string? _bbc;
+        public string? Bbc { get => _bbc; set { if (_bbc == value) return; _bbc = value; OnPropertyChanged("Bbc"); } }
+
         private int? _tob;
         public int? Tob { get => _tob; set { if (_tob == value) return; _tob = value; OnPropertyChanged("Tob"); } }
 
@@ -284,6 +287,9 @@ namespace Prg_Moadian.SQLMODELS
         public string? NAME_VAHED { get => _NAME_VAHED; set { if (_NAME_VAHED == value) return; _NAME_VAHED = value; OnPropertyChanged("NAME_VAHED"); } }
         public long? ROWNUMBER { get; set; }
         public string PersianCRT { get; set; }
+
+        public long? DATE_N { get; set; }
+        public string REMARKS { get; set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
         public void OnPropertyChanged(string strCaller = null)

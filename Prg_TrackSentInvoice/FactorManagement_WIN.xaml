@@ -8,7 +8,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         FontFamily="pack://application:,,,/Prg_Graphicy;component/UIY/FNT/#IRANYekanFN"
         WindowStartupLocation="CenterScreen"
-        Title="فاکتور برگشت فروش آزاد" Height="550" Width="1024" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered" Closing="Window_Closing">
+        Title="فاکتور برگشت فروش آزاد" Height="595" Width="1024" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered" Closing="Window_Closing">
     <Window.Resources>
         <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
             <Setter Property="HorizontalContentAlignment" Value="Center"/>

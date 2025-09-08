@@ -18,10 +18,10 @@
             </tb:TaskbarIcon.TrayToolTip>
         </tb:TaskbarIcon>
 
-        <DataGrid x:Name="INVOCIE_DTGR" IsReadOnly="True" AutoGenerateColumns="False" Margin="10,310,10,36" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Visible" PreviewMouseDoubleClick="INVOCIE_DTGR_PreviewMouseDoubleClick" SelectionMode="Single" SelectionUnit="FullRow">
+        <DataGrid x:Name="INVOCIE_DTGR" IsReadOnly="True" AutoGenerateColumns="False" Margin="10,310,10,36" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Visible" PreviewMouseDoubleClick="INVOCIE_DTGR_PreviewMouseDoubleClick" SelectionMode="Extended" SelectionUnit="FullRow" SelectionChanged="INVOCIE_DTGR_SelectionChanged">
             <DataGrid.ContextMenu>
                 <ContextMenu FlowDirection="LeftToRight">
-                    <MenuItem Header="Copy Data" Click="CopyData_Click" Icon="{materialDesign:PackIcon Kind=ContentCopy}" />
+                    <MenuItem Header="Copy Data" Click="CopyData_Click" Icon="{materialDesign:PackIcon Kind=ContentCopy}"/>
                     <Separator/>
                     <MenuItem Header="Export to XML" Click="ExportToXml_Click" Icon="{materialDesign:PackIcon Kind=Xml}" />
                     <MenuItem Header="Export to JSON" Click="ExportToJson_Click" Icon="{materialDesign:PackIcon Kind=CodeJson}" />
@@ -188,11 +188,13 @@
 
             </DataGrid.Columns>
         </DataGrid>
-        <TextBox x:Name="UID_TXB" Margin="0,11,247,0" TextWrapping="Wrap"  Text="{Binding ElementName=INVOCIE_DTGR,Path=SelectedItem.RefrenceNumber,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" HorizontalAlignment="Right" Width="265" TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus"/>
-        <Label Content="(Refrence Number) شناسه صورت حساب :"  HorizontalAlignment="Right" Margin="0,18,19,0" VerticalAlignment="Top" FlowDirection="RightToLeft"/>
-        <Button x:Name="ESTELAM_BTN"  Style="{StaticResource MaterialDesignFlatButton}" Content="بررسی لحظه ای (استعلام)" Margin="0,16,516,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="ESTELAM_BTN_Click" HorizontalAlignment="Right" Width="167" FlowDirection="RightToLeft"/>
-        <RadioButton GroupName="RD_TAXURL" x:Name="RD_MAINTAX" Content="سامانه اصلی" HorizontalAlignment="Left" Margin="195,32,0,0" VerticalAlignment="Top" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="True"/>
-        <RadioButton GroupName="RD_TAXURL" x:Name="RD_SANDBOX" Content="(Sandbox) سامانه آزمایشی" HorizontalAlignment="Left" Margin="20,32,0,0" VerticalAlignment="Top"   Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="True"/>
+        <TextBox x:Name="UID_TXB" Margin="0,13,240,0" TextWrapping="Wrap"  Text="{Binding ElementName=INVOCIE_DTGR,Path=SelectedItem.RefrenceNumber,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" HorizontalAlignment="Right" Width="265" TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus"/>
+        <Label Content="(Refrence Number) شناسه صورت حساب :"  HorizontalAlignment="Right" Margin="0,20,13,0" VerticalAlignment="Top" FlowDirection="RightToLeft"/>
+        <Button x:Name="ESTELAM_BTN"  Style="{StaticResource MaterialDesignFlatButton}" Content="بررسی لحظه ای (استعلام)" Margin="0,18,510,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="ESTELAM_BTN_Click" HorizontalAlignment="Right" Width="167" FlowDirection="RightToLeft"/>
+        <Button x:Name="RESEND_BTN" IsEnabled="False" Style="{StaticResource MaterialDesignFlatButton}" Content="ارسال مجدد (تکراری) فاکتور های انتخاب شده" Margin="0,18,689,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="RESEND_BTN_Click" HorizontalAlignment="Right" Width="261" FlowDirection="RightToLeft"/>
+        
+        <RadioButton GroupName="RD_TAXURL" x:Name="RD_MAINTAX" Content="سامانه اصلی" HorizontalAlignment="Left" Margin="193,23,0,0" VerticalAlignment="Top" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="True"/>
+        <RadioButton GroupName="RD_TAXURL" x:Name="RD_SANDBOX" Content="(Sandbox) سامانه آزمایشی" HorizontalAlignment="Left" Margin="19,23,0,0" VerticalAlignment="Top"   Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="True"/>
         <StackPanel Orientation="Horizontal"  Height="40" Margin="93,123,19,0" FlowDirection="RightToLeft" VerticalAlignment="Top">
             <Label Content="متن جستجو:" VerticalAlignment="Center" FlowDirection="RightToLeft" Margin="0,0,0,-4"/>
             <TextBox x:Name="SEARCHBOX" TextWrapping="Wrap" Text="" Width="843" Margin="3,0,0,0" Height="33" Padding="0,6,0,4"/>

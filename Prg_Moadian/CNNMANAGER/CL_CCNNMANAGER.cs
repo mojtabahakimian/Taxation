@@ -59,6 +59,7 @@ namespace Prg_Moadian.CNNMANAGER
                                 value.Equals("SSPI", StringComparison.OrdinalIgnoreCase) ||
                                 value.Equals("True", StringComparison.OrdinalIgnoreCase);
                             break;
+
                     }
                 }
             }
@@ -66,13 +67,18 @@ namespace Prg_Moadian.CNNMANAGER
             // Append "TrustServerCertificate=True;" for .NET Core compatibility.
             connectionStringBuilder.TrustServerCertificate = true;
 
-            // If the password was not provided, and we're not using Integrated Security, set it as an empty string.
+            // If the password was not provided ...
             if (!passwordProvided && userIdProvided && !integratedSecurityProvided)
             {
                 connectionStringBuilder.Password = string.Empty;
             }
 
-            return connectionStringBuilder.ConnectionString;
+            // --- normalize key name (fix): ---
+            var cs = connectionStringBuilder.ConnectionString;
+            cs = cs.Replace("Trust Server Certificate=", "TrustServerCertificate=");
+            // ----------------------------------
+
+            return cs;
         }
         public CL_CCNNMANAGER()
         {
