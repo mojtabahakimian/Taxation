@@ -15,6 +15,7 @@ using Prg_Moadian.CNNMANAGER;
 using Prg_Moadian.Generaly;
 using static Prg_Moadian.Generaly.CL_Generaly;
 using Newtonsoft.Json.Linq;
+using Prg_Moadian.FUNCTIONS;
 
 namespace Prg_Moadian.Service
 {
@@ -165,12 +166,39 @@ namespace Prg_Moadian.Service
                 Payments = list3,
                 Extension = list4
             });
+
             TaxModel.SendInvoicesModel sendInvoicesModel = new TaxModel.SendInvoicesModel();
             HttpResponse<AsyncResponseModel> httpResponse = TaxApiService.Instance.TaxApis.SendInvoices(list, null);
-            sendInvoicesModel.ReferenceNumber = httpResponse.Body.Result.Select((PacketResponse x) => x.ReferenceNumber).FirstOrDefault();
-            sendInvoicesModel.Uid = httpResponse.Body.Result.Select((PacketResponse x) => x.Uid).FirstOrDefault();
+            const string serverSideErrorMessage = "خطا در ارتباط با سامانه مودیان رخ داد و مشکل از سمت سرورهای سامانه است. لطفاً بعداً دوباره تلاش کنید.";
+            HashSet<PacketResponse>? packetResponses = httpResponse.Body?.Result;
+            if (packetResponses == null || !packetResponses.Any())
+            {
+                List<ErrorModel>? responseErrors = httpResponse.Body?.Errors;
+                List<string>? errorMessages = responseErrors?
+                    .Where(error => error != null && (!string.IsNullOrWhiteSpace(error.ErrorCode) || !string.IsNullOrWhiteSpace(error.Detail)))
+                    .Select(error => $"{error?.ErrorCode}: {error?.Detail}")
+                    .Where(message => !string.IsNullOrWhiteSpace(message))
+                    .ToList();
+
+                string detailMessage = (errorMessages != null && errorMessages.Count > 0)
+                    ? string.Join(" | ", errorMessages)
+                    : $"Status Code : {httpResponse.Status}";
+
+                throw new InvalidOperationException($"{serverSideErrorMessage} جزئیات: {detailMessage}");
+            }
+
+            PacketResponse? packetResponse = packetResponses.FirstOrDefault();
+
+            if (packetResponse == null)
+            {
+                throw new InvalidOperationException($"{serverSideErrorMessage} جزئیات: پاسخ دریافتی از سرور نامعتبر بود.");
+            }
+
+            sendInvoicesModel.ReferenceNumber = packetResponse.ReferenceNumber;
+            sendInvoicesModel.Uid = packetResponse.Uid;
             sendInvoicesModel.TaxId = header.Taxid;
             return sendInvoicesModel;
+
         }
 
         public TaxModel.InquiryByReferenceIdModel.Root InquiryByReferenceId(string referenceCode)

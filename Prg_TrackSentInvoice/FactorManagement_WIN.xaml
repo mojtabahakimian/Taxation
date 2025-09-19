@@ -298,7 +298,7 @@
         <!-- GridSplitter allows resizing between the two DataGrids -->
         <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="#FF1F1F1F"/>
 
-        <TextBlock Grid.Row="3" TextWrapping="Wrap" Text="لیست موارد برگشتی , با دابل کلیک روی هر سطر میتوانید مقدار کل کالا را اصلاح کنید و با انتخاب سطر و حذف (دکمه Delete) میتوانید از لیست موارد برگشتی حذف کنید, عملیات حذف/اصلاح در این قسمت روی فاکتور در دیتابیس اعمال نمیشود , فقط به صورت موقت برای ارسال آماده میشوند." FlowDirection="RightToLeft" Margin="10,4,10,231"/>
+        <TextBlock Grid.Row="3" TextWrapping="Wrap" Text="لیست موارد برگشتی , با دابل کلیک روی هر سطر میتوانید مقدار کل کالا را اصلاح کنید و با انتخاب سطر و حذف (دکمه Delete) میتوانید از لیست موارد برگشتی حذف کنید, عملیات حذف/اصلاح در این قسمت روی فاکتور در دیتابیس اعمال نمیشود , فقط به صورت موقت برای ارسال آماده میشوند." FlowDirection="RightToLeft" Margin="10,4,10,249"/>
 
         <DataGrid x:Name="INVOICE_BODY" ItemsSource="{Binding BODY_DATA_INVOICE}" PreviewKeyDown="INVOICE_BODY_PreviewKeyDown" SelectionMode="Extended" Grid.Row="3" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" AutoGenerateColumns="False" Margin="10,50,10,10" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Visible"  SelectionUnit="FullRow" PreviewMouseDoubleClick="INVOICE_BODY_PreviewMouseDoubleClick" LostFocus="INVOICE_BODY_LostFocus">
 

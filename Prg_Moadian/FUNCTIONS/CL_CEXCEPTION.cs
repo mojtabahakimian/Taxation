@@ -1,12 +1,4 @@
-﻿using Prg_Moadian.SQLMODELS;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.ConstrainedExecution;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Prg_Moadian.FUNCTIONS
+﻿namespace Prg_Moadian.FUNCTIONS
 {
     public class CustomExceptErMsg
     {
@@ -192,7 +184,10 @@ namespace Prg_Moadian.FUNCTIONS
                     var FactNum = nullyEx.Message.Replace("HEAD_LST not found for invoice", "");
                     return ($"اطلاعات این فاکتور/حواله {FactNum} ناقص می باشد , لطفا از صحیح بودن سطر های فاکتور اطمینان حاصل فرمایید.");
                 }
-
+            }
+            else if (ex.Message.Contains("Value cannot be null", StringComparison.InvariantCultureIgnoreCase))
+            {
+                return ($"خطا در انجام عملیات : محتوای تهی در هنگام ارسال وجود دارد و نمیتوان عملیات را ادامه داد");
             }
             //else
             //{
@@ -201,7 +196,7 @@ namespace Prg_Moadian.FUNCTIONS
             //    // It's generally a good practice to log the details of the exception for debugging purposes
             //    // You can use ex.Message and ex.StackTrace properties to get exception details
             //}
-            return null;
+            return ex.Message;
         }
     }
     public class NullyExceptiony : Exception
