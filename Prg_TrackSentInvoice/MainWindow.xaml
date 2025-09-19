@@ -194,14 +194,14 @@
         <Button x:Name="RESEND_BTN" IsEnabled="False" Style="{StaticResource MaterialDesignFlatButton}" Content="ارسال مجدد (تکراری) فاکتور های انتخاب شده" Margin="0,18,689,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="RESEND_BTN_Click" HorizontalAlignment="Right" Width="261" FlowDirection="RightToLeft"/>
         
         <RadioButton GroupName="RD_TAXURL" x:Name="RD_MAINTAX" Content="سامانه اصلی" HorizontalAlignment="Left" Margin="193,23,0,0" VerticalAlignment="Top" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="True"/>
-        <RadioButton GroupName="RD_TAXURL" x:Name="RD_SANDBOX" Content="(Sandbox) سامانه آزمایشی" HorizontalAlignment="Left" Margin="19,23,0,0" VerticalAlignment="Top"   Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="True"/>
+        <RadioButton GroupName="RD_TAXURL" x:Name="RD_SANDBOX" Content="(Sandbox) سامانه آزمایشی" HorizontalAlignment="Left" Margin="19,23,0,0" VerticalAlignment="Top"   Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False"/>
         <StackPanel Orientation="Horizontal"  Height="40" Margin="93,123,19,0" FlowDirection="RightToLeft" VerticalAlignment="Top">
             <Label Content="متن جستجو:" VerticalAlignment="Center" FlowDirection="RightToLeft" Margin="0,0,0,-4"/>
             <TextBox x:Name="SEARCHBOX" TextWrapping="Wrap" Text="" Width="843" Margin="3,0,0,0" Height="33" Padding="0,6,0,4"/>
             <Button x:Name="SEARCH_BUTTON" Content="جستجو" Style="{StaticResource MaterialDesignFlatButton}" Click="SEARCH_BUTTON_Click" FontSize="12" Padding="16,4,16,4" Margin="4,0,0,0" Width="110"/>
         </StackPanel>
         <Label x:Name="STATUS_LABEL" HorizontalContentAlignment="Center" Visibility="Hidden" VerticalContentAlignment="Center" Background="#FF1A1A1A" Foreground="#DDFFFFFF" Opacity="0.90" Margin="0,209,0,0"/>
-        <Border BorderThickness="1" Margin="0,71,0,0" RenderTransformOrigin="0.5,0.5" Height="4" VerticalAlignment="Top">
+        <Border x:Name="MyBoderStatus" BorderThickness="1" Margin="0,71,0,0" RenderTransformOrigin="0.5,0.5" Height="4" VerticalAlignment="Top">
             <Border.Background>
                 <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
                     <GradientStop Color="#FF00B3FF"/>

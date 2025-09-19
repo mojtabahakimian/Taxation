@@ -33,6 +33,7 @@ using System.Net.Sockets;
 using System.Net;
 using System.Data.SqlClient;
 using Dapper;
+using System.Windows.Media;
 
 namespace Prg_TrackSentInvoice
 {
@@ -312,18 +313,21 @@ namespace Prg_TrackSentInvoice
             }
             catch (Exception er)
             {
+                MyBoderStatus.Height = 30;
+                MyBoderStatus.Background = new SolidColorBrush(Color.FromArgb(255, 178, 34, 34)); // Firebrick
+
                 var _msger = CER.ExpecMsgEr(er);
 
                 if (!string.IsNullOrEmpty(_msger)) //Known Message
                 {
                     new Msgwin(false, _msger).ShowDialog();//نمایش خطای شناخته شده
-                    System.Environment.Exit(0);
+                    //System.Environment.Exit(0);
                 }
                 else
                 {
                     new Msgwin(false, "خطا در انجام عملیات , Unknown").ShowDialog();
                     CL_Generaly.DoWritePRGLOG("Unknown Error in Send Estelam Invoce : \n", er);
-                    System.Environment.Exit(0);
+                    //System.Environment.Exit(0);
                 }
             }
         }
@@ -599,9 +603,21 @@ namespace Prg_TrackSentInvoice
                 {
                     if (!string.IsNullOrEmpty(_msgitem?.Taxid))
                     {
-                        FactorManagement_WIN FM_WIN = new FactorManagement_WIN();
-                        FM_WIN.TAXID = _msgitem.Taxid;
-                        FM_WIN.ShowDialog();
+                        //FactorManagement_WIN FM_WIN = new FactorManagement_WIN();
+                        //FM_WIN.TAXID = _msgitem.Taxid;
+                        //FM_WIN.ShowDialog();
+
+                        byte _apitypesent = 0;
+                        if (TaxURL is "https://tp.tax.gov.ir/req/api/") // اگر روی اصلیه
+                            _apitypesent = 1;
+                        else
+                            _apitypesent = 0;
+
+                        WIN_MODIFYINVOICE WINMODIFY = new WIN_MODIFYINVOICE();
+                        WINMODIFY.TaxURL = TaxURL;
+                        WINMODIFY.APITYPESENT_PARAM = _apitypesent.ToString();
+                        WINMODIFY.TAXID_PARAM = _msgitem.Taxid;
+                        WINMODIFY.ShowDialog();
                     }
                 }
                 IsOtherProccessingNow = false;
@@ -1114,7 +1130,6 @@ namespace Prg_TrackSentInvoice
             {
                 return;
             }
-
 
             #region LOG
             try
