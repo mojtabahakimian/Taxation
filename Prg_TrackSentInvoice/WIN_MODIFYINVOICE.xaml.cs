@@ -22,6 +22,8 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using static Prg_Graphicy.Payewin;
+using static Prg_Moadian.Generaly.CL_Generaly;
 using static Prg_TrackSentInvoice.FactorManagement_WIN;
 
 namespace Prg_TrackSentInvoice
@@ -34,6 +36,7 @@ namespace Prg_TrackSentInvoice
         public ObservableCollection<TAXDTL> TAXDTL_DATA { get; set; } = new ObservableCollection<TAXDTL>();
         public List<VAHEDS> VAHEDHA { get; private set; }
         public string TAXID_PARAM { get; set; } // = "A2HGPP04F5E00227BB8965";
+        public string IRTAXID_PARAM { get; set; }
         public string APITYPESENT_PARAM { get; set; } = "0";
 
         public bool SendHappenned { get; set; } = false;
@@ -337,6 +340,8 @@ VALUES
                     item.Mu = decimal.Truncate(decimal.Parse(item.Mu, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
                     item.NAME_VAHED = VAHEDHA.Where(vi => vi.IDD == Convert.ToDouble(item.Mu)).FirstOrDefault()?.NAME_MO;
                 }
+
+                item.Irtaxid = item.Taxid;
 
                 _snapshots[MakePk(item.IDD)] = TakeSnapshot(item);
             }
@@ -698,15 +703,27 @@ VALUES
                     return;
                 }
                 IsEbtali = SelectedHeadItem.Ins == 3;
+                if (TAXDTL_DATA.Count == 0 && !IsEbtali)
+                {
+                    new Msgwin(false, "برای صورتحساب اصلاحی یا برگشتی باید حداقل یک قلم کالا وجود داشته باشد.").Show();
+                    return;
+                }
+                if (TAXDTL_DATA.Any(x => string.IsNullOrWhiteSpace(x.Inno) || string.IsNullOrEmpty(x.Inno)))
+                {
+                    new Msgwin(false, "سریال جدید (Inno) را وارد کنید.").Show();
+                    return;
+                }
+                if (TAXDTL_DATA.Any(x => string.IsNullOrWhiteSpace(x.Irtaxid) || string.IsNullOrEmpty(x.Irtaxid)))
+                {
+                    new Msgwin(false, "شماره صورت حساب مرجع (Irtaxid) را وارد کنید.").Show();
+                    return;
+                }
             }
-            if (TAXDTL_DATA.Count == 0 && !IsEbtali)
+
+            Msgwin msgwin1 = new Msgwin(true, $"آیا از ارسال صورت حساب از نوع [{GetMessageBasedOnId((int)TAXDTL_DATA.FirstOrDefault().Ins)}] با مقادیر انتخاب شده مطمئن هستید ؟ ");
+            msgwin1.ShowDialog();
+            if (msgwin1.DialogResult != true)
             {
-                new Msgwin(false, "برای صورتحساب اصلاحی یا برگشتی باید حداقل یک قلم کالا وجود داشته باشد.").Show();
-                return;
-            }
-            if (TAXDTL_DATA.Any(x => string.IsNullOrWhiteSpace(x.Inno) || string.IsNullOrEmpty(x.Inno)))
-            {
-                new Msgwin(false, "سریال جدید (Inno) را وارد کنید.").Show();
                 return;
             }
 
@@ -719,6 +736,7 @@ VALUES
             }
 
             AMALIAT();
+
 
             try
             {
@@ -755,9 +773,9 @@ VALUES
                 header.Bbc = HeadFirst.Bbc; //کد شعبه خریدار
                 header.Bpc = HeadFirst.Bpc; //کد پستی خریدار
                 header.Ft = Convert.ToInt32(HeadFirst.Ft); //نوع پرواز
-                ////header.Bpn = HeadFirst.Bpn; //شماره گذرنامه خریدار
+                                                           ////header.Bpn = HeadFirst.Bpn; //شماره گذرنامه خریدار
                 header.Scln = HeadFirst.Scln; //شماره پروانه گمرکی فروشنده
-                ////header.Scc = HeadFirst.Scc; //کد گمرک محل اظهار
+                                              ////header.Scc = HeadFirst.Scc; //کد گمرک محل اظهار
                 header.Crn = HeadFirst.Crn; //شناسه یکتای ثبت قرارداد فروشنده
                 header.Billid = HeadFirst.Billid; //شماره اشتراک/شناسه قبض بهره بردار
                 header.Tprdis = Convert.ToDecimal(HeadFirst.Tprdis); //مجموع مبلغ قبل از کسر تخفیف //INVO_LST	Sum(MABL_K)
@@ -975,6 +993,12 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                         dbms.DoExecuteSQL(insertSql, p);
                     }
                     //آماده سازی داده ها }
+
+                    Msgwin msgwin = new Msgwin(false, $"صورت حساب [{GetMessageBasedOnId((int)(HeadFirst?.Ins))}] با شماره {HeadFirst?.NUMBER} به کد دهگیری :  {sendInvoicesModel.ReferenceNumber} " +
+                        $"\n به شماره صورت حساب مالیاتی (شماره مالیاتی) : {taxidNew}\n در صف ارسال قرار گرفت , لطفا مدتی بعد بررسی بفرمایید.");
+                    msgwin.ShowDialog();
+
+                    TrytoGetInvoiceStatus(sendInvoicesModel.ReferenceNumber);
                 }
                 catch (Exception ex)
                 {
@@ -999,8 +1023,61 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                 }
             }
 
+
             SendHappenned = true;
         }
 
+        public string GetMessageBasedOnId(int id)
+        {
+            switch (id)
+            {
+                case 1:
+                    return "اصلی";
+                case 2:
+                    return "اصلاحی";
+                case 3:
+                    return "ابطالی";
+                case 4:
+                    return "برگشت فروش";
+                default:
+                    return "شناسه نامعتبر";
+            }
+        }
+        private void TrytoGetInvoiceStatus(string _ReferenceNumber_)
+        {
+            #region JustTryToEstelam
+            try
+            {
+                string _msger = null;
+                //var _qre0 = dbms.DoGetDataSQL<ES1>($"SELECT TheError,TheStatus FROM dbo.TAXDTL WHERE TheStatus <> N'PENDING' AND TheError <> N'' AND RefrenceNumber = N'{FactorInfoSent.ReferenceNumber}' ").ToList();
+                var _qre0 = dbms.DoGetDataSQL<ES1>($"SELECT TheError,TheStatus FROM dbo.TAXDTL WHERE RefrenceNumber = N'{_ReferenceNumber_}' ").ToList();
+                foreach (var item in _qre0)
+                {
+                    if (!string.IsNullOrEmpty(item.TheError) && !string.IsNullOrWhiteSpace(item.TheError))
+                        _msger = item.TheError;
+                    if (!string.IsNullOrEmpty(item.TheStatus) && !string.IsNullOrWhiteSpace(item.TheStatus))
+                    {
+                        if (item.TheStatus != "SUCCESS")
+                        {
+                            _msger = "_NOT_OK_";
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(_msger) && !string.IsNullOrWhiteSpace(_msger) && _msger != "NULL")
+                {
+                    if (_msger != "_NOT_OK_")
+                    {
+                        new MsgListwin(false, TheFunctions.GetNormilizedMsg(_msger)).ShowDialog();
+                    }
+                }
+                else //اگر در استعلام خطایی یافت نشد
+                {
+                    new Msgwin(false, "صورت حساب با موفقیت در سامانه ثبت شد.").ShowDialog();
+                }
+            }
+            catch (Exception) { }
+            #endregion
+        }
     }
 }
