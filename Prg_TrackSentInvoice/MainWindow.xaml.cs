@@ -34,6 +34,7 @@ using System.Net;
 using System.Data.SqlClient;
 using Dapper;
 using System.Windows.Media;
+using System.Windows.Data;
 
 namespace Prg_TrackSentInvoice
 {
@@ -491,103 +492,197 @@ namespace Prg_TrackSentInvoice
         {
             IsOtherProccessingNow = true;
 
-            if (!string.IsNullOrEmpty(UID_TXB.Text.Trim()))
+            try
             {
-                bool IsInProgressOrNotFound = false;
-
-                try
+                // 1) ورودی
+                var referenceCode = UID_TXB?.Text?.Trim();
+                if (string.IsNullOrWhiteSpace(referenceCode))
                 {
-                    var _newsaz = dbms.DoGetDataSQL<SAZMAN>("SELECT MEMORYID,MEMORYIDsand,PRIVIATEKEY,Dcertificate FROM dbo.SAZMAN").FirstOrDefault();
-                    var PrivateKeyTax = _newsaz.PRIVIATEKEY.Replace("-----BEGIN PRIVATE KEY-----\r\n", "").Replace("\r\n-----END PRIVATE KEY-----\r\n", "").Trim();
-                    string MemoryTax = "";
-                    if (TaxURL == "https://tp.tax.gov.ir/req/api/")
-                    {
-                        MemoryTax = _newsaz.MEMORYID.Trim(); //حافظه مالیاتی اصلی
-                    }
-                    else
-                    {
-                        MemoryTax = _newsaz.MEMORYIDsand.Trim(); //حافظه مالیاتی تستی سندباکس
-                    }
-                    TaxApiService.Instance.Init(MemoryTax, new SignatoryConfig(PrivateKeyTax, null), new NormalProperties(ClientType.SELF_TSP), TaxURL);
-                    ServerInformationModel serverInformationModel = TaxApiService.Instance.TaxApis.GetServerInformation();
-                    TokenModel tokenModel = TaxApiService.Instance.TaxApis.RequestToken();
-
-                    var referenceCode = UID_TXB.Text.Trim();
-                    var inquiryResultModels = TaxApiService.Instance.TaxApis.InquiryByReferenceId(new() { referenceCode });
-
-                    List<string> list = new List<string>(); list.Add(referenceCode);
-                    List<InquiryResultModel> list2 = TaxApiService.Instance.TaxApis.InquiryByReferenceId(list);
-
-                    if (list2.FirstOrDefault()?.Status?.ToUpper() == "IN_PROGRESS")
-                    {
-                        IsInProgressOrNotFound = true;
-
-                        new Msgwin(false, @"وضعیت این صورت حساب باتوجه به پاسخ سامانه ""در حال انجام"" (IN_PROGRESS) است , و هنوز نهایی نشده است.
-                                    ولی گاهی به خاطر ترافیک سنگین سامانه صورت حساب میتواند در کارپوشه اضافه شده باشد ولی همچنان وضعیت مذکور را داشته باشد, پس در صورت نیاز دستی آنرا در کارپوشه با شماره مالیاتی جستجو کنید.").ShowDialog();
-                    }
-                    else if (list2.FirstOrDefault()?.Status?.ToUpper() == "NOT_FOUND")
-                    {
-                        IsInProgressOrNotFound = true;
-
-                        new Msgwin(false, @"چنین صورت حساب یافت نشد , کد وضعیت : ""NOT_FOUND"" , این خطا زمانی رخ میدهد که این کد رهگیری صورت حساب متعلق به حافظه مالیاتی شما نباشد (این صورت حساب شما نیست)
-                                   , در موارد خاصی به دلیل ترافیک بالای سامانه این خطا نیز میتواند رخ دهد , در صورتی که مطمئن هستید این کد صورت حساب متعلق به شماست , صبر کنید و ساعاتی بعد مجدد آنرا چک کنید.").ShowDialog();
-                    }
-                    else if (list2.FirstOrDefault()?.Status?.ToUpper() == "SUCCESS")
-                    {
-                        IsInProgressOrNotFound = true;
-
-                        new Msgwin(false, @"صورت حساب با موفقیت در سامانه ثبت شده").ShowDialog();
-                    }
-                    else if (list2.FirstOrDefault()?.Status?.ToUpper() == "PENDING")
-                    {
-                        IsInProgressOrNotFound = true;
-                        new Msgwin(false, "این صورت حساب هنوز در وضعیت \"در انتظار\" است , لطفا صبر کنید و مدتی بعد مجددا بررسی بفرمایید.").ShowDialog();
-                    }
-                    else if (list2.FirstOrDefault()?.Status?.ToUpper() == "FAILED")
-                    {
-                        IsInProgressOrNotFound = true;
-
-                        TaxModel.InquiryByReferenceIdModel inquiryByReferenceIdModel = new TaxModel.InquiryByReferenceIdModel();
-                        string value = list2.Select((InquiryResultModel x) => x.Data).FirstOrDefault()!.ToString();
-                        TaxModel.InquiryByReferenceIdModel.Root manuallroot = JsonConvert.DeserializeObject<TaxModel.InquiryByReferenceIdModel.Root>(value);
-                        manuallroot.status = list2[0].Status;
-
-                        List<string>? _er_lst = new List<string>();
-
-                        foreach (var item in manuallroot.error)
-                            _er_lst.Add(item.code + " | " + item.message);
-
-                        string? _msgitem_theError = (_er_lst != null && _er_lst.Count > 0) ? $"{string.Join(",", _er_lst)}" : null;
-
-                        if (!string.IsNullOrEmpty(_msgitem_theError) && !string.IsNullOrWhiteSpace(_msgitem_theError))
-                        {
-                            new MsgListwin(false, Functions.GetNormilizedMsg(_msgitem_theError)).ShowDialog();
-                        }
-                    }
+                    new Msgwin(false, "کد رهگیری (UID/Reference) وارد نشده است.").ShowDialog();
+                    return;
                 }
-                catch (Exception er)
+
+                // 2) بارگذاری تنظیمات سازمان/کلید
+                var org = dbms.DoGetDataSQL<SAZMAN>("SELECT MEMORYID, MEMORYIDsand, PRIVIATEKEY, Dcertificate FROM dbo.SAZMAN").FirstOrDefault();
+
+                if (org is null || string.IsNullOrWhiteSpace(org.PRIVIATEKEY))
                 {
-                    try
-                    {
-                        if (!IsInProgressOrNotFound) //if is not In Progress it has really error
+                    new Msgwin(false, "تنظیمات امضا/سازمان ناقص است.").ShowDialog();
+                    return;
+                }
+
+                var privateKey = CleanPrivateKey(org.PRIVIATEKEY);
+                var memoryTax = (TaxURL == "https://tp.tax.gov.ir/req/api/")
+                                ? org.MEMORYID?.Trim()
+                                : org.MEMORYIDsand?.Trim();
+
+                if (string.IsNullOrWhiteSpace(memoryTax))
+                {
+                    new Msgwin(false, "شناسه یکتای حافظه مالیاتی (FiscalId) تنظیم نشده است.").ShowDialog();
+                    return;
+                }
+
+                // 3) آماده‌سازی سرویس
+                TaxApiService.Instance.Init(
+                    memoryTax,
+                    new SignatoryConfig(privateKey, null),
+                    new NormalProperties(ClientType.SELF_TSP),
+                    TaxURL
+                );
+
+                // اختیاری اما مفید برای Warm-up و بررسی دسترسی:
+                _ = TaxApiService.Instance.TaxApis.GetServerInformation();
+                _ = TaxApiService.Instance.TaxApis.RequestToken();
+
+                //استعلام صورت حساب ها بر اساس تاریخ
+                ////var inquiryResultModels = TaxApiService.Instance.TaxApis.InquiryByTime("14040623");
+                ////var inquiryResultModels2 = TaxApiService.Instance.TaxApis.InquiryByTimeRange("14040630", "14040630");
+
+                // 4) استعلام اولیه بر اساس ReferenceId
+                var byRefResults = TaxApiService.Instance.TaxApis.InquiryByReferenceId(new List<string> { referenceCode });
+                var result = byRefResults?.FirstOrDefault();
+
+                if (result is null)
+                {
+                    new Msgwin(false, "پاسخی از سامانه دریافت نشد. کمی بعد دوباره تلاش کنید.").ShowDialog();
+                    return;
+                }
+
+                var status = (result.Status ?? string.Empty).Trim().ToUpperInvariant();
+
+                // 5) سوییچ وضعیت
+                switch (status)
+                {
+                    case "IN_PROGRESS":
+                        new Msgwin(false,
+                            @"وضعیت این صورتحساب «در حال انجام» (IN_PROGRESS) است. ممکن است در کارپوشه اضافه شده باشد اما هنوز نهایی نشده؛ در صورت نیاز، با شماره مالیاتی در کارپوشه جستجو کنید.")
+                            .ShowDialog();
+                        break;
+
+                    case "PENDING":
+                        new Msgwin(false, @"این صورتحساب هنوز «در انتظار» (PENDING) است. لطفاً بعداً دوباره بررسی کنید.")
+                            .ShowDialog();
+                        break;
+
+                    case "SUCCESS":
+                        new Msgwin(false, @"صورت‌حساب با موفقیت در سامانه ثبت شده است.").ShowDialog();
+                        break;
+
+                    case "FAILED":
+                        ShowFailedErrors(result);
+                        break;
+
+                    case "NOT_FOUND":
                         {
-                            if (er.InnerException is null)
+                            // --- بهبود مهم: استعلام مجدد با UID + FiscalId در صورت امکان ---
+                            var rechecked = false;
+                            if (INVOCIE_DTGR.SelectedItem is TRACK_TAXDTL row)
                             {
-                                new Msgwin(false, "\"پاسخی از سمت سامانه دریافت نشد\" , این پیغام یعنی صورت حساب هنوز در سامانه پردازش نـشده است , لطفا ساعاتی بعد مجددا بررسی بفرمایید.").ShowDialog();
+                                var _UID_REF_ = string.IsNullOrWhiteSpace(row.UID) ? referenceCode : row.UID;
+
+                                var uidAndFiscalId = new UidAndFiscalId(_UID_REF_.Trim(), memoryTax);
+                                var byUidResults = TaxApiService.Instance.TaxApis.InquiryByUidAndFiscalId(new List<UidAndFiscalId> { uidAndFiscalId });
+                                var r2 = byUidResults?.FirstOrDefault();
+
+                                if (r2 != null)
+                                {
+                                    rechecked = true;
+                                    var status2 = (r2.Status ?? string.Empty).Trim().ToUpperInvariant();
+
+                                    if (status2 == "SUCCESS")
+                                    {
+                                        new Msgwin(false, @"(استعلام ثانویه) صورت‌حساب شما با موفقیت ثبت شده است.").ShowDialog();
+                                        break;
+                                    }
+                                    else if (status2 == "FAILED")
+                                    {
+                                        ShowFailedErrors(r2);
+                                        break;
+                                    }
+                                    else if (status2 == "IN_PROGRESS")
+                                    {
+                                        new Msgwin(false,
+                                            @"(استعلام ثانویه) وضعیت «در حال انجام» است. احتمال درج در کارپوشه وجود دارد؛ در صورت نیاز دستی بررسی کنید.")
+                                            .ShowDialog();
+                                        break;
+                                    }
+                                    else if (status2 == "PENDING")
+                                    {
+                                        new Msgwin(false, @"(استعلام ثانویه) هنوز «در انتظار» است؛ بعداً دوباره بررسی کنید.").ShowDialog();
+                                        break;
+                                    }
+                                }
                             }
-                            else
-                            {
-                                new Msgwin(false, "خطا در انجام عملیات استعلام").ShowDialog();
-                                CL_Generaly.DoWritePRGLOG("GETESTELAM_REFCODE_UPDATE : \n", er);
-                            }
+
+                            var tail = rechecked ? " (پس از استعلام ثانویه نیز یافت نشد.)" : string.Empty;
+                            new Msgwin(false,
+                                @"چنین صورت‌حسابی یافت نشد، کد وضعیت: ""NOT_FOUND"". این خطا معمولاً زمانی رخ می‌دهد که کد رهگیری متعلق به حافظه مالیاتی شما نباشد. 
+در مواردی به دلیل ترافیک سامانه نیز ممکن است رخ دهد. اگر مطمئنید این کد متعلق به شماست، بعداً مجدداً بررسی کنید." + tail)
+                                .ShowDialog();
+
+                            break;
                         }
-                    }
-                    catch { }
+
+                    default:
+                        new Msgwin(false, $"وضعیت ناشناخته از سامانه: \"{status}\". لطفاً بعداً دوباره بررسی کنید.").ShowDialog();
+                        break;
                 }
             }
-
-            IsOtherProccessingNow = false;
+            catch (Exception ex)
+            {
+                // اگر قبلاً وضعیت‌های قابل‌انتظار را گرفتیم، نیازی به پیام خطای سنگین نیست
+                new Msgwin(false, "خطا در انجام عملیات استعلام.").ShowDialog();
+                CL_Generaly.DoWritePRGLOG("GETESTELAM_REFCODE_UPDATE : \n", ex);
+            }
+            finally
+            {
+                IsOtherProccessingNow = false;
+            }
         }
+        /// <summary>
+        /// حذف هدر/فوتر PEM و تمیزکردن کلید خصوصی
+        /// </summary>
+        private static string CleanPrivateKey(string pem)
+        {
+            return pem?
+                .Replace("-----BEGIN PRIVATE KEY-----", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("-----END PRIVATE KEY-----", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("\r", string.Empty)
+                .Replace("\n", string.Empty)
+                .Trim();
+        }
+        private void ShowFailedErrors(InquiryResultModel result)
+        {
+            try
+            {
+                // Data معمولاً یک آبجکت یا رشتهٔ JSON است
+                var dataJson = result?.Data?.ToString();
+                if (string.IsNullOrWhiteSpace(dataJson))
+                {
+                    new Msgwin(false, "در حالت FAILED جزئیات خطا از سامانه ارسال نشد.").ShowDialog();
+                    return;
+                }
+
+                // مدل خودت: TaxModel.InquiryByReferenceIdModel.Root
+                var root = JsonConvert.DeserializeObject<TaxModel.InquiryByReferenceIdModel.Root>(dataJson);
+                if (root != null) root.status = result!.Status;
+
+                var errors = new List<string>();
+                if (root?.error != null)
+                {
+                    foreach (var e in root.error)
+                        errors.Add($"{e.code} | {e.message}");
+                }
+
+                var msg = (errors.Count > 0) ? string.Join(", ", errors) : "FAILED بدون شرح خطای قابل‌خواندن";
+                new MsgListwin(false, Functions.GetNormilizedMsg(msg)).ShowDialog();
+            }
+            catch
+            {
+                new Msgwin(false, "خطا در پردازش جزئیات FAILED.").ShowDialog();
+            }
+        }
+
         private void INVOCIE_DTGR_PreviewMouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (INVOCIE_DTGR.SelectedItem is not null)
@@ -1246,6 +1341,125 @@ namespace Prg_TrackSentInvoice
                         var bodies = CreateBodyListFromFullTaxDtl((List<FULL_TAXDTL>)originalInvoiceRows);
                         var payments = new List<InvoiceModel.Payment>();
 
+                        #region Cleaning_RestoreValiding
+                        if (header is InvoiceModel.Header TheHead)
+                        {
+                            //Matter {
+                            if (TheHead?.Bpn != null) //شماره گذرنامه خریدار
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Bpn) || TheHead?.Bpn == "0")
+                                {
+                                    TheHead.Bpn = null;
+                                }
+                            }
+                            if (TheHead?.Scc != null) //کد گمرک محل اظهار فروشنده
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Scc) || TheHead?.Scc == "0")
+                                {
+                                    TheHead.Scc = null;
+                                }
+                            }
+                            //Matter }
+
+                            if (string.IsNullOrEmpty(TheHead?.Crn) || TheHead?.Crn == "0")
+                            {
+                                if (TheHead?.Crn != null)
+                                {
+                                    TheHead.Crn = null; //شناسه یکتای ثبت قرار داد فروشنده
+                                }
+                            }
+                            if (TheHead?.Irtaxid != null) //جلوگیری از مقدار خالی یا Space
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Irtaxid))
+                                {
+                                    if (TheHead?.Inp != 7) //الگوی صورتحساب => صادرات نیست
+                                    {
+                                        TheHead.Irtaxid = null;
+                                    }
+                                }
+                            }
+                        }
+                        foreach (var item in bodies)
+                        {
+                            if (item?.Cut != null) //نوع ارز
+                            {
+                                if (string.IsNullOrWhiteSpace(item?.Cut))
+                                {
+                                    item.Cut = null;
+                                }
+                            }
+                            if (item?.Cfee == null)
+                            {
+                                item.Cfee = 0; //میزان ارز
+                            }
+                            if (string.IsNullOrWhiteSpace(item?.Odt))
+                            {
+                                item.Odt = "0"; //موضوع سایر مالیات و عوارض
+                            }
+                            if (item?.Odr == null)
+                            {
+                                item.Odr = 0; //نرخ سایر مالیات و عوارض
+                            }
+                            if (item?.Odam == null)
+                            {
+                                item.Odam = 0; //مبلغ سایر مالیات و عوارض
+                            }
+                            // --- سایر وجوه قانونی ---
+                            if (string.IsNullOrWhiteSpace(item?.Olt))
+                            {
+                                item.Olt = "0";  //موضوع سایر وجوه قانونی
+                            }
+                            if (item?.Olr == null)
+                            {
+                                item.Olr = 0; //نرخ سایر وجوه قانونی
+                            }
+                            if (item?.Olam == null)
+                            {
+                                item.Olam = 0; //مبلغ سایر وجوه قانونی
+                            }
+                            // --- هزینه‌ها و سود ---
+                            if (item?.Consfee == null)
+                            {
+                                item.Consfee = 0; //اجرت ساخت
+                            }
+                            if (item?.Spro == null)
+                            {
+                                item.Spro = 0; ////سود فروشنده
+                            }
+                            if (item?.Bros == null)
+                            {
+                                item.Bros = 0; //حق العمل
+                            }
+                            if (item?.Tcpbs == null)
+                            {
+                                item.Tcpbs = 0; //جمع کل اجرت , حق العمل و سود
+                            }
+                            if (item?.Cop == null)
+                            {
+                                item.Cop = 0; //سهم نقدی از پرداخت
+                            }
+                            if (item?.Vop == null) //سهم ارزش افزوده از پرداخت
+                            {
+                                item.Vop = 0;
+                            }
+                            if (string.IsNullOrWhiteSpace(item?.Bsrn))
+                            {
+                                item.Bsrn = null; //شناسه یکتای ثبت قرارداد حق العملکاری
+                            }
+                            if (item?.Nw == null || item.Nw == 0)
+                            {
+                                item.Nw = 0; //وزن خالص
+                            }
+                            if (item?.Ssrv == null || item.Ssrv == 0)
+                            {
+                                item.Ssrv = 0;  //ارزش ریالی کالا
+                            }
+                            if (item?.Sscv == null || item.Sscv == 0)
+                            {
+                                item.Sscv = 0; //ارزش ارزی کالا
+                            }
+                        }
+                        #endregion
 
                         #region JSON_LOG
                         try
@@ -1500,7 +1714,142 @@ namespace Prg_TrackSentInvoice
 
             return bodies;
         }
-
         #endregion
+
+        private void DG_SUB_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            DataGrid dataGrid = sender as DataGrid;
+            if (dataGrid == null) return;
+
+            if (dataGrid.SelectedItems.Count > 0)
+            {
+                return;
+            }
+
+            // Find the row under the mouse
+            DependencyObject dep = (DependencyObject)e.OriginalSource;
+            while (dep != null && !(dep is DataGridRow))
+            {
+                dep = VisualTreeHelper.GetParent(dep);
+            }
+
+            DataGridRow row = dep as DataGridRow;
+            if (row != null && row.Item != null && row.Item != CollectionView.NewItemPlaceholder)
+            {
+                // Select the row under the mouse
+                dataGrid.SelectedItem = row.Item;
+
+                // Show the context menu
+                dataGrid.ContextMenu.IsOpen = true;
+
+                // Mark the event as handled to prevent the default context menu behavior
+                e.Handled = true;
+            }
+            else
+            {
+                // No valid row, don't show context menu
+                e.Handled = true;
+            }
+        }
+
+        private void SEARCH_BUTTON1_Click(object sender, RoutedEventArgs e)
+        {
+            // لیست آیتم‌های قابل‌بایند به DataGrid شما
+            var rows = new List<object>();
+            int r = 1;
+
+            // کمک‌تابع ساخت سطر
+            void AddRow(string code, string text) => rows.Add(new { ROW_U = r++, CODE_U = code, MessageText_U = text });
+
+            // نگاشت وضعیت‌ها به فارسی
+            string MapStatus(string? s) => (s ?? "").ToUpperInvariant() switch
+            {
+                "ACTIVE" => "فعال",
+                "INACTIVE" => "غیرفعال",
+                "SUSPENDED" => "معلق",
+                "BLOCKED" => "مسدود",
+                _ => "نامشخص"
+            };
+
+            // هندل نال/خالی
+            string OrDash(string? s) => string.IsNullOrWhiteSpace(s) ? "——" : s!.Trim();
+
+            // 1) اعتبارسنجی ورودی
+            var ecode = EGCODE.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(ecode))
+            {
+                AddRow("", "❗ کد اقتصادی را وارد کنید.");
+                new MsgListwin(false, rows, "#FFFF0000").ShowDialog(); // قرمز برای خطا
+                return;
+            }
+
+            // 2) استعلام اطلاعات کد اقتصادی
+            EconomicCodeModel? info = null;
+            try
+            {
+                info = TaxApiService.Instance.TaxApis.GetEconomicCodeInformation(ecode);
+            }
+            catch (Exception)
+            {
+                AddRow("", "خطا در برقراری ارتباط با سرویس استعلام کد اقتصادی. لطفاً دوباره تلاش کنید.");
+                new MsgListwin(false, rows, "#FFFF0000").ShowDialog();
+                return;
+            }
+
+            if (info == null || string.IsNullOrWhiteSpace(info.NationalId))
+            {
+                AddRow("", "نتیجه‌ای یافت نشد. کد اقتصادی نامعتبر است یا در سامانه موجود نیست.");
+                new MsgListwin(false, rows, "#FFFF0000").ShowDialog();
+                return;
+            }
+
+            // 3) نمایش نتایج کاربرپسند برای کد اقتصادی
+            //AddRow("", "✅ اطلاعات مؤدی یافت شد:");
+            AddRow("نام/عنوان", OrDash(info.NameTrade));
+            AddRow("شماره/شناسه اقتصادی", OrDash(info.NationalId));
+            AddRow("وضعیت مؤدی", MapStatus(info.TaxpayerStatus));
+            AddRow("نوع مؤدی", OrDash(info.TaxpayerType));
+            AddRow("کد پستی", OrDash(info.PostalcodeTaxpayer));
+            AddRow("نشانی", OrDash(info.AddressTaxpayer));
+
+            // خط جداکننده‌ی بصری
+            AddRow("", "──────────────────────────");
+
+            // 4) اگر کاربر ردیفی از گرید فاکتور را انتخاب کرده باشد، استعلام حافظه مالیاتی نیز انجام شود
+            if (INVOCIE_DTGR.SelectedItem is TRACK_TAXDTL selRow)
+            {
+                try
+                {
+                    var fiscal = TaxApiService.Instance.TaxApis.GetFiscalInformation(selRow.SentTaxMemory);
+
+                    if (fiscal == null)
+                    {
+                        AddRow("", "نتیجه‌ای برای حافظه مالیاتی یافت نشد.");
+                    }
+                    else
+                    {
+                        AddRow("", "ℹ️ اطلاعات حافظه مالیاتی:");
+                        AddRow("نام/عنوان", OrDash(fiscal.NameTrade));
+
+                        // اگر EconomicCode خالی بود، NationalId را جایگزین کن
+                        var econOrNat = string.IsNullOrWhiteSpace(fiscal.EconomicCode)
+                                        ? fiscal.NationalId
+                                        : fiscal.EconomicCode;
+                        AddRow("کد/شناسه اقتصادی", OrDash(econOrNat));
+
+                        AddRow("وضعیت حافظه", MapStatus(fiscal.FiscalStatus.ToString()));
+                    }
+                }
+                catch (Exception)
+                {
+                    AddRow("", "خطا در استعلام حافظه مالیاتی. لطفاً دوباره تلاش کنید.");
+                }
+            }
+
+            // 5) نمایش پیام‌ها (رنگ پیش‌فرض)
+            new MsgListwin(false, rows).ShowDialog();
+        }
+
+
     }
 }

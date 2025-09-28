@@ -18,7 +18,7 @@
             </tb:TaskbarIcon.TrayToolTip>
         </tb:TaskbarIcon>
 
-        <DataGrid x:Name="INVOCIE_DTGR" IsReadOnly="True" AutoGenerateColumns="False" Margin="10,310,10,36" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Visible" PreviewMouseDoubleClick="INVOCIE_DTGR_PreviewMouseDoubleClick" SelectionMode="Extended" SelectionUnit="FullRow" SelectionChanged="INVOCIE_DTGR_SelectionChanged">
+        <DataGrid x:Name="INVOCIE_DTGR" MouseRightButtonUp="DG_SUB_MouseRightButtonUp" IsReadOnly="True" AutoGenerateColumns="False" Margin="10,310,10,36" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Visible" PreviewMouseDoubleClick="INVOCIE_DTGR_PreviewMouseDoubleClick" SelectionMode="Extended" SelectionUnit="FullRow" SelectionChanged="INVOCIE_DTGR_SelectionChanged">
             <DataGrid.ContextMenu>
                 <ContextMenu FlowDirection="LeftToRight">
                     <MenuItem Header="Copy Data" Click="CopyData_Click" Icon="{materialDesign:PackIcon Kind=ContentCopy}"/>
@@ -188,20 +188,20 @@
 
             </DataGrid.Columns>
         </DataGrid>
-        <TextBox x:Name="UID_TXB" Margin="0,13,240,0" TextWrapping="Wrap"  Text="{Binding ElementName=INVOCIE_DTGR,Path=SelectedItem.RefrenceNumber,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" HorizontalAlignment="Right" Width="265" TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus"/>
-        <Label Content="(Refrence Number) شناسه صورت حساب :"  HorizontalAlignment="Right" Margin="0,20,13,0" VerticalAlignment="Top" FlowDirection="RightToLeft"/>
-        <Button x:Name="ESTELAM_BTN"  Style="{StaticResource MaterialDesignFlatButton}" Content="بررسی لحظه ای (استعلام)" Margin="0,18,510,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="ESTELAM_BTN_Click" HorizontalAlignment="Right" Width="167" FlowDirection="RightToLeft"/>
-        <Button x:Name="RESEND_BTN" IsEnabled="False" Style="{StaticResource MaterialDesignFlatButton}" Content="ارسال مجدد (تکراری) فاکتور های انتخاب شده" Margin="0,18,689,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="RESEND_BTN_Click" HorizontalAlignment="Right" Width="261" FlowDirection="RightToLeft"/>
-        
-        <RadioButton GroupName="RD_TAXURL" x:Name="RD_MAINTAX" Content="سامانه اصلی" HorizontalAlignment="Left" Margin="193,23,0,0" VerticalAlignment="Top" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="True"/>
-        <RadioButton GroupName="RD_TAXURL" x:Name="RD_SANDBOX" Content="(Sandbox) سامانه آزمایشی" HorizontalAlignment="Left" Margin="19,23,0,0" VerticalAlignment="Top"   Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False"/>
-        <StackPanel Orientation="Horizontal"  Height="40" Margin="93,123,19,0" FlowDirection="RightToLeft" VerticalAlignment="Top">
+        <TextBox x:Name="UID_TXB" Margin="0,10,240,0" TextWrapping="Wrap"  Text="{Binding ElementName=INVOCIE_DTGR,Path=SelectedItem.RefrenceNumber,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" HorizontalAlignment="Right" Width="265" TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus"/>
+        <Label Content="(Refrence Number) شناسه صورت حساب :"  HorizontalAlignment="Right" Margin="0,17,13,0" VerticalAlignment="Top" FlowDirection="RightToLeft"/>
+        <Button x:Name="ESTELAM_BTN"  Style="{StaticResource MaterialDesignFlatButton}" Content="بررسی لحظه ای (استعلام)" Margin="0,15,510,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="ESTELAM_BTN_Click" HorizontalAlignment="Right" Width="167" FlowDirection="RightToLeft"/>
+        <Button x:Name="RESEND_BTN" IsEnabled="False" Style="{StaticResource MaterialDesignFlatButton}" Content="ارسال مجدد (تکراری) فاکتور های انتخاب شده" Margin="0,15,689,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="RESEND_BTN_Click" HorizontalAlignment="Right" Width="261" FlowDirection="RightToLeft"/>
+
+        <RadioButton GroupName="RD_TAXURL" x:Name="RD_MAINTAX" Content="سامانه اصلی" HorizontalAlignment="Left" Margin="193,20,0,0" VerticalAlignment="Top" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="False"/>
+        <RadioButton GroupName="RD_TAXURL" x:Name="RD_SANDBOX" Content="(Sandbox) سامانه آزمایشی" HorizontalAlignment="Left" Margin="19,20,0,0" VerticalAlignment="Top"   Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" IsChecked="True"/>
+        <StackPanel Orientation="Horizontal"  Height="40" Margin="93,85,19,0" FlowDirection="RightToLeft" VerticalAlignment="Top">
             <Label Content="متن جستجو:" VerticalAlignment="Center" FlowDirection="RightToLeft" Margin="0,0,0,-4"/>
             <TextBox x:Name="SEARCHBOX" TextWrapping="Wrap" Text="" Width="843" Margin="3,0,0,0" Height="33" Padding="0,6,0,4"/>
             <Button x:Name="SEARCH_BUTTON" Content="جستجو" Style="{StaticResource MaterialDesignFlatButton}" Click="SEARCH_BUTTON_Click" FontSize="12" Padding="16,4,16,4" Margin="4,0,0,0" Width="110"/>
         </StackPanel>
         <Label x:Name="STATUS_LABEL" HorizontalContentAlignment="Center" Visibility="Hidden" VerticalContentAlignment="Center" Background="#FF1A1A1A" Foreground="#DDFFFFFF" Opacity="0.90" Margin="0,209,0,0"/>
-        <Border x:Name="MyBoderStatus" BorderThickness="1" Margin="0,71,0,0" RenderTransformOrigin="0.5,0.5" Height="4" VerticalAlignment="Top">
+        <Border x:Name="MyBoderStatus" BorderThickness="1" Margin="0,60,0,0" RenderTransformOrigin="0.5,0.5" Height="4" VerticalAlignment="Top">
             <Border.Background>
                 <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
                     <GradientStop Color="#FF00B3FF"/>
@@ -217,7 +217,7 @@
                 </TransformGroup>
             </Border.RenderTransform>
         </Border>
-        <Button x:Name="ExportToExcelBtn" Click="ExportToExcelBtn_Click" Style="{StaticResource MaterialDesignFlatButton}" Margin="15,124,0,0" VerticalAlignment="Top" Height="43" HorizontalAlignment="Left" Width="70">
+        <Button x:Name="ExportToExcelBtn" Click="ExportToExcelBtn_Click" Style="{StaticResource MaterialDesignFlatButton}" Margin="15,83,0,0" VerticalAlignment="Top" Height="43" HorizontalAlignment="Left" Width="70">
             <Button.Content>
                 <Viewbox>
                     <materialDesign:PackIcon Kind="MicrosoftExcel"/>
@@ -231,9 +231,9 @@
                 </Viewbox>
             </Button.Content>
         </Button>
-        <TextBox x:Name="TAXId_TextBox" Margin="0,191,228,0" TextWrapping="Wrap" Text="{Binding ElementName=INVOCIE_DTGR,Path=SelectedItem.Taxid,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" HorizontalAlignment="Right" Width="202" IsReadOnly="True" PreviewGotKeyboardFocus="TAXId_TextBox_PreviewGotKeyboardFocus"/>
-        <Label Content="شماره منحصر به فرد مالیاتی (جهت کپی) :" FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,197,9,0" VerticalAlignment="Top"/>
-        <TextBlock FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Justify" VerticalAlignment="Top" Margin="110,191,457,0" Height="52" Opacity="0.7"><Run Text="نکته : گاهی اوقات سامانه به دلیل بروز رسانی یا ترافیک شدید تا مدتی نتیجه صورت حساب ارسالی را مشخص نمی کند , بنا بر این صبر کنید تا وضعیت نهایی آن مشخص شود و یا از طریق شماره مالیاتی , مستقیما آنرا در کارپوشه خود جستجو کنید."/><LineBreak/><Run/></TextBlock>
+        <TextBox x:Name="TAXId_TextBox" Margin="0,146,228,0" TextWrapping="Wrap" Text="{Binding ElementName=INVOCIE_DTGR,Path=SelectedItem.Taxid,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" HorizontalAlignment="Right" Width="202" IsReadOnly="True" PreviewGotKeyboardFocus="TAXId_TextBox_PreviewGotKeyboardFocus"/>
+        <Label Content="شماره منحصر به فرد مالیاتی (جهت کپی) :" FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,152,9,0" VerticalAlignment="Top"/>
+        <TextBlock FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Justify" VerticalAlignment="Top" Margin="110,147,457,0" Height="52" Opacity="0.7"><Run Text="نکته : گاهی اوقات سامانه به دلیل بروز رسانی یا ترافیک شدید تا مدتی نتیجه صورت حساب ارسالی را مشخص نمی کند , بنا بر این صبر کنید تا وضعیت نهایی آن مشخص شود و یا از طریق شماره مالیاتی , مستقیما آنرا در کارپوشه خود جستجو کنید."/><LineBreak/><Run/></TextBlock>
         <RadioButton GroupName="ZAMAN" x:Name="RD_ALL_TIME" IsChecked="False" Content="همه صورت حساب ها" HorizontalAlignment="Left" Margin="20,277,0,0" VerticalAlignment="Top" Padding="4,-1,0,0" Click="RD_ALL_TIME_Click"/>
         <RadioButton GroupName="ZAMAN" x:Name="RD_LAST30" Content="صورت حساب های 30 روز گذشته" HorizontalAlignment="Left" Margin="176,277,0,0" VerticalAlignment="Top" Padding="4,-1,0,0" IsChecked="True" Click="RD_LAST30_Click"/>
         <TextBlock FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Justify" VerticalAlignment="Top" Margin="868,276,9,0" Height="21" Opacity="0.7"><Run FlowDirection="RightToLeft" Text="صورت حساب های ارسالی به سامانه مودیان به تفکیک فاکتور"/><Run FlowDirection="RightToLeft" Language="fa-ir" Text=":"/></TextBlock>
@@ -242,7 +242,12 @@
         <TextBox x:Name="MOADINA_SCNUM" IsReadOnly="True" Margin="0,62,267,0" TextWrapping="Wrap"  Text="" VerticalAlignment="Top" HorizontalAlignment="Right" Width="245" TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus" Visibility="Collapsed"/>
         <Label x:Name="LBL_MOADINA_SCNUM" Content="شماره فاکتور (حواله) داخلی Inno شروع از عدد :"  HorizontalAlignment="Right" Margin="0,69,19,0" VerticalAlignment="Top" FlowDirection="RightToLeft" PreviewMouseDoubleClick="LBL_MOADINA_SCNUM_PreviewMouseDoubleClick" Visibility="Collapsed"/>
         <Button x:Name="BTN_SAVE_MOADINA_SCNUM"  Style="{StaticResource MaterialDesignFlatButton}" Content="ذخیره →" Margin="526,67,0,0" VerticalAlignment="Top" Height="33" FontSize="12" HorizontalAlignment="Left" Width="158" Click="BTN_SAVE_MOADINA_SCNUM_Click" Visibility="Collapsed"/>
-        <Label x:Name="LBL_WARN" Content="" FlowDirection="RightToLeft" Margin="7,82,7,0" VerticalAlignment="Top" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+        <Label x:Name="LBL_WARN" Content="" FlowDirection="RightToLeft" Margin="1,62,-1,0" VerticalAlignment="Top" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+        <StackPanel Orientation="Horizontal"  Height="40" Margin="93,202,19,0" FlowDirection="RightToLeft" VerticalAlignment="Top">
+            <Label Content="استعلام کد اقتصادی:" VerticalAlignment="Center" FlowDirection="RightToLeft" Margin="0,0,0,-4"/>
+            <TextBox x:Name="EGCODE" TextWrapping="Wrap" Text="" Width="200" TextAlignment="Left" Margin="3,0,0,0" Height="33" Padding="0,6,0,4"/>
+            <Button x:Name="SEARCH_BUTTON1" Content="بررسی" Style="{StaticResource MaterialDesignFlatButton}" Click="SEARCH_BUTTON1_Click" FontSize="12" Padding="16,4,16,4" Margin="4,0,0,0" Width="110"/>
+        </StackPanel>
     </Grid>
 </Window>
  
