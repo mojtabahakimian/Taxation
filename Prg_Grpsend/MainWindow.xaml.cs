@@ -199,10 +199,14 @@ namespace Prg_Grpsend
                 UpdateRowCountLabel();
             }
         }
+        public static bool IsDenafaraz { get; set; } = false;
         private void ReGetData()
         {
             FACTOR_DATA?.Clear();
-            var MasterHead = dbms.DoGetDataSQL<HEAD_LST>(@$"SELECT
+
+            string condition = IsDenafaraz ? "2" : "13";
+
+            string SQL = @$"SELECT
                                                             dbo.HEAD_LST.NUMBER1,
                                                             dbo.HEAD_LST.TAH,
                                                             dbo.HEAD_LST.NUMBER,
@@ -270,7 +274,7 @@ namespace Prg_Grpsend
                                                         LEFT OUTER JOIN
                                                             dbo.CUST_HESAB ON dbo.HEAD_LST.CUST_NO = dbo.CUST_HESAB.hes
                                                         WHERE
-                                                            (dbo.HEAD_LST.TAG = 13) AND
+                                                            (dbo.HEAD_LST.TAG = {condition}) AND
                                                             (dbo.HEAD_LST_EXTENDED.irtaxid IS NULL OR dbo.HEAD_LST_EXTENDED.irtaxid = N'0' OR dbo.HEAD_LST_EXTENDED.irtaxid = N'') AND -- اونهایی که صورت حساب مرجع شون خالیه
                                                             NOT EXISTS (
                                                                 SELECT 1
@@ -280,7 +284,9 @@ namespace Prg_Grpsend
                                                                     dbo.TAXDTL.ApiTypeSent = 1 AND             -- شرط نوع API ارسال سامانه اصلی
                                                                     dbo.TAXDTL.Ins = 1 AND                     -- موضوع صورتحساب : اصلی/فروش
                                                                     dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING') -- شرط وضعیت‌های ارسال شده یا در انتظار
-                                                            ) ORDER BY dbo.HEAD_LST.NUMBER1,dbo.HEAD_LST.NUMBER DESC").ToList();
+                                                            ) ORDER BY dbo.HEAD_LST.NUMBER1,dbo.HEAD_LST.NUMBER DESC";
+
+            var MasterHead = dbms.DoGetDataSQL<HEAD_LST>(SQL).ToList();
             foreach (var item in MasterHead)
             {
                 FACTOR_DATA?.Add(item);
@@ -506,7 +512,7 @@ namespace Prg_Grpsend
                     ? "https://tp.tax.gov.ir/req/api/"
                     : "https://sandboxrc.tax.gov.ir/req/api/";
 
-            
+
             // ❶ آماده‌سازی UI
             IsEnabledIndicator = true;
             BTN_SENDGRP.IsEnabled = false;

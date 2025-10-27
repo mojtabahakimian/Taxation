@@ -27,5 +27,9 @@
         public double? NUMBER { get; set; }
         public double? TAG { get; set; }
         public int? DATE_N { get; set; }
+
+        public string CUST_NO { get; set; }
+        public string MOLAH { get; set; }
+        public string SHARAYET { get; set; }
     }
 }

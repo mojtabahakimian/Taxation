@@ -33,7 +33,7 @@
             </Border.RenderTransform>
             <Border x:Name="TitleDrawBar" CornerRadius="10,10,0,0"  Margin="-9,-9,-9,0" VerticalAlignment="Top" UseLayoutRounding="False" Height="36" MouseLeftButtonDown="TitleDrawBar_MouseLeftButtonDown" Background="{Binding Background, ElementName=GENERAL_RANG}">
                 <Grid>
-                    <Label Content="8.6.5" HorizontalAlignment="Left" VerticalContentAlignment="Center" Width="458" Margin="10,0,0,0" Foreground="#DDFFFFFF"/>
+                    <Label Content="8.6.7" HorizontalAlignment="Left" VerticalContentAlignment="Center" Width="458" Margin="10,0,0,0" Foreground="#DDFFFFFF"/>
                     <Button x:Name="Btn_Closer" Click="Btn_Closer_Click" IsEnabled="False" Margin="0,0,9,0"  BorderBrush="{x:Null}" Background="Transparent" FontSize="12"  Height="18" VerticalAlignment="Center" FontFamily="Tahoma" Foreground="White" Padding="1,-2,1,1" IsTabStop="False" HorizontalAlignment="Right" Width="24" >
                         <materialDesign:PackIcon Kind="WindowClose" Margin="0,0,0,0" Height="17" Width="21" Foreground="White" />
                     </Button>
