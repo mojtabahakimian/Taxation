@@ -237,6 +237,8 @@ namespace Prg_TrackSentInvoice
         }
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            CL_PRC_LOADER.Start();
+
             try
             {
                 var dbms = new CL_CCNNMANAGER();
@@ -300,6 +302,7 @@ namespace Prg_TrackSentInvoice
                 MOADINA_SCNUM.Text = res.ToString();
             }
 
+            CL_PRC_LOADER.Dispose();
         }
         private void Window_ContentRendered(object sender, EventArgs e)
         {
@@ -349,61 +352,81 @@ namespace Prg_TrackSentInvoice
             if (isOnlyLast30Days)
             {
                 TAXDTL_DATA = dbms.DoGetDataSQL<TRACK_TAXDTL>(@$"SELECT 
-                                                                     ROW_NUMBER() OVER (ORDER BY MAX(CRT) DESC) AS RowNumber,
-                                                                     Taxid,
-                                                                     MAX(Inno) AS Inno,
-                                                                     MAX(Inty) AS Inty,
-                                                                 	MAX(Inp) AS Inp,
-                                                                 	MAX(Ins) AS Ins,
-                                                                 	COUNT(*) AS LineCount,
-                                                                 	UID,
-                                                                     RefrenceNumber,
-                                                                     TheConfirmationReferenceId,
-                                                                     SentTaxMemory,
-                                                                     MAX(CRT) AS CRT,
-                                                                     MAX(CAST(TheSuccess AS INT)) AS TheSuccess,
-                                                                 	TheStatus,
-                                                                    MAX(DATE_N) AS DATE_N,
-                                                                    MAX(CAST(ApiTypeSent AS INT)) AS ApiTypeSent,
-                                                                 	MAX(TheError) AS TheError
-                                                                 FROM 
-                                                                     dbo.TAXDTL
-                                                                 WHERE 
-                                                                     ApiTypeSent = {_apitypesent} 
-                                                                     AND CRT >= DATEADD(DAY, -30, GETDATE())
-                                                                 GROUP BY 
-                                                                     Taxid,TheStatus, UID, RefrenceNumber, TheConfirmationReferenceId, SentTaxMemory
-                                                                 ORDER BY 
-                                                                     CRT DESC;").ToList();
+                                                         ROW_NUMBER() OVER (ORDER BY MAX(T.CRT) DESC) AS RowNumber,
+                                                         T.Taxid,
+                                                         MAX(T.Inno) AS Inno,
+                                                         MAX(T.Inty) AS Inty,
+                                                         MAX(T.Inp) AS Inp,
+                                                         MAX(T.Ins) AS Ins,
+                                                         COUNT(*) AS LineCount,
+                                                         T.UID,
+                                                         T.RefrenceNumber,
+                                                         T.TheConfirmationReferenceId,
+                                                         T.SentTaxMemory,
+                                                         MAX(T.CRT) AS CRT,
+                                                         MAX(CAST(T.TheSuccess AS INT)) AS TheSuccess,
+                                                         T.TheStatus,
+                                                         MAX(T.DATE_N) AS DATE_N,
+                                                         MAX(CAST(T.ApiTypeSent AS INT)) AS ApiTypeSent,
+                                                         MAX(T.TheError) AS TheError,
+                                                         MAX(H.CUST_NO) AS CUST_NO,
+                                                         MAX(H.MOLAH) AS MOLAH,
+                                                         MAX(H.SHARAYET) AS SHARAYET
+                                                     FROM 
+                                                         dbo.TAXDTL T
+                                                     LEFT OUTER JOIN dbo.HEAD_LST H ON 
+                                                         CASE 
+                                                             WHEN ISNUMERIC(RIGHT(T.Inno, 6)) = 1 
+                                                             THEN CAST(RIGHT(T.Inno, 6) AS float) 
+                                                             ELSE NULL 
+                                                         END = H.NUMBER 
+                                                         AND H.TAG = 2
+                                                     WHERE 
+                                                         T.ApiTypeSent = {_apitypesent} 
+                                                         AND T.CRT >= DATEADD(DAY, -30, GETDATE())
+                                                     GROUP BY 
+                                                         T.Taxid, T.TheStatus, T.UID, T.RefrenceNumber, T.TheConfirmationReferenceId, T.SentTaxMemory
+                                                     ORDER BY 
+                                                         CRT DESC;").ToList();
             }
             else
             {
                 TAXDTL_DATA = dbms.DoGetDataSQL<TRACK_TAXDTL>(@$"SELECT 
-                                                                     ROW_NUMBER() OVER (ORDER BY MAX(CRT) DESC) AS RowNumber,
-                                                                     Taxid,
-                                                                     MAX(Inno) AS Inno,
-                                                                     MAX(Inty) AS Inty,
-                                                                 	MAX(Inp) AS Inp,
-                                                                 	MAX(Ins) AS Ins,
-                                                                 	COUNT(*) AS LineCount,
-                                                                 	UID,
-                                                                     RefrenceNumber,
-                                                                     TheConfirmationReferenceId,
-                                                                     SentTaxMemory,
-                                                                     MAX(CRT) AS CRT,
-                                                                     MAX(CAST(TheSuccess AS INT)) AS TheSuccess,
-                                                                 	TheStatus,
-                                                                    MAX(DATE_N) AS DATE_N,
-                                                                     MAX(CAST(ApiTypeSent AS INT)) AS ApiTypeSent,
-                                                                 	MAX(TheError) AS TheError
-                                                                 FROM 
-                                                                     dbo.TAXDTL
-                                                                 WHERE 
-                                                                     ApiTypeSent = {_apitypesent}
-                                                                 GROUP BY 
-                                                                     Taxid,TheStatus, UID, RefrenceNumber, TheConfirmationReferenceId, SentTaxMemory
-                                                                 ORDER BY 
-                                                                     CRT DESC;").ToList();
+                                                         ROW_NUMBER() OVER (ORDER BY MAX(T.CRT) DESC) AS RowNumber,
+                                                         T.Taxid,
+                                                         MAX(T.Inno) AS Inno,
+                                                         MAX(T.Inty) AS Inty,
+                                                         MAX(T.Inp) AS Inp,
+                                                         MAX(T.Ins) AS Ins,
+                                                         COUNT(*) AS LineCount,
+                                                         T.UID,
+                                                         T.RefrenceNumber,
+                                                         T.TheConfirmationReferenceId,
+                                                         T.SentTaxMemory,
+                                                         MAX(T.CRT) AS CRT,
+                                                         MAX(CAST(T.TheSuccess AS INT)) AS TheSuccess,
+                                                         T.TheStatus,
+                                                         MAX(T.DATE_N) AS DATE_N,
+                                                         MAX(CAST(T.ApiTypeSent AS INT)) AS ApiTypeSent,
+                                                         MAX(T.TheError) AS TheError,
+                                                         MAX(H.CUST_NO) AS CUST_NO,
+                                                         MAX(H.MOLAH) AS MOLAH,
+                                                         MAX(H.SHARAYET) AS SHARAYET
+                                                     FROM 
+                                                         dbo.TAXDTL T
+                                                     LEFT OUTER JOIN dbo.HEAD_LST H ON 
+                                                         CASE 
+                                                             WHEN ISNUMERIC(RIGHT(T.Inno, 6)) = 1 
+                                                             THEN CAST(RIGHT(T.Inno, 6) AS float) 
+                                                             ELSE NULL 
+                                                         END = H.NUMBER 
+                                                         AND H.TAG = 2
+                                                     WHERE 
+                                                         T.ApiTypeSent = {_apitypesent}
+                                                     GROUP BY 
+                                                         T.Taxid, T.TheStatus, T.UID, T.RefrenceNumber, T.TheConfirmationReferenceId, T.SentTaxMemory
+                                                     ORDER BY 
+                                                         CRT DESC;").ToList();
             }
             foreach (var item in TAXDTL_DATA)
             {

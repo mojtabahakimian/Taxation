@@ -1,6 +1,8 @@
 ﻿using Prg_Graphicy.Wins;
 using Prg_Moadian.CNNMANAGER;
+using Prg_Moadian.Generaly;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -15,9 +17,38 @@ namespace Prg_Grpsend.Utility
             "D21336C4BBEF5189D2211240151A875",
             "BD618EC8C63B53CF2A72396FCA729FCA",  //CORRECT (mrcorrect....)
             "C1B24D1A2F74199C1391551849B865",
+
+            "BF6C88CFCE305635AA5FB0685D5B5635", //Dena faraz new ghofl
+            "59DC325C997EC02475F937146CE2655",  //Dena faraz
+            "AE799CDDDF23432CB948A3714C484021", //Dena faraz
+            "BD618EC8C63B533CAA50B16455505031", //Dena faraz
+
             "CDBAE05EDFBB33D7BA4821B25CE850D9",
             "DEA2F24BC6A323C7A95033A745F040C9" //CORRECT
         };
+        private readonly HashSet<string> DenaFarazKeys = new HashSet<string> //Denafarz
+        {
+            "BF6C88CFCE305635AA5FB0685D5B5635",
+            "59DC325C997EC02475F937146CE2655",
+            "AE799CDDDF23432CB948A3714C484021",
+            "BD618EC8C63B533CAA50B16455505031"
+        };
+        public bool IsDenaFarazKey(string key)
+        {
+            return DenaFarazKeys.Contains(key);
+        }
+        public void CheckIsDenafaraz()
+        {
+            foreach (var key in TheKeys)
+            {
+                if (IsDenaFarazKey(key))
+                {
+                    MainWindow.IsDenafaraz = true;
+                    CL_Generaly.MrCorrect = "d";
+                }
+            }
+        }
+
         public string LockReasonError(string ErrCode)
         {
             switch (ErrCode)
@@ -101,6 +132,8 @@ namespace Prg_Grpsend.Utility
                         try
                         {
                             axTiny1 = InitializeAxTiny(); //Try to get regiestered files on system (Tiny.ocx)
+
+                            CheckIsDenafaraz();
                         }
                         catch (System.Runtime.InteropServices.COMException ex) when (ex.ErrorCode == unchecked((int)0x80040154))
                         {

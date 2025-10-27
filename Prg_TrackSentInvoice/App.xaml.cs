@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.SqlClient;
 using Prg_Graphicy.Wins;
 using Prg_Moadian.CNNMANAGER;
+using Prg_Moadian.FUNCTIONS;
 using Prg_TrackSentInvoice.LMETHOD;
 using System;
 using System.Collections;
@@ -16,6 +17,8 @@ namespace Prg_TrackSentInvoice
     {
         private void Application_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
+            try { CL_PRC_LOADER.Dispose(); } catch { }
+
             try
             {
                 CL_CCNNMANAGER dbms = new CL_CCNNMANAGER();

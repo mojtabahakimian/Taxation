@@ -251,7 +251,10 @@ namespace Prg_Moadian.FUNCTIONS
                 throw new NullyExceptiony($"HEAD_LST not found for invoice{NUMBER}");
             }
 
-            string? src_ECODE = L_DRV_TBL_US.FirstOrDefault().ECODE; //10840014242
+            //ECODE = کداقتصادی
+            //MCODEM = شماره ثبت|شناسه ملی|کد ملی
+
+            string? src_ECODE = L_DRV_TBL_US.FirstOrDefault().ECODE; //10840014242 //11رقم باید باشه
 
             var _HEAD_EXTENDED = dbms.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER = {NUMBER} AND TGU = {TAG}").FirstOrDefault();
 

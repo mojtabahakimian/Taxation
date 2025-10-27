@@ -5,7 +5,6 @@ using Prg_Moadian.CNNMANAGER;
 using Prg_Moadian.FUNCTIONS;
 using Prg_Moadian.SQLMODELS;
 using System;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Windows;
