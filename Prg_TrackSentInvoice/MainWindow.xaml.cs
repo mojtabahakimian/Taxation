@@ -237,7 +237,7 @@ namespace Prg_TrackSentInvoice
         }
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            CL_PRC_LOADER.Start();
+            CL_PRC_LOADER.Start("Prg_TrackSentInvoice.ADDON.Preloader.exe");
 
             try
             {
