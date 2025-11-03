@@ -12,24 +12,29 @@ namespace Prg_Moadian.FUNCTIONS
 
         public static Process Start(string resourceName = null, string arguments = null)
         {
-            resourceName = "Prg_Graphicy.ADDON.Preloader.exe";
+            if (string.IsNullOrWhiteSpace(resourceName))
+            {
+                resourceName = "Prg_Graphicy.ADDON.Preloader.exe";
+            }
             arguments = "1354";
 
-            using (Stream stream = Assembly.GetEntryAssembly().GetManifestResourceStream($"Prg_Graphicy.ADDON.Preloader.exe"))
+            try
             {
-                byte[] exeBytes = new byte[stream.Length];
-                stream.Read(exeBytes, 0, exeBytes.Length);
-
-                // Save the byte array to a temporary file
-                string tempExePath = Path.GetTempFileName() + ".exe";
-                _tempExePaths.Add(tempExePath); // Store the temp path for later cleanup
-
-                File.WriteAllBytes(tempExePath, exeBytes);
-
-                // Start the process from the byte array with arguments
-                var process = new Process
+                using (Stream stream = Assembly.GetEntryAssembly().GetManifestResourceStream(resourceName))
                 {
-                    StartInfo =
+                    byte[] exeBytes = new byte[stream.Length];
+                    stream.Read(exeBytes, 0, exeBytes.Length);
+
+                    // Save the byte array to a temporary file
+                    string tempExePath = Path.GetTempFileName() + ".exe";
+                    _tempExePaths.Add(tempExePath); // Store the temp path for later cleanup
+
+                    File.WriteAllBytes(tempExePath, exeBytes);
+
+                    // Start the process from the byte array with arguments
+                    var process = new Process
+                    {
+                        StartInfo =
                             {
                                 FileName = tempExePath,
                                 Arguments = arguments,
@@ -38,14 +43,20 @@ namespace Prg_Moadian.FUNCTIONS
                                 RedirectStandardError = true,
                                 CreateNoWindow = true
                             }
-                };
-                process.Start();
+                    };
+                    process.Start();
 
-                // Store the process in the dictionary
-                _runningProcesses.TryAdd(process.Id, process);
+                    // Store the process in the dictionary
+                    _runningProcesses.TryAdd(process.Id, process);
 
-                return process;
+                    return process;
+                }
             }
+            catch (Exception)
+            {
+            }
+
+            return null;
         }
 
         public static void Stop(Process process)
