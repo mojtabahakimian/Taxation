@@ -187,6 +187,7 @@ namespace Prg_Grpsend
                 ////new COMBOYMODEL { ID = 3, NAME = "نقد/نسیه" }
             };
 
+            GetPersianTodayDate();
 
             ReGetData();
 
@@ -198,7 +199,20 @@ namespace Prg_Grpsend
 
                 UpdateRowCountLabel();
             }
+
         }
+
+        private void GetPersianTodayDate()
+        {
+            // تنظیم تاریخ امروز به عنوان پیش‌فرض برای تاریخ سفارشی
+            var persianCalendar = new System.Globalization.PersianCalendar();
+            var today = DateTime.Now;
+            var year = persianCalendar.GetYear(today);
+            var month = persianCalendar.GetMonth(today);
+            var day = persianCalendar.GetDayOfMonth(today);
+            TXT_CUSTOM_DATE.Text = $"{year:0000}/{month:00}/{day:00}";
+        }
+
         public static bool IsDenafaraz { get; set; } = false;
         private void ReGetData()
         {
@@ -514,6 +528,9 @@ namespace Prg_Grpsend
 
 
             // ❶ آماده‌سازی UI
+            bool IsCustomDate = CHK_CUSTOM_DATE?.IsChecked ?? false;
+            string CustomDateValue = TXT_CUSTOM_DATE.Text.Trim();
+
             IsEnabledIndicator = true;
             BTN_SENDGRP.IsEnabled = false;
             IsBusy = true;
@@ -549,7 +566,7 @@ namespace Prg_Grpsend
                                  selected, 2,
                                  inty,
                                  setm,
-                                 pr);
+                                 pr, IsCustomDate, CustomDateValue);
                 });
 
                 //-------------------------------------------------
