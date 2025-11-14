@@ -114,6 +114,16 @@
                     <Label Content="تا شماره :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="5"/>
                     <materialDesign:NumericUpDown x:Name="TA_NUMBER" Width="60" Margin="5"  Minimum="1" ValueChanged="TA_NUMBER_ValueChanged"/>
                 </DockPanel>
+                <TabPanel FlowDirection="RightToLeft">
+                    <DockPanel>
+                        <CheckBox x:Name="CHK_CUSTOM_DATE" Content="استفاده از تاریخ سفارشی برای ارسال" IsChecked="False" Margin="5" VerticalContentAlignment="Center"/>
+                        <Label Content="تاریخ سفارشی :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="5"/>
+                        <TextBox x:Name="TXT_CUSTOM_DATE" Width="120" Margin="5" Text=""
+                             IsEnabled="{Binding ElementName=CHK_CUSTOM_DATE,Path=IsChecked,UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="فرمت: 1404/08/24"/>
+                    </DockPanel>
+
+                </TabPanel>
             </TabPanel>
             <Label Content="نکات قبل از ارسال" FontWeight="Bold" FlowDirection="RightToLeft" FontSize="13"/>
             <TabPanel FlowDirection="RightToLeft" >
@@ -121,6 +131,7 @@
                     <Label Content=" * درصورت خالی گذاشتن نوع صورت حساب یا روش تسویه , سیستم از اطلاعات ثبت شده در فاکتور , مقادیر را برمیدارد." VerticalContentAlignment="Center" Foreground="#FFD20000"/>
                     <Label Content=" * در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
                     <Label Content=" * فقط میتوان فاکتور هایی را ارسال کرد که شماره صورت حساب مرجع آنها خالی باشد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                    <Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
                 </StackPanel>
             </TabPanel>
 

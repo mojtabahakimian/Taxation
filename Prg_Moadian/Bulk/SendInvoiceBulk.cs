@@ -68,9 +68,13 @@ namespace Prg_Moadian.Bulk
         /// ارسال گروهی فاکتورها با تگ مشخص
         /// </summary>
         /// <param name="invoiceNumbers">لیست شماره فاکتورها</param>
-        /// <param name="tag">تگ فاکتورها</param>
+        /// <param name="inty_value">نوع صورت حساب</param>
+        /// <param name="setm_value">روش تسویه</param>
+        /// <param name="progress">گزارش پیشرفت</param>
+        /// <param name="useCustomDate">استفاده از تاریخ سفارشی</param>
+        /// <param name="customDateText">متن تاریخ سفارشی (مثال: 1404/08/24)</param>
         public async Task<BulkSendResult> SendAsync(IEnumerable<long> invoiceNumbers, int tag, int? inty_value = default, int? setm_value = default,
-            IProgress<int>? progress = null)
+            IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null)
         {
             var cer = new CustomExceptErMsg();
 
@@ -91,7 +95,7 @@ namespace Prg_Moadian.Bulk
 
                 try
                 {
-                    var (dto, records) = BuildDtoAndRecords(number, tag, inty_value, setm_value);
+                    var (dto, records) = BuildDtoAndRecords(number, tag, inty_value, setm_value, useCustomDate, customDateText);
 
                     allDtos.Add(dto);
                     allRecords[dto] = records;
@@ -169,7 +173,7 @@ namespace Prg_Moadian.Bulk
             return result;
         }
 
-        private (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default)
+        private (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default, bool useCustomDate = false, string customDateText = null)
         {
             // 1. بارگذاری HEAD_LST_EXTENDED
             var headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
@@ -328,7 +332,29 @@ namespace Prg_Moadian.Bulk
             if (!isExport) { headExt.cut = null; headExt.exr = null; }
 
             // محاسبه تاریخ و TaxId
-            var dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
+            //var dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
+            // اگر تاریخ سفارشی فعال شده باشد، از آن استفاده کن، در غیر این صورت از تاریخ فاکتور استفاده کن
+            DateTime dt;
+            if (useCustomDate && !string.IsNullOrWhiteSpace(customDateText))
+            {
+                try
+                {
+                    // تبدیل تاریخ شمسی سفارشی به میلادی
+                    // فرمت انتظاری: 1404/08/24
+                    var customDateInt = int.Parse(customDateText.Replace("/", ""));
+                    dt = _fn.GetGregorianDateTime(customDateInt.ToString());
+                }
+                catch
+                {
+                    // اگر تاریخ سفارشی نامعتبر بود، از تاریخ فاکتور استفاده کن
+                    dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
+                }
+            }
+            else
+            {
+                dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
+            }
+
             var taxId = _taxService.RequestTaxId(_memoryId, dt);
             var ts = TaxService.ConvertDateToLong(dt);
 
