@@ -71,6 +71,12 @@
                 <RadioButton x:Name="RD_MAINAPI" GroupName="APITYPE" Content="سامانه اصلی" Margin="5"/>
                 <RadioButton x:Name="RD_SANDBOXAPI" GroupName="APITYPE" IsChecked="True" Content="تستی SandBox" Margin="5"/>
             </DockPanel>
+            <DockPanel x:Name="DockPanel_SentType" FlowDirection="RightToLeft" Margin="0,10,0,0">
+                <Label Content="⚠️ نمایش فاکتورها :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontWeight="Bold" Foreground="#FFD20000"/>
+                <RadioButton x:Name="RD_NOT_SENT_ONLY" GroupName="SENTTYPE" IsChecked="True" Content="فقط فاکتورهای ارسال نشده" Margin="5" Checked="RD_SENT_TYPE_Changed"/>
+                <RadioButton x:Name="RD_INCLUDE_SENT" GroupName="SENTTYPE" Content="⚠️ همه فاکتورها (شامل ارسال شده)" Margin="5" Foreground="#FFD20000" FontWeight="Bold" Checked="RD_SENT_TYPE_Changed"/>
+                <Button Content="دریافت مجدد داده ها" Style="{StaticResource MaterialDesignFlatButton}" HorizontalAlignment="Left" FontSize="12" Click="Button_Click_1"/>
+            </DockPanel>
             <TabPanel FlowDirection="RightToLeft" Margin="0,10,0,0">
                 <DockPanel>
                     <Label Content="نوع صورت حساب :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
@@ -129,9 +135,18 @@
             <TabPanel FlowDirection="RightToLeft" >
                 <StackPanel>
                     <Label Content=" * درصورت خالی گذاشتن نوع صورت حساب یا روش تسویه , سیستم از اطلاعات ثبت شده در فاکتور , مقادیر را برمیدارد." VerticalContentAlignment="Center" Foreground="#FFD20000"/>
-                    <Label Content=" * در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                    <!--<Label Content=" * در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
                     <Label Content=" * فقط میتوان فاکتور هایی را ارسال کرد که شماره صورت حساب مرجع آنها خالی باشد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                    <!--<Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
+                    <Label Content=" * به طور پیش فرض در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+
+                    <Label Content=" * فقط میتوان فاکتور هایی را ارسال کرد که شماره صورت حساب مرجع آنها خالی باشد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+
                     <Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+
+                    <Label x:Name="LBL_WARNING_RESEND" Content=" ⚠️⚠️⚠️ هشدار: ارسال مجدد فاکتورهای قبلاً ارسال شده ممکن است منجر به تکراری شدن صورتحساب در سامانه مودیان شود! این گزینه فقط در شرایط خاص استفاده شود."
+                           VerticalContentAlignment="Center" Foreground="#FFFF0000" FontWeight="Bold" FontSize="12"
+                           Visibility="Collapsed" Background="#33FF0000"/>
                 </StackPanel>
             </TabPanel>
 

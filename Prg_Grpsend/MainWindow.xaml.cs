@@ -214,13 +214,140 @@ namespace Prg_Grpsend
         }
 
         public static bool IsDenafaraz { get; set; } = false;
+
+        /// <summary>
+        /// Event handler برای تغییر نوع نمایش فاکتورها (ارسال شده یا نشده)
+        /// </summary>
+        private void RD_SENT_TYPE_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!NowIsReady) return;
+
+            // بررسی اینکه آیا کاربر گزینه "شامل ارسال شده" را انتخاب کرده
+            bool includeSent = RD_INCLUDE_SENT?.IsChecked ?? false;
+            if (includeSent)
+            {
+                // تغییر پس‌زمینه به نارنجی
+                if (DockPanel_SentType != null)
+                {
+                    DockPanel_SentType.Background = new System.Windows.Media.SolidColorBrush(
+                        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#33FF9800"));
+                }
+
+                // نمایش هشدار قوی
+                if (LBL_WARNING_RESEND != null)
+                {
+                    LBL_WARNING_RESEND.Visibility = Visibility.Visible;
+                }
+
+                // نمایش دیالوگ هشدار
+                var warning = @"⚠️⚠️⚠️ هشدار مهم ⚠️⚠️⚠️
+شما در حال فعال کردن گزینه نمایش فاکتورهای ارسال شده هستید!
+توجه داشته باشید که:
+• ارسال مجدد فاکتورهای قبلاً ارسال شده ممکن است منجر به تکراری شدن در سامانه مودیان شود
+• این گزینه فقط برای شرایط خاصی که نیاز به ارسال مجدد دارید، استفاده شود
+• تمامی اقدامات شما در سیستم ثبت و لاگ می‌شود
+آیا مطمئن هستید که می‌خواهید ادامه دهید؟";
+
+                if (!(new Msgwin(true, warning).ShowDialog() ?? false))
+                {
+                    // اگر کاربر انصراف داد، به حالت قبلی برگردان
+                    RD_NOT_SENT_ONLY.IsChecked = true;
+                    return;
+                }
+                // ثبت لاگ در جدول AMALIAT
+                try { Logation.AMALIYAT_USER($"{GetType().Name}| کاربر گزینه نمایش فاکتورهای ارسال شده را فعال کرد [⚠️ WARNING]"); } catch { }
+            }
+            else
+            {
+                // برگرداندن پس‌زمینه به حالت عادی (شفاف)
+                if (DockPanel_SentType != null)
+                {
+                    DockPanel_SentType.Background = System.Windows.Media.Brushes.Transparent;
+                }
+
+                // مخفی کردن هشدار
+                if (LBL_WARNING_RESEND != null)
+                {
+                    LBL_WARNING_RESEND.Visibility = Visibility.Collapsed;
+                }
+            }
+            // بارگذاری مجدد داده‌ها بر اساس انتخاب جدید
+            ReGetData();
+        }
+        /// <summary>
+        /// بررسی و هشدار برای فاکتورهای ارسال شده
+        /// </summary>
+        /// <returns>true اگر کاربر تأیید کرد، false اگر انصراف داد</returns>
+        private bool CheckAndWarnForAlreadySentInvoices()
+        {
+            bool includeSentInvoices = RD_INCLUDE_SENT?.IsChecked ?? false;
+
+            if (!includeSentInvoices)
+                return true; // اگر فاکتورهای ارسال شده نمایش داده نمی‌شوند، ادامه بده
+
+            var selected = FACTOR_DATA.Where(h => h.IsSelected).Select(h => (long)h.NUMBER).ToList();
+
+            if (!selected.Any())
+                return true;
+
+            // چک کردن تعداد فاکتورهایی که قبلاً ارسال شده‌اند
+            string checkSql = $@"SELECT COUNT(DISTINCT NUMBER) FROM dbo.TAXDTL
+                                 WHERE NUMBER IN ({string.Join(",", selected)})
+                                 AND ApiTypeSent = 1
+                                 AND Ins = 1
+                                 AND TheStatus IN ('SUCCESS', 'PENDING')";
+
+            int alreadySentCount = 0;
+            try
+            {
+                alreadySentCount = dbms.DoGetDataSQL<int>(checkSql).FirstOrDefault();
+            }
+            catch { /* در صورت خطا، ادامه بده */ }
+
+            if (alreadySentCount > 0)
+            {
+                var criticalWarning = $@"🚨🚨🚨 هشدار بحرانی 🚨🚨🚨
+از {selected.Count} فاکتور انتخاب شده، {alreadySentCount} فاکتور قبلاً به سامانه مودیان ارسال شده است!
+⚠️ ارسال مجدد این فاکتورها می‌تواند منجر به موارد زیر شود:
+• ایجاد صورت‌حساب تکراری در سامانه مودیان
+• مشکلات حسابداری و مالیاتی
+• نیاز به حذف دستی صورت‌حساب‌های تکراری
+📝 این عملیات در سیستم لاگ شده و قابل پیگیری است.
+آیا واقعاً می‌خواهید این فاکتورها را مجدداً ارسال کنید؟";
+
+                if (!(new Msgwin(true, criticalWarning).ShowDialog() ?? false))
+                    return false;
+
+                // ثبت لاگ در جدول AMALIAT
+                try
+                {
+                    Logation.AMALIYAT_USER($"{GetType().Name}| ⚠️ ارسال مجدد فاکتورها - تعداد کل:{selected.Count}, تعداد قبلاً ارسال شده:{alreadySentCount}");
+                }
+                catch { /* در صورت خطا در لاگ، ادامه بده */ }
+            }
+            return true;
+        }
         private void ReGetData()
         {
             FACTOR_DATA?.Clear();
 
             string condition = IsDenafaraz ? "2" : "13";
 
-            string SQL = @$"SELECT
+            // بررسی اینکه آیا کاربر می‌خواهد فاکتورهای ارسال شده را هم ببیند
+            bool includeSentInvoices = RD_INCLUDE_SENT?.IsChecked ?? false;
+
+            // اگر کاربر فاکتورهای ارسال شده را هم می‌خواهد، شرط NOT EXISTS را حذف می‌کنیم
+            string notExistsCondition = includeSentInvoices ? "" : @"AND NOT EXISTS (
+                                                                SELECT 1
+                                                                FROM dbo.TAXDTL
+                                                                WHERE
+                                                                    dbo.TAXDTL.NUMBER = dbo.HEAD_LST.NUMBER AND  -- شرط اتصال دو جدول
+                                                                    dbo.TAXDTL.ApiTypeSent = 1 AND             -- شرط نوع API ارسال سامانه اصلی
+                                                                    dbo.TAXDTL.Ins = 1 AND                     -- موضوع صورتحساب : اصلی/فروش
+                                                                    dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING') -- شرط وضعیت‌های ارسال شده یا در انتظار
+                                                            )";
+
+            string SQL = $@"SELECT
                                                             dbo.HEAD_LST.NUMBER1,
                                                             dbo.HEAD_LST.TAH,
                                                             dbo.HEAD_LST.NUMBER,
@@ -289,22 +416,17 @@ namespace Prg_Grpsend
                                                             dbo.CUST_HESAB ON dbo.HEAD_LST.CUST_NO = dbo.CUST_HESAB.hes
                                                         WHERE
                                                             (dbo.HEAD_LST.TAG = {condition}) AND
-                                                            (dbo.HEAD_LST_EXTENDED.irtaxid IS NULL OR dbo.HEAD_LST_EXTENDED.irtaxid = N'0' OR dbo.HEAD_LST_EXTENDED.irtaxid = N'') AND -- اونهایی که صورت حساب مرجع شون خالیه
-                                                            NOT EXISTS (
-                                                                SELECT 1
-                                                                FROM dbo.TAXDTL
-                                                                WHERE
-                                                                    dbo.TAXDTL.NUMBER = dbo.HEAD_LST.NUMBER AND  -- شرط اتصال دو جدول
-                                                                    dbo.TAXDTL.ApiTypeSent = 1 AND             -- شرط نوع API ارسال سامانه اصلی
-                                                                    dbo.TAXDTL.Ins = 1 AND                     -- موضوع صورتحساب : اصلی/فروش
-                                                                    dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING') -- شرط وضعیت‌های ارسال شده یا در انتظار
-                                                            ) ORDER BY dbo.HEAD_LST.NUMBER1,dbo.HEAD_LST.NUMBER DESC";
+                                                            (dbo.HEAD_LST_EXTENDED.irtaxid IS NULL OR dbo.HEAD_LST_EXTENDED.irtaxid = N'0' OR dbo.HEAD_LST_EXTENDED.irtaxid = N'') -- اونهایی که صورت حساب مرجع شون خالیه
+                                                            {notExistsCondition}
+                                                        ORDER BY dbo.HEAD_LST.NUMBER1,dbo.HEAD_LST.NUMBER DESC";
 
             var MasterHead = dbms.DoGetDataSQL<HEAD_LST>(SQL).ToList();
             foreach (var item in MasterHead)
             {
                 FACTOR_DATA?.Add(item);
             }
+
+            ROWCOUNT_TEXTBLK.Text = (FACTOR_DATA?.Count ?? 0).ToString();
         }
 
         #region FilterBy
@@ -515,6 +637,9 @@ namespace Prg_Grpsend
             Logation.AMALIYAT_USER($"{GetType().Name}| کلیک روی دکمۀ ارسال گروهی SelectedCount:{SelectedItemsCount}");
 
             if (!IsValid()) return;
+
+            if (!CheckAndWarnForAlreadySentInvoices())
+                return;
 
             // -- دیالوگ تأیید
             if (!(new Msgwin(true, "آیا از ارسال گروهی آیتم‌های انتخاب‌شده مطمئن هستید؟")
@@ -800,6 +925,11 @@ namespace Prg_Grpsend
                     item.IsSelected = AllSelected;
             }
 
+        }
+
+        private void Button_Click_1(object sender, RoutedEventArgs e)
+        {
+            ReGetData();
         }
     }
 }
