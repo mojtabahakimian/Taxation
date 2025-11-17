@@ -198,5 +198,10 @@ namespace Prg_Grpsend
         {
             SetDefaultFocus();
         }
+
+        private void Window_ContentRendered_1(object sender, EventArgs e)
+        {
+
+        }
     }
 }
