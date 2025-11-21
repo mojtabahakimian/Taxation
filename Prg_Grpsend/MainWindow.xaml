@@ -11,7 +11,7 @@
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
         xmlns:sfusion="clr-namespace:Syncfusion.UI.Xaml.Grid;assembly=Syncfusion.SfGrid.WPF" 
         WindowStartupLocation="CenterScreen" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered"
-        Title="ارسال گروهی صورت حساب به سامانه مودیان" Height="600" Width="1024">
+        Title="ارسال گروهی صورت حساب به سامانه مودیان" Height="770" Width="1024">
     <Window.Resources>
         <ItemsPanelTemplate x:Key="VSP">
             <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True" ScrollViewer.CanContentScroll="True" VirtualizingPanel.VirtualizationMode="Recycling"/>
@@ -143,6 +143,7 @@
                     <Label Content=" * فقط میتوان فاکتور هایی را ارسال کرد که شماره صورت حساب مرجع آنها خالی باشد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
 
                     <Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                    <Label Content=" * اگر تاریخ سفارشی را اعمال کنید , بعدا باید مسئله تاریخ را در نظر بگیرید که تاریخ صورت حساب های اصلاح/ابطالی/برگشتی باید بعد از تاریخ صورت حساب (اصلی فروش) مرجع باشد ."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
 
                     <Label x:Name="LBL_WARNING_RESEND" Content=" ⚠️⚠️⚠️ هشدار: ارسال مجدد فاکتورهای قبلاً ارسال شده ممکن است منجر به تکراری شدن صورتحساب در سامانه مودیان شود! این گزینه فقط در شرایط خاص استفاده شود."
                            VerticalContentAlignment="Center" Foreground="#FFFF0000" FontWeight="Bold" FontSize="12"
@@ -210,6 +211,8 @@
                     <syncfusion:GridTextColumn x:Name="SANAD_COLUMN" HeaderText="شماره سند" MappingName="N_S"  Width="110" IsReadOnly="True" />
                     <syncfusion:GridTextColumn x:Name="CUST_HESAB_COLUMN" HeaderText="حساب مشتری" MappingName="CUST_NO" Width="200"  IsReadOnly="True" />
                     <syncfusion:GridTextColumn x:Name="CUST_NAME_COLUMN" HeaderText="نام مشتری" MappingName="NAME" Width="350"  IsReadOnly="True" />
+                    <syncfusion:GridTextColumn x:Name="ECODE_COLUMN" HeaderText="کد اقتصادی" MappingName="ECODE" Width="200" IsReadOnly="True" />
+                    <syncfusion:GridTextColumn x:Name="MCODEM_COLUMN" HeaderText="کدملی/شناسه ملی" MappingName="MCODEM" Width="200" IsReadOnly="True" />
                     <syncfusion:GridTextColumn x:Name="MOLAH_COLUMN" HeaderText="ملاحظات" MappingName="MOLAH" Width="350" IsReadOnly="True" />
                     <syncfusion:GridTextColumn x:Name="NAGHD_COLUMN" HeaderText="مبلغ نقد" MappingName="M_NAGHD"  IsReadOnly="True" />
                     <syncfusion:GridTextColumn x:Name="VARIZI_COLUMN" HeaderText="مبلغ واریزی" MappingName="MABL_VAR" IsReadOnly="True" >

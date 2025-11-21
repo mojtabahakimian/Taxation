@@ -24,7 +24,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using static Prg_Graphicy.Payewin;
 using static Prg_Moadian.Generaly.CL_Generaly;
-using static Prg_TrackSentInvoice.FactorManagement_WIN;
 
 namespace Prg_TrackSentInvoice
 {
@@ -53,6 +52,11 @@ namespace Prg_TrackSentInvoice
         }
 
         #region LOCAL_MODEL
+        public class VAHEDS
+        {
+            public int IDD { get; set; }
+            public string? NAME_MO { get; set; }
+        }
         public class COMBOYMODEL
         {
             public string NAME { get; set; }
@@ -331,6 +335,8 @@ VALUES
             var RST = dbms.DoGetDataSQL<TAXDTL>($"SELECT Taxid, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Iinn, Acn, Trmn, Trn, Pcn, Pid, Pdt, Cdcn, Cdcd, Tonw, Torv, Tocv, Nw, Ssrv, Sscv, Pmt, PV, IDD, RefrenceNumber, TheConfirmationReferenceId, TheError, TheStatus, TheSuccess, CRT, UID, SentTaxMemory, ApiTypeSent, Indatim_Sec, Indati2m_Sec, NUMBER, TAG, DATE_N, REMARKS FROM dbo.TAXDTL " +
                 $"WHERE TheSuccess = 1 AND ApiTypeSent = {APITYPESENT_PARAM} AND Taxid = N'{TAXID_PARAM}'").ToList();
 
+            TAXID_LABEL.Text = " شماره مالیاتی صورت حساب اولیه ارسال شده " + RST.FirstOrDefault()?.Taxid;
+
             foreach (var item in RST)
             {
                 TAXDTL_DATA?.Add(item);
@@ -343,11 +349,12 @@ VALUES
 
                 item.Irtaxid = item.Taxid;
 
+                item.Taxid = null; //make it null to avoid any conflict and also let the app to get new one Taxid
+
                 _snapshots[MakePk(item.IDD)] = TakeSnapshot(item);
             }
 
             GetHeaderSum();
-
         }
 
         //Head
@@ -731,12 +738,11 @@ VALUES
 
             if (!TotalsAreConsistent(out var why))
             {
-                new Msgwin(false, "قواعد جمع/رندینگ رعایت نشده: " + why).Show();
+                new Msgwin(false, "قواعد جمع/رُندینگ رعایت نشده: " + why).Show();
                 return;
             }
 
             AMALIAT();
-
 
             try
             {
@@ -752,6 +758,14 @@ VALUES
                 var taxidNew = taxService.RequestTaxId(_memoryId, now);
                 long indatim = TaxService.ConvertDateToLong(now);
                 long indatim2 = TaxService.ConvertDateToLong(now);
+
+                //بروز رسانی آیتم های حیاتی تغییر یافته برای ارسال جدید:
+                foreach (var taxrow in TAXDTL_DATA)
+                {
+                    taxrow.Taxid = taxidNew;
+                    taxrow.Indatim_Sec = indatim;
+                    taxrow.Indati2m_Sec = indatim2;
+                }
 
                 var HeadFirst = TAXDTL_DATA.First() as TAXDTL;
                 // هدر جدید
@@ -912,7 +926,7 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
 
                         var p = new
                         {
-                            Taxid = CL_MOADIAN.SafeString(src_item.Taxid, 22),
+                            Taxid = CL_MOADIAN.SafeString(taxidNew, 22),
                             Indatim = (DateTime?)null,
                             Indati2m = (DateTime?)null,
                             src_item.Indatim_Sec,

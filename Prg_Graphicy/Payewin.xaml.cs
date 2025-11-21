@@ -117,6 +117,15 @@ namespace Prg_Graphicy
                                     GoFullExitNow();
                                 }
                             }
+                            else if (_Issent.Contains("FAILED"))
+                            {
+                                Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
+                                msgwinv.ShowDialog();
+                                if (msgwinv.DialogResult is false)
+                                {
+                                    GoFullExitNow();
+                                }
+                            }
                         }
                     }
 
@@ -137,6 +146,15 @@ namespace Prg_Graphicy
                         else if (_Corrective_.Contains("SUCCESS") && CL_MOADIAN.TaxURL == "https://tp.tax.gov.ir/req/api/")
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع اصلاحی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟");
+                            msgwinv.ShowDialog();
+                            if (msgwinv.DialogResult is false)
+                            {
+                                GoFullExitNow();
+                            }
+                        }
+                        else if (_Corrective_.Contains("FAILED"))
+                        {
+                            Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
                             if (msgwinv.DialogResult is false)
                             {
@@ -175,6 +193,15 @@ namespace Prg_Graphicy
                                 GoFullExitNow();
                             }
                         }
+                        else if (_Cancely_.Contains("FAILED"))
+                        {
+                            Msgwin msgwinv = new Msgwin(true, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
+                            msgwinv.ShowDialog();
+                            if (msgwinv.DialogResult is false)
+                            {
+                                GoFullExitNow();
+                            }
+                        }
                         //irtaxid_RefNum_cancel = "A278R704C75000163ECF64"; //TaxIDWasGenerated
                         if (!string.IsNullOrEmpty(_HEAD_EXTENDED.irtaxid)) { }
                         else
@@ -199,6 +226,15 @@ namespace Prg_Graphicy
                         else if (_Returny_.Contains("SUCCESS") && CL_MOADIAN.TaxURL == "https://tp.tax.gov.ir/req/api/")
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع برگشتی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟");
+                            msgwinv.ShowDialog();
+                            if (msgwinv.DialogResult is false)
+                            {
+                                GoFullExitNow();
+                            }
+                        }
+                        else if (_Returny_.Contains("FAILED"))
+                        {
+                            Msgwin msgwinv = new Msgwin(true, $"این صورت حساب برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
                             if (msgwinv.DialogResult is false)
                             {
