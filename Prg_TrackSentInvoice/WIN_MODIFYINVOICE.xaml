@@ -23,7 +23,7 @@
 
         <StackPanel Grid.Row="0" Margin="10">
             <Border CornerRadius="5,5,0,0" Background="#F20EB1E8" Padding="5" SnapsToDevicePixels="True">
-                <Label Content="سربرگ صورت حساب Header" FontWeight="Bold" FlowDirection="RightToLeft" FontSize="14" Foreground="#DDFFFFFF" Background="Transparent"/>
+                <Label x:Name="HEADER_LABEL" Content="سربرگ صورت حساب Header" FontWeight="Bold" FlowDirection="RightToLeft" FontSize="14" Foreground="#DDFFFFFF" Background="Transparent"/>
             </Border>
             <DataGrid x:Name="DG_HEAD_INVOICE" RowHeight="50" Height="110" MaxHeight="110" RowEditEnding="DG_HEAD_INVOICE_RowEditEnding" d:ItemsSource="{d:SampleData ItemCount=1}" ItemsSource="{Binding TAXDTL_DATA}" AutoGenerateColumns="False" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Hidden" SelectionMode="Single" SelectionUnit="FullRow" CanUserAddRows="False" CanUserDeleteRows="False">
                 <DataGrid.Style>
@@ -34,7 +34,7 @@
                     </Style>
                 </DataGrid.Style>
                 <DataGrid.Columns>
-                    <DataGridTextColumn x:Name="taxidColumn" Binding="{Binding Taxid}" IsReadOnly="True" Header="شماره منحصر به فرد مالیاتی Taxid" Width="auto"/>
+                    <DataGridTextColumn x:Name="taxidColumn" Visibility="Hidden" Binding="{Binding Taxid}" IsReadOnly="True" Header="شماره منحصر به فرد مالیاتی Taxid" Width="auto"/>
                     <DataGridTemplateColumn Header="نوع صورت حساب Inty" Width="auto" IsReadOnly="True" >
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -251,7 +251,7 @@
                   VerticalAlignment="Center"
                   Background="#FF1F1F1F"/>
 
-            <DataGrid Grid.Row="2"
+            <DataGrid Grid.Row="2" d:ItemsSource="{d:SampleData}"
               x:Name="DG_BODY_INVOICE"
               ItemsSource="{Binding TAXDTL_DATA}"
               AutoGenerateColumns="False"
@@ -314,10 +314,10 @@
             <!-- ===== Totals + Button ===== -->
             <StackPanel Grid.Row="3">
                 <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" Margin="10">
-                    <Label Content="تعداد رکورد ها:" FlowDirection="RightToLeft" />
-                    <TextBlock x:Name="ROWCOUNT_TEXTBLK" Text="" FlowDirection="RightToLeft"
-                       Width="230" HorizontalAlignment="Right" Height="23"/>
-                    <TextBlock Text="{Binding SelectedItemsCount, StringFormat='تعداد انتخاب شده: {0}'}"/>
+                    <!--<Label Content="تعداد رکورد ها:" FlowDirection="RightToLeft" />
+                    <TextBlock x:Name="ROWCOUNT_TEXTBLK" Text="" FlowDirection="RightToLeft" Width="230" HorizontalAlignment="Right" Height="23"/>
+                    <TextBlock Text="{Binding DG_BODY_INVOICE.Items.Count,UpdateSourceTrigger=PropertyChanged}"/>-->
+                    <TextBlock x:Name="TAXID_LABEL" Text=""/>
                 </StackPanel>
 
                 <StackPanel Orientation="Vertical" FlowDirection="RightToLeft" Margin="10,-5,14,10">
@@ -327,7 +327,7 @@
                     <TextBlock x:Name="GrandTotalText" Text="مبلغ نهایی: 0" FontWeight="Bold" Foreground="DarkGreen"/>
                 </StackPanel>
 
-                <UniformGrid Margin="10,-4,10,0">
+                <UniformGrid Margin="10,-6,10,16">
                     <Button x:Name="BTN_SEND"
                     Click="BTN_SEND_Click"
                     Content="ارسال این صورت حساب"

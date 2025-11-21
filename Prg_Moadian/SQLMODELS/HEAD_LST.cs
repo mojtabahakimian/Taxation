@@ -23,6 +23,8 @@ namespace Prg_Moadian.SQLMODELS
         public string? PEPNAME { get; set; }
         public string? PENAME { get; set; }
         public string? PPAME { get; set; }
+        public string? ECODE { get; set; }
+        public string? MCODEM { get; set; }
         public int? inty { get; set; }
         public int? inp { get; set; }
         public int? ins { get; set; }

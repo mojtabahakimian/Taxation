@@ -356,6 +356,8 @@ namespace Prg_Grpsend
                                                             dbo.HEAD_LST.N_S,
                                                             dbo.HEAD_LST.CUST_NO,
                                                             dbo.CUST_HESAB.NAME,
+                                                            dbo.CUST_HESAB.ECODE,
+                                                            dbo.CUST_HESAB.MCODEM,
                                                             dbo.HEAD_LST.MOLAH,
                                                             dbo.HEAD_LST.M_NAGHD,
                                                             dbo.HEAD_LST.MABL_VAR,
