@@ -141,8 +141,10 @@ namespace Prg_Moadian.FUNCTIONS
             {
                 bodies.Add(new TaxModel.InvoiceModel.Body
                 {
-                    Sstid = item.Sstid, //شناسه کالا/خدمت //CODE	STUF_DEF      
-                    Sstt = item.Sstt, //شرح کالا/خدمت //NAME	STUF_DEF
+                    Sstid = item.Sstid, //شناسه کالا/خدمت //CODE	STUF_DEF
+                    Sstt = (_newsaz.FrooshUnitInDeed == true && !string.IsNullOrEmpty(item.Mu))
+                        ? $"{item.Sstt} ({item.Mu})"
+                        : item.Sstt, //شرح کالا/خدمت //NAME	STUF_DEF - واحد اضافه می‌شود اگر تنظیم فعال باشد
                     Mu = item.Mu, //واحد اندازه گیری //VNAMES	TCOD_VAHEDS
                     Am = Convert.ToDecimal(item.Am),//تعداد/مقدار //MEGH	INVO_LST
                     Fee = Convert.ToDecimal(item.Fee), //مبلغ واحد //MABL	INVO_LST

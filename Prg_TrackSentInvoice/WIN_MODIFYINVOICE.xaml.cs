@@ -43,6 +43,7 @@ namespace Prg_TrackSentInvoice
         public string TaxURL { get; set; } = "https://sandboxrc.tax.gov.ir/req/api/";
         private string _memoryId = null;
         private string _privateKey = null;
+        private SAZMAN _sazmanConfig = null;
 
         public WIN_MODIFYINVOICE()
         {
@@ -690,9 +691,10 @@ VALUES
         private void LoadConfig()
         {
             // SAZMAN: گرفتن کلید خصوصی و حافظه
-            var saz = dbms.DoGetDataSQL<SAZMAN>("SELECT TOP 1 MOADINA_SCNUM , YEA , MEMORYID, MEMORYIDsand, PRIVIATEKEY, Dcertificate, ECODE FROM dbo.SAZMAN").FirstOrDefault();
+            var saz = dbms.DoGetDataSQL<SAZMAN>("SELECT TOP 1 MOADINA_SCNUM , YEA , MEMORYID, MEMORYIDsand, PRIVIATEKEY, Dcertificate, ECODE, FrooshUnitInDeed FROM dbo.SAZMAN").FirstOrDefault();
             if (saz == null) throw new Exception("SAZMAN not configured.");
 
+            _sazmanConfig = saz;
             _privateKey = saz.PRIVIATEKEY?.Replace("-----BEGIN PRIVATE KEY-----\r\n", "").Replace("\r\n-----END PRIVATE KEY-----\r\n", "").Trim();
 
             _memoryId = (TaxURL == "https://tp.tax.gov.ir/req/api/") ? saz.MEMORYID?.Trim() : saz.MEMORYIDsand?.Trim();
@@ -924,6 +926,14 @@ VALUES
 Taxid, Indatim, Indati2m, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, NUMBER, TAG, DATE_N)
 VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @NUMBER, @TAG, @DATE_N);";
 
+                        // تعیین Sstt با اضافه شدن واحد اگر تنظیم فعال باشد
+                        string finalSstt = CL_MOADIAN.SafeString(src_item.Sstt, 400);
+                        if (_sazmanConfig?.FrooshUnitInDeed == true && !string.IsNullOrEmpty(src_item.Mu) && !finalSstt.Contains($"({src_item.Mu})"))
+                        {
+                            finalSstt = $"{finalSstt} ({src_item.Mu})";
+                            finalSstt = CL_MOADIAN.SafeString(finalSstt, 400);
+                        }
+
                         var p = new
                         {
                             Taxid = CL_MOADIAN.SafeString(taxidNew, 22),
@@ -964,7 +974,7 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                             src_item.Torv,
                             src_item.Tocv,
                             Sstid = CL_MOADIAN.SafeString(src_item.Sstid, 13),
-                            Sstt = CL_MOADIAN.SafeString(src_item.Sstt, 400),
+                            Sstt = finalSstt,
                             Mu = CL_MOADIAN.SafeDecimal(src_item.Mu),
                             src_item.Am,
                             src_item.Fee,

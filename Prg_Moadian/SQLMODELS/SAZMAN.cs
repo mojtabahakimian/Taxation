@@ -136,6 +136,10 @@
         public string HPOR { get; set; }
         public bool? SAGHF2 { get; set; }
         public string OPTIONSS { get; set; }
+        /// <summary>
+        /// در فاکتور فروش واحد فروش در سند حسابداری ذکر شود
+        /// </summary>
+        public bool? FrooshUnitInDeed { get; set; }
         public bool? CTL_DT { get; set; }
         public bool? LOCKFAP { get; set; }
         public bool? LOCKFSI { get; set; }

@@ -527,8 +527,10 @@ namespace Prg_Moadian.FUNCTIONS
                     //head }
 
                     //body{
-                    Sstid = item.sstid, //شناسه کالا/خدمت //CODE	STUF_DEF      
-                    Sstt = item.KALA, //شرح کالا/خدمت //NAME	STUF_DEF
+                    Sstid = item.sstid, //شناسه کالا/خدمت //CODE	STUF_DEF
+                    Sstt = (L_Baseknow_US.FirstOrDefault()?.FrooshUnitInDeed == true && !string.IsNullOrEmpty(item.mu))
+                        ? $"{item.KALA} ({item.mu})"
+                        : item.KALA, //شرح کالا/خدمت //NAME	STUF_DEF - واحد اضافه می‌شود اگر تنظیم فعال باشد
                     Mu = item.mu, //واحد اندازه گیری //VNAMES	TCOD_VAHEDS
                     Am = (decimal)item.MEGHk,//تعداد/مقدار //MEGH	INVO_LST
                     Fee = (decimal)item.MABL, //مبلغ واحد //MABL	INVO_LST

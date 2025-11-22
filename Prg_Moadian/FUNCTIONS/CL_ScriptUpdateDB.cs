@@ -699,6 +699,9 @@ namespace Prg_Moadian.FUNCTIONS
             //ادامه شماره فاکتور از سال قبل
             try { dbms.DoExecuteSQL(@"ALTER TABLE [dbo].[SAZMAN] ADD [MOADINA_SCNUM] [decimal] (18,0) NOT NULL CONSTRAINT [DF_SAZMAN_MOADINA_SCNUM] DEFAULT (1)"); } catch { }
 
+            // در فاکتور فروش واحد فروش در سند حسابداری ذکر شود
+            try { dbms.DoExecuteSQL(@"ALTER TABLE [dbo].[SAZMAN] ADD [FrooshUnitInDeed] [bit] NULL DEFAULT (0)"); } catch { }
+
             try { dbms.DoExecuteSQL(@"ALTER TABLE dbo.TAXDTL ADD REMARKS NVARCHAR(4000) NULL"); } catch { }
 
             string sqlscript = @"IF OBJECT_ID('dbo.ufn_SplitNVarchar','IF') IS NOT NULL

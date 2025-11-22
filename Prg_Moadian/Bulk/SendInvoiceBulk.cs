@@ -431,7 +431,9 @@ namespace Prg_Moadian.Bulk
             {
 
                 Sstid = l.sstid, //شناسه کالا/خدمت //CODE	STUF_DEF
-                Sstt = l.KALA, //شرح کالا/خدمت //NAME	STUF_DEF
+                Sstt = (_sazman.FrooshUnitInDeed == true && !string.IsNullOrEmpty(l.mu))
+                    ? $"{l.KALA} ({l.mu})"
+                    : l.KALA, //شرح کالا/خدمت //NAME	STUF_DEF - واحد اضافه می‌شود اگر تنظیم فعال باشد
                 Mu = l.mu, //واحد اندازه گیری //VNAMES	TCOD_VAHEDS
                 Am = l.MEGHk ?? 0, //تعداد/مقدار //MEGH	INVO_LST
                 Fee = l.MABL ?? 0, //مبلغ واحد //MABL	INVO_LST
