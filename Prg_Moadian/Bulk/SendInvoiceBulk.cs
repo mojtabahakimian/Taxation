@@ -177,13 +177,17 @@ namespace Prg_Moadian.Bulk
         {
             // 1. بارگذاری HEAD_LST_EXTENDED
             var headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
+            bool headExtExisted = headExt != null;
+
             if (headExt == null)
             {
                 if (Inty_Value != null || Setm_Value != null) //نوع صورت حساب
                 {
+                    var intyValue = Inty_Value.HasValue ? Inty_Value.Value.ToString() : "NULL";
+                    var setmValue = Setm_Value.HasValue ? Setm_Value.Value.ToString() : "NULL";
 
                     _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                                VALUES({number}, {tag}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
+                                VALUES({number}, {tag}, {intyValue}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, {setmValue}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
 
                     headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
 
@@ -193,15 +197,33 @@ namespace Prg_Moadian.Bulk
                     throw new NullyExceptiony($"HEAD_LST_EXTENDED not found for invoice {number} tag {tag}");
                 }
             }
-
-
-            if (Inty_Value != null) //نوع صورت حساب
+            else
             {
-                headExt.inty = Inty_Value;
-            }
-            if (Setm_Value != null) //روش تسویه
-            {
-                headExt.setm = Setm_Value;
+                // اگر headExt از قبل موجود بود، مقادیر را به‌روز کنیم
+                bool needsUpdate = false;
+
+                if (Inty_Value != null && headExt.inty != Inty_Value)
+                {
+                    headExt.inty = Inty_Value;
+                    needsUpdate = true;
+                }
+                if (Setm_Value != null && headExt.setm != Setm_Value)
+                {
+                    headExt.setm = Setm_Value;
+                    needsUpdate = true;
+                }
+
+                // ذخیره تغییرات در دیتابیس
+                if (needsUpdate)
+                {
+                    var intyValue = headExt.inty.HasValue ? headExt.inty.Value.ToString() : "NULL";
+                    var setmValue = headExt.setm.HasValue ? headExt.setm.Value.ToString() : "NULL";
+
+                    _db.DoExecuteSQL($@"UPDATE dbo.HEAD_LST_EXTENDED
+                                        SET inty = {intyValue},
+                                            setm = {setmValue}
+                                        WHERE NUMBER = {number} AND TGU = {tag}");
+                }
             }
 
             // بارگذاری HEAD_LST برای پیدا کردن DEPATMAN
