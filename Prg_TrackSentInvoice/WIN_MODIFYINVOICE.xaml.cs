@@ -768,6 +768,7 @@ VALUES
                 }
 
                 var HeadFirst = TAXDTL_DATA.First() as TAXDTL;
+
                 // هدر جدید
                 #region PrepareModel
                 TaxModel.InvoiceModel.Header header = new TaxModel.InvoiceModel.Header();
