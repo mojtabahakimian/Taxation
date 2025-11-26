@@ -1040,6 +1040,8 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
 
 
             SendHappenned = true;
+
+            BTN_SEND.IsEnabled = false;
         }
 
         public string GetMessageBasedOnId(int id)
