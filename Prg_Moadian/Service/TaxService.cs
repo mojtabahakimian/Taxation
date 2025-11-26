@@ -212,5 +212,11 @@ namespace Prg_Moadian.Service
             root.status = list2[0].Status;
             return root;
         }
+
+        public string RequestTaxIdWithSpecificSerial(string memoryId, DateTime date, long serial)
+        {
+            // اینجا دیگه رندوم نیست، دقیقاً سریالی که می‌خواهیم را می‌فرستیم
+            return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
+        }
     }
 }

@@ -123,8 +123,8 @@ namespace Prg_Moadian.FUNCTIONS
 
             if (_newsaz != null && _newsaz.YEA > 0)
             {
-
-                StarterInnoNumber = _newsaz.YEA.ToString() + "00" + NUMBER;
+                ////StarterInnoNumber = _newsaz.YEA.ToString() + "00" + NUMBER;
+                StarterInnoNumber = TheFunctions.GenerateFixedLengthInno(_newsaz.YEA.ToString(), NUMBER);
             }
 
             ////TheFunctions.SendSampleInvoiceTest1(MemoryID, privateKey, TaxURL);////return; //Just Test and Get Back--------------------------------------------------------------------------|
@@ -479,10 +479,10 @@ namespace Prg_Moadian.FUNCTIONS
                     _HEAD_EXTENDED.crn = null; //شناسه یکتای ثبت قرار داد فروشنده
                 }
 
-                if (StarterInnoNumber == "1")
-                {
-                    StarterInnoNumber = NUMBER.ToString();
-                }
+                ////if (StarterInnoNumber == "1")
+                ////{
+                ////    StarterInnoNumber = NUMBER.ToString();
+                ////}
 
                 L_TAXDTL_US.Add(new TAXDTL
                 {
@@ -491,7 +491,7 @@ namespace Prg_Moadian.FUNCTIONS
                     Indatim_Sec = src_Indatim, //تاریخ و زمان صدور صورت حساب - میلادی
                     Indati2m_Sec = src_Indati2m, //تاریخ و زمان ایجاد صورتحساب - میلادی
                     Inty = _HEAD_EXTENDED?.inty, //نوع صورت حساب // نوع اول , دوم , سوم
-                    Inno = TheFunctions.InnoAddZeroes(StarterInnoNumber), // سریال صورت حساب
+                    Inno = StarterInnoNumber, // سریال صورت حساب
                     Irtaxid = "", //شماره منحصر به فرد مالیاتی صورتحساب مرجع - برای اصلاح , ابطال , برگشت
                     Inp = _HEAD_EXTENDED.inp, //الگوی صورتحساب // الگوی:1 فروشالگوی:2 فروش ارزی الگوی:3 صورتحساب طال، جواهر و پالتین
                     Ins = _HEAD_EXTENDED.ins, //موضوع صورتحساب //ابطالی , اصلاحی 

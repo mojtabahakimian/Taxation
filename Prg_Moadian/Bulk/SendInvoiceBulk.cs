@@ -358,6 +358,12 @@ namespace Prg_Moadian.Bulk
             var taxId = _taxService.RequestTaxId(_memoryId, dt);
             var ts = TaxService.ConvertDateToLong(dt);
 
+            // 1. دریافت شماره فاکتور (مثلاً 10391)
+            long invoiceNum = long.Parse(number.ToString());
+            // 2. تولید سریال ۱۰ رقمی استاندارد
+            // فرض: _sazman.YEA "1404" است
+            string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
+
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto
             {
@@ -365,7 +371,7 @@ namespace Prg_Moadian.Bulk
                 Indatim = ts,
                 Indati2m = ts,
                 Inty = headExt.inty ?? 1,
-                Inno = _fn.InnoAddZeroes($"{_sazman.YEA}00{number}"),
+                Inno = finalInno, //// _fn.InnoAddZeroes($"{_sazman.YEA}00{number}")
                 Irtaxid = null,
                 Inp = /*headExt.inp ??*/ 1,
                 Ins = /*headExt.ins ??*/ 1,
