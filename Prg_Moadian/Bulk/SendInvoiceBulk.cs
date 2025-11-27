@@ -1,22 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
-using System.Reflection.Metadata;
-using System.Text.Json;
-using System.Threading.Tasks;
-using Azure;
+﻿using Azure;
 using Microsoft.Identity.Client;
 using Prg_Moadian.CNNMANAGER;
 using Prg_Moadian.FUNCTIONS;
 using Prg_Moadian.Generaly;
 using Prg_Moadian.Service;
 using Prg_Moadian.SQLMODELS;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Reflection.Metadata;
+using System.Text.Json;
+using System.Threading.Tasks;
 using TaxCollectData.Library.Business;
 using TaxCollectData.Library.Dto.Content;
 using TaxCollectData.Library.Dto.Transfer;
 using static Prg_Moadian.CNNMANAGER.TaxModel;
 using static Prg_Moadian.CNNMANAGER.TaxModel.InvoiceModel;
+using static Prg_Moadian.Generaly.CL_Generaly;
 
 namespace Prg_Moadian.Bulk
 {
@@ -179,18 +180,39 @@ namespace Prg_Moadian.Bulk
             var headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
             if (headExt == null)
             {
-                if (Inty_Value != null || Setm_Value != null) //نوع صورت حساب
-                {
+                //if (Inty_Value != null || Setm_Value != null) //نوع صورت حساب
+                //{
 
+                //    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
+                //                VALUES({number}, {tag}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
+
+                //    headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
+
+                //}
+                //else
+                //{
+                //    throw new NullyExceptiony($"HEAD_LST_EXTENDED not found for invoice {number} tag {tag}");
+                //}
+
+                // ✅ ساخت خودکار رکورد پیش‌فرض برای سربرگ مودیان
+                // اگر نوع صورت حساب یا روش تسویه از UI ارسال شده، از اونها استفاده می‌کنیم
+                // در غیر این صورت از مقادیر پیش‌فرض استفاده می‌شود
+                int defaultInty = Inty_Value ?? 1;  // پیش‌فرض: نوع اول
+                int defaultSetm = Setm_Value ?? 1;  // پیش‌فرض: نقدی
+
+                try
+                {
                     _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                                VALUES({number}, {tag}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
-
-                    headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
-
+                            VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
                 }
-                else
+                catch { }
+
+                headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
+
+                // اگر بعد از INSERT هم نتونستیم بخونیم، خطا بده (این نباید اتفاق بیفته)
+                if (headExt == null)
                 {
-                    throw new NullyExceptiony($"HEAD_LST_EXTENDED not found for invoice {number} tag {tag}");
+                    throw new NullyExceptiony($"Failed to create HEAD_LST_EXTENDED for invoice {number} tag {tag}");
                 }
             }
 
@@ -355,8 +377,12 @@ namespace Prg_Moadian.Bulk
                 dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
             }
 
-            var taxId = _taxService.RequestTaxId(_memoryId, dt);
-            var ts = TaxService.ConvertDateToLong(dt);
+            //var taxId = _taxService.RequestTaxId(_memoryId, dt);
+            //var ts = TaxService.ConvertDateToLong(dt);
+            // اعمال اختلاف زمانی سرور
+            var dtAdjusted = dt.Add(TokenLifeTime.ServerClockSkew); //جلوگیری از خطای تاریخ
+            var taxId = _taxService.RequestTaxId(_memoryId, dtAdjusted);
+            var ts = TaxService.ConvertDateToLong(dtAdjusted);
 
             // 1. دریافت شماره فاکتور (مثلاً 10391)
             long invoiceNum = long.Parse(number.ToString());

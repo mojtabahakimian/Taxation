@@ -22,6 +22,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using TaxCollectData.Library.Business;
 using static Prg_Graphicy.Payewin;
 using static Prg_Moadian.Generaly.CL_Generaly;
 
@@ -236,7 +237,7 @@ VALUES
         public decimal SumTbill => TAXDTL_DATA.Sum(d => d.Tsstam ?? 0);
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
+        {          
             AMALIAT();
 
             FILL_ALL_COMBOBOXES();
@@ -748,16 +749,33 @@ VALUES
             {
                 LoadConfig();
 
+                #region TMPTEST
+                //try
+                //{
+                //    var serverInfo = TaxApiService.Instance.TaxApis.GetServerInformation();
+                //    if (serverInfo?.ServerTime != null)
+                //    {
+                //        TimeSync.SyncWithServer(serverInfo.ServerTime);
+                //    }
+                //}
+                //catch { }
+                #endregion
+
                 // TaxService آماده
                 var taxService = new TaxService(_memoryId, _privateKey, TaxURL);
                 var _ = taxService.RequestToken(); // اعتبارسنجی
 
                 // تاریخ و TaxId جدید
                 var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-                var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, iranTZ);
+                //var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, iranTZ);
+                var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZ);
+
                 var taxidNew = taxService.RequestTaxId(_memoryId, now);
                 long indatim = TaxService.ConvertDateToLong(now);
                 long indatim2 = TaxService.ConvertDateToLong(now);
+
+                //indatim = TimeSync.GetMoadianTimestamp();
+                //indatim2 = TimeSync.GetMoadianTimestamp();
 
                 //بروز رسانی آیتم های حیاتی تغییر یافته برای ارسال جدید:
                 foreach (var taxrow in TAXDTL_DATA)
