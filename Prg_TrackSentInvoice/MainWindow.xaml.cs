@@ -1,40 +1,41 @@
-﻿using Newtonsoft.Json;
+﻿using Dapper;
+using Newtonsoft.Json;
+using NPOI.SS.UserModel;
+using NPOI.Util;
+using NPOI.XSSF.UserModel;
+using Prg_Graphicy.LMethods;
 using Prg_Graphicy.Wins;
 using Prg_Moadian.CNNMANAGER;
 using Prg_Moadian.FUNCTIONS;
 using Prg_Moadian.Generaly;
+using Prg_Moadian.Service;
 using Prg_Moadian.SQLMODELS;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
+using System.Data.SqlClient;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Diagnostics;
-using System.ComponentModel;
-using Prg_Graphicy.LMethods;
-using NPOI.SS.UserModel;
-using NPOI.XSSF.UserModel;
+using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Xml.Serialization;
 using TaxCollectData.Library.Business;
-using TaxCollectData.Library.Dto.Content;
 using TaxCollectData.Library.Dto.Config;
+using TaxCollectData.Library.Dto.Content;
 using TaxCollectData.Library.Dto.Properties;
 using TaxCollectData.Library.Enums;
-using System.Windows.Documents;
-using System.Threading.Tasks;
-using Prg_Moadian.Service;
 using static Prg_Moadian.CNNMANAGER.TaxModel;
-using NPOI.Util;
-using System.Globalization;
-using System.Net.Sockets;
-using System.Net;
-using System.Data.SqlClient;
-using Dapper;
-using System.Windows.Media;
-using System.Windows.Data;
+using static Prg_Moadian.Generaly.CL_Generaly;
 
 namespace Prg_TrackSentInvoice
 {
@@ -1642,7 +1643,7 @@ namespace Prg_TrackSentInvoice
         private long GetCurrentDateLong()
         {
             var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-            var DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, iranTZ);
+            var DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZ);
             return TaxService.ConvertDateToLong(DtNowBase);
         }
         public InvoiceModel.Header CreateHeaderFromFullTaxDtl(FULL_TAXDTL row)
