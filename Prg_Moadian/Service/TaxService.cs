@@ -218,5 +218,6 @@ namespace Prg_Moadian.Service
             // اینجا دیگه رندوم نیست، دقیقاً سریالی که می‌خواهیم را می‌فرستیم
             return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
         }
+
     }
 }

@@ -27,7 +27,13 @@ namespace Prg_Moadian.Generaly
 
         public static class TokenLifeTime
         {
+            /// <summary>
+            /// تاریخ و ساعت سرور مودیان
+            /// </summary>
             public static DateTime ServerUtcTime { get; set; }
+            /// <summary>
+            /// اختلاف زمانی بین تاریخ و ساعت سرور مودیان و ویندوز جاری
+            /// </summary>
             public static TimeSpan ServerClockSkew { get; set; }
             public static DateTime ExpirationTokenTimeUtc { get; set; }
             public static bool IsExpired

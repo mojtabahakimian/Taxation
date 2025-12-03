@@ -237,7 +237,7 @@ VALUES
         public decimal SumTbill => TAXDTL_DATA.Sum(d => d.Tsstam ?? 0);
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
-        {          
+        {
             AMALIAT();
 
             FILL_ALL_COMBOBOXES();
@@ -761,21 +761,26 @@ VALUES
                 //catch { }
                 #endregion
 
-                // TaxService آماده
+                //// TaxService آماده
                 var taxService = new TaxService(_memoryId, _privateKey, TaxURL);
-                var _ = taxService.RequestToken(); // اعتبارسنجی
+                var _ = taxService.RequestToken(); //// اعتبارسنجی
 
-                // تاریخ و TaxId جدید
+                //// تاریخ و TaxId جدید
                 var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-                //var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, iranTZ);
-                var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZ);
+                var serverInfo = TaxApiService.Instance.TaxApis.GetServerInformation();
+
+                var serverUtcNow = serverInfo != null
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(serverInfo.ServerTime).UtcDateTime
+                    : DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
+
+                var now = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
 
                 var taxidNew = taxService.RequestTaxId(_memoryId, now);
                 long indatim = TaxService.ConvertDateToLong(now);
                 long indatim2 = TaxService.ConvertDateToLong(now);
 
-                //indatim = TimeSync.GetMoadianTimestamp();
-                //indatim2 = TimeSync.GetMoadianTimestamp();
+                ////indatim = TimeSync.GetMoadianTimestamp();
+                ////indatim2 = TimeSync.GetMoadianTimestamp();
 
                 //بروز رسانی آیتم های حیاتی تغییر یافته برای ارسال جدید:
                 foreach (var taxrow in TAXDTL_DATA)
