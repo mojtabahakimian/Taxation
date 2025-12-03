@@ -52,9 +52,21 @@ namespace Prg_Moadian.Service
         public static long ConvertDateToLong(DateTime dateTime)
         {
             ////شاید بعدا , صرفا اینجا باشه
-            ////// حذف ثانیه و میلی‌ثانیه 
+            ////// حذف ثانیه و میلی‌ثانیه
             ////dateTime = dateTime.AddTicks(-(dateTime.Ticks % TimeSpan.TicksPerMinute));
             ////return new DateTimeOffset(dateTime).ToUnixTimeMilliseconds();
+
+            // اگر DateTime.Kind نامشخص است، به UTC تبدیل می‌کنیم
+            if (dateTime.Kind == DateTimeKind.Unspecified)
+            {
+                // فرض می‌کنیم که تاریخ ورودی در منطقه زمانی ایران است
+                var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+                dateTime = TimeZoneInfo.ConvertTimeToUtc(dateTime, iranTZ);
+            }
+            else if (dateTime.Kind == DateTimeKind.Local)
+            {
+                dateTime = dateTime.ToUniversalTime();
+            }
 
             return new DateTimeOffset(dateTime).ToUnixTimeMilliseconds();
         }

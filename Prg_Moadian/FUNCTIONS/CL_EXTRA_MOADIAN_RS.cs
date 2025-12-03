@@ -83,7 +83,8 @@ namespace Prg_Moadian.FUNCTIONS
                 return;
             }
 
-            DateTime dt = DateTime.UtcNow;
+            // اعمال ServerClockSkew برای همزمانی با سرور مودیان
+            DateTime dt = DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
 
             //جدول موقتی که فاکتور برای برگشت فروش داخل اون هست
             var RS_ROW = dbms.DoGetDataSQL<FULL_TAXDTL>($"SELECT * FROM {RSDTL_TMP_NAME}").ToList();

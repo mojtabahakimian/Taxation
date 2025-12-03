@@ -298,7 +298,8 @@ namespace Prg_Moadian.FUNCTIONS
                 case 2: //اصلاحی
                 case 3: //یا ابطالی
                     var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-                    DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, iranTZ);
+                    // اعمال ServerClockSkew برای جلوگیری از خطای 02002 (تاریخ نامعتبر)
+                    DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZ);
 
                     src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase); //تولید شماره منحصربه فرد مالیاتی طبق تاریخ الان
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
