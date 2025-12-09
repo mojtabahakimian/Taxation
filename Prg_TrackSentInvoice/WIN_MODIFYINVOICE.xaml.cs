@@ -45,6 +45,8 @@ namespace Prg_TrackSentInvoice
         private string _memoryId = null;
         private string _privateKey = null;
 
+        public bool IsSpecialF { get; set; } = false;
+
         public WIN_MODIFYINVOICE()
         {
             InitializeComponent();
@@ -332,10 +334,17 @@ VALUES
         }
         private void ReGetData()
         {
-            TAXDTL_DATA?.Clear();
-            var RST = dbms.DoGetDataSQL<TAXDTL>($"SELECT Taxid, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Iinn, Acn, Trmn, Trn, Pcn, Pid, Pdt, Cdcn, Cdcd, Tonw, Torv, Tocv, Nw, Ssrv, Sscv, Pmt, PV, IDD, RefrenceNumber, TheConfirmationReferenceId, TheError, TheStatus, TheSuccess, CRT, UID, SentTaxMemory, ApiTypeSent, Indatim_Sec, Indati2m_Sec, NUMBER, TAG, DATE_N, REMARKS FROM dbo.TAXDTL " +
-                $"WHERE TheSuccess = 1 AND ApiTypeSent = {APITYPESENT_PARAM} AND Taxid = N'{TAXID_PARAM}'").ToList();
+            string SQLTEXT = $"SELECT Taxid, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Iinn, Acn, Trmn, Trn, Pcn, Pid, Pdt, Cdcn, Cdcd, Tonw, Torv, Tocv, Nw, Ssrv, Sscv, Pmt, PV, IDD, RefrenceNumber, TheConfirmationReferenceId, TheError, TheStatus, TheSuccess, CRT, UID, SentTaxMemory, ApiTypeSent, Indatim_Sec, Indati2m_Sec, NUMBER, TAG, DATE_N, REMARKS FROM dbo.TAXDTL " +
+                $"WHERE TheSuccess = {(IsSpecialF ? 0 : 1)} AND ApiTypeSent = {APITYPESENT_PARAM} AND Taxid = N'{TAXID_PARAM}'";
 
+            if (IsSpecialF)
+            {
+                string? HeaderText = HEADER_LABEL?.Content?.ToString();
+                HEADER_LABEL.Content = HeaderText + " - حالت ویژه فعال است ";
+            }
+
+            TAXDTL_DATA?.Clear();
+            var RST = dbms.DoGetDataSQL<TAXDTL>(SQLTEXT).ToList();
             TAXID_LABEL.Text = " شماره مالیاتی صورت حساب اولیه ارسال شده " + RST.FirstOrDefault()?.Taxid;
 
             foreach (var item in RST)

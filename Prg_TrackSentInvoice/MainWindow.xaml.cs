@@ -718,14 +718,10 @@ namespace Prg_TrackSentInvoice
                 {
                     new MsgListwin(false, Functions.GetNormilizedMsg(_msgitem.TheError)).ShowDialog();
                 }
-                else if (_msgitem.TheStatus is "SUCCESS" && (_msgitem.Ins is 1)) //اصلی
+                else if ((_msgitem.TheStatus is "SUCCESS") && (_msgitem.Ins is 1)) //اصلی
                 {
                     if (!string.IsNullOrEmpty(_msgitem?.Taxid))
                     {
-                        //FactorManagement_WIN FM_WIN = new FactorManagement_WIN();
-                        //FM_WIN.TAXID = _msgitem.Taxid;
-                        //FM_WIN.ShowDialog();
-
                         byte _apitypesent = 0;
                         if (TaxURL is "https://tp.tax.gov.ir/req/api/") // اگر روی اصلیه
                             _apitypesent = 1;
@@ -1873,7 +1869,91 @@ namespace Prg_TrackSentInvoice
             // 5) نمایش پیام‌ها (رنگ پیش‌فرض)
             new MsgListwin(false, rows).ShowDialog();
         }
+        private void MenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (INVOCIE_DTGR.SelectedItem is not null)
+            {
+                IsOtherProccessingNow = true;
+                var _msgitem = INVOCIE_DTGR.SelectedItem as TRACK_TAXDTL;
 
+                if (_msgitem?.TheStatus is "PENDING")
+                {
+                    return;
+                }
 
+                if (_msgitem?.Ins is 1) //اصلی
+                {
+                    var IsFailed = _msgitem.TheStatus is "FAILED";
+                    if (!string.IsNullOrEmpty(_msgitem?.Taxid))
+                    {
+                        if (IsFailed)
+                        {
+                            Msgwin MSG0 = new Msgwin(true, $"این صورت حساب {_msgitem.Inno} ناموفق بوده با این حال از ارسال ابطالی/برگشتی/اصلاحی آن اطمینان دارید؟");
+                            MSG0.ShowDialog();
+                            if (MSG0.DialogResult != true)
+                            {
+                                return;
+                            }
+                            else
+                            {
+                                #region LOG
+                                try
+                                {
+                                    using (var db = new SqlConnection(CL_CCNNMANAGER.CONNECTION_STR))
+                                    {
+                                        db.Open();
+
+                                        var windowsUser = Environment.UserName; // Windows username
+
+                                        // Get local IPv4 address (skip loopback)
+                                        string ipAddress = Dns.GetHostEntry(Dns.GetHostName())
+                                            .AddressList
+                                            .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a))
+                                            ?.ToString() ?? "UnknownIP";
+
+                                        // Combine into username field
+                                        string username = $"{windowsUser} | {ipAddress}";
+
+                                        string _FRM_ = this.GetType().Name;
+
+                                        var sql = @"
+                            INSERT INTO AMALIAT
+                                (USERID, USERNAME, ADATE, AMALID)
+                            VALUES
+                                (@UserId, @Username, GETDATE(), @AmalId)";
+                                        var parameters = new
+                                        {
+                                            UserId = 0,
+                                            Username = TruncateString(username, 49),
+                                            AmalId = TruncateString("ابطال فاکتور ناموفق", 49)
+                                        };
+                                        db.Execute(sql, parameters);
+                                    }
+                                }
+                                catch { }
+                                #endregion
+                            }
+                        }
+
+                        byte _apitypesent = 0;
+                        if (TaxURL is "https://tp.tax.gov.ir/req/api/") // اگر روی اصلیه
+                            _apitypesent = 1;
+                        else
+                            _apitypesent = 0;
+
+                        WIN_MODIFYINVOICE WINMODIFY = new WIN_MODIFYINVOICE();
+                        if (IsFailed)
+                        {
+                            WINMODIFY.IsSpecialF = true;
+                        }
+                        WINMODIFY.TaxURL = TaxURL;
+                        WINMODIFY.APITYPESENT_PARAM = _apitypesent.ToString();
+                        WINMODIFY.TAXID_PARAM = _msgitem.Taxid;
+                        WINMODIFY.ShowDialog();
+                    }
+                }
+                IsOtherProccessingNow = false;
+            }
+        }
     }
 }
