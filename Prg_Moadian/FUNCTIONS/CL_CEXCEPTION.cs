@@ -2,63 +2,6 @@
 {
     public class CustomExceptErMsg
     {
-        #region BEFORE_RAW_CODES
-        //private void LetInitiEstelam() //مقدار دهی سرویس
-        //{
-        //    try
-        //    {
-        //        ESTELAM.GET_INIT_TAX(TaxURL);
-        //    }
-        //    catch (HttpRequestException ex) // VPN is ON | Internet Not Connected
-        //    {
-        //        new Msgwin(false, "خطای شبکه ای , لطفا از خاموش بودن وی پی خودن و سپس اتصال به اینترنت اطمینان حاصل فرمایید").ShowDialog();
-        //    }
-        //    catch (System.FormatException ex) // Incorrect Private Key
-        //    {
-        //        new Msgwin(false, "کلید خصوصی صحیح نیست").ShowDialog();
-        //    }
-        //    catch (Org.BouncyCastle.OpenSsl.PemException ex) // NULL Private Key
-        //    {
-        //        new Msgwin(false, "کلید خصوصی خالی است.").ShowDialog();
-        //    }
-        //    catch (NullyExceptiony er)
-        //    {
-        //        if (er.Message is "TaxURL is NULL")
-        //        {
-        //            new Msgwin(false, "آدرس مربوط به سایت اصلی یا سندباکس سامانه صحیح نیست !").ShowDialog();
-        //        }
-        //        if (er.Message is "MemoryTax is NULL")
-        //        {
-        //            new Msgwin(false, "حافظه مالیاتی خالی است").ShowDialog();
-        //        }
-        //        if (er.Message is "PrivateKeyTax is NULL")
-        //        {
-        //            new Msgwin(false, "کلید خصوصی خالی است.").ShowDialog();
-        //        }
-        //        if (er.Message is "Authentication is not completed or incorrect entered")
-        //        {
-        //            new Msgwin(false, "حافظه مالیاتی صحیح وارد نشده یا احراز هویت شما کامل نیست و باید برای دریافت گواهی الکترونیکی اقدام کنید").ShowDialog();
-        //        }
-        //    }
-        //    catch (Exception er)
-        //    {
-        //        var _msg = CER.ExpecMsgEr(er);
-
-        //        if (!string.IsNullOrEmpty(_msg))
-        //        {
-        //            new Msgwin(false, _msg).ShowDialog();
-        //        }
-        //        else
-        //        {
-        //            new Msgwin(false, "کلید خصوصی یا حافظه مالیاتی صحیح نیست").ShowDialog();
-        //        }
-        //        //if (er.InnerException is null)
-        //        //{
-        //        //    new Msgwin(false, "کلید خصوصی یا حافظه مالیاتی صحیح نیست").ShowDialog();
-        //        //}
-        //    }
-        //}
-        #endregion
         public string? ExpecMsgEr(Exception ex)
         {
             if (ex is HttpRequestException httpEx)
@@ -184,10 +127,18 @@
                     var FactNum = nullyEx.Message.Replace("HEAD_LST not found for invoice", "");
                     return ($"اطلاعات این فاکتور/حواله {FactNum} ناقص می باشد , لطفا از صحیح بودن سطر های فاکتور اطمینان حاصل فرمایید.");
                 }
+                else if (nullyEx.Message.Contains("ECODE is null or empty"))
+                {
+                    return "کد اقتصادی مشتری خالی است. کد اقتصادی را وارد کنید.";
+                }
             }
             else if (ex.Message.Contains("Value cannot be null", StringComparison.InvariantCultureIgnoreCase))
             {
                 return ($"خطا در انجام عملیات : محتوای تهی در هنگام ارسال وجود دارد و نمیتوان عملیات را ادامه داد");
+            }
+            else if (ex is NullReferenceException || ex.Message.Contains("Object reference not set to an instance of an object", StringComparison.InvariantCultureIgnoreCase))
+            {
+                return "خطا در پردازش اطلاعات فاکتور (NullRef) : اطلاعات ناقص یا خالی وجود دارد. لطفاً از کامل بودن اطلاعات مشتری مانند کدملی/شناسه ملی، کالا و سربرگ فاکتور اطمینان حاصل کنید.";
             }
             //else
             //{

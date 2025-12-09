@@ -343,7 +343,7 @@ namespace Prg_Grpsend
                                                                 WHERE
                                                                     dbo.TAXDTL.NUMBER = dbo.HEAD_LST.NUMBER AND  -- شرط اتصال دو جدول
                                                                     dbo.TAXDTL.ApiTypeSent = 1 AND             -- شرط نوع API ارسال سامانه اصلی
-                                                                    dbo.TAXDTL.Ins = 1 AND                     -- موضوع صورتحساب : اصلی/فروش
+                                                                    dbo.TAXDTL.Ins = 1 AND                     -- موضوع صورتحساب
                                                                     dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING') -- شرط وضعیت‌های ارسال شده یا در انتظار
                                                             )";
 
@@ -429,6 +429,14 @@ namespace Prg_Grpsend
             }
 
             ROWCOUNT_TEXTBLK.Text = (FACTOR_DATA?.Count ?? 0).ToString();
+
+            try
+            {
+                filterService.ClearFilters();
+                ActiveFilters.Clear();
+                ApplyCumulativeFilter();
+            }
+            catch { }
         }
 
         #region FilterBy

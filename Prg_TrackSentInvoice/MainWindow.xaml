@@ -23,8 +23,9 @@
                 <ContextMenu FlowDirection="LeftToRight">
                     <MenuItem Header="Copy Data" Click="CopyData_Click" Icon="{materialDesign:PackIcon Kind=ContentCopy}"/>
                     <Separator/>
-                    <MenuItem Header="Export to XML" Click="ExportToXml_Click" Icon="{materialDesign:PackIcon Kind=Xml}" />
-                    <MenuItem Header="Export to JSON" Click="ExportToJson_Click" Icon="{materialDesign:PackIcon Kind=CodeJson}" />
+                    <!--<MenuItem Header="Export to XML" Click="ExportToXml_Click" Icon="{materialDesign:PackIcon Kind=Xml}" />
+                    <MenuItem Header="Export to JSON" Click="ExportToJson_Click" Icon="{materialDesign:PackIcon Kind=CodeJson}" />-->
+                    <MenuItem Header="ابطالی/برگشتی/اصلاحی این صورت حساب" Click="MenuItem_Click" Icon="{materialDesign:PackIcon Kind=Invoice}"/>
 
                 </ContextMenu>
             </DataGrid.ContextMenu>
