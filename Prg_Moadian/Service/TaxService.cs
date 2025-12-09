@@ -207,6 +207,10 @@ namespace Prg_Moadian.Service
             list.Add(referenceCode);
             List<InquiryResultModel> list2 = TaxApiService.Instance.TaxApis.InquiryByReferenceId(list);
             TaxModel.InquiryByReferenceIdModel inquiryByReferenceIdModel = new TaxModel.InquiryByReferenceIdModel();
+            if (list2 == null || !list2.Any())
+            {
+                return null;
+            }
             string value = list2.Select((InquiryResultModel x) => x.Data).FirstOrDefault()!.ToString();
             TaxModel.InquiryByReferenceIdModel.Root root = JsonConvert.DeserializeObject<TaxModel.InquiryByReferenceIdModel.Root>(value);
             root.status = list2[0].Status;

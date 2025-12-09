@@ -139,12 +139,13 @@ namespace Prg_Moadian.Bulk
                     // ❶ یک «تخمینی» قبل از ارسال (اختیاری)
                     progress?.Report(0);
 
-                    var response = TaxApiService.Instance.TaxApis.SendInvoices(batch, null);
+                    //var response = TaxApiService.Instance.TaxApis.SendInvoices(batch, null);
+
                     //------------------------------------
                     // ❷ فراخوانی وب‌سرویس (ترجیحاً نسخهٔ async)
-                    //var response = await Task
-                    //    .Run(() => TaxApiService.Instance.TaxApis.SendInvoices(batch, null))
-                    //    .ConfigureAwait(false);
+                    var response = await Task
+                        .Run(() => TaxApiService.Instance.TaxApis.SendInvoices(batch, null))
+                        .ConfigureAwait(false);
 
 
                     var batchRecords = batch.Select(dto => allRecords[dto]).ToList();
@@ -270,6 +271,12 @@ namespace Prg_Moadian.Bulk
             string ECODE_M = null, CODEMELI_M = lines.First().MCODEM;
             if (headExt.inty == 1)
             {
+                // بررسی خالی نبودن کد اقتصادی برای نوع اول صورتحساب
+                if (string.IsNullOrWhiteSpace(srcEcode))
+                {
+                    throw new NullyExceptiony("ECODE is null or empty");
+                }
+
                 if (lines.First().tob == 1) // حقیقی
                 {
                     if (srcEcode.Length > 14) throw new InvoiceValidationException(number, "Over Length 14 Ecode for tob=1");
