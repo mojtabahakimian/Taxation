@@ -15,6 +15,17 @@ namespace Prg_Moadian.FUNCTIONS
 {
     public class CL_FUNTIONS
     {
+        public string SafeRemoveFirstFour(string text)
+        {
+            // ۱. اگر نال یا خالی بود -> برگرداندن نال یا خالی
+            if (string.IsNullOrEmpty(text)) return text;
+
+            // ۲. اگر طول رشته ۴ یا کمتر بود -> یعنی بعد از حذف ۴ تا چیزی نمی‌ماند
+            if (text.Length <= 4) return string.Empty;
+
+            // ۳. پرش از ۴ کاراکتر اول و گرفتن بقیه
+            return text.Substring(4);
+        }
         // در کلاس CL_FUNTIONS اضافه یا جایگزین کنید
         public string GenerateFixedLengthInno(string year, long invoiceNumber)
         {

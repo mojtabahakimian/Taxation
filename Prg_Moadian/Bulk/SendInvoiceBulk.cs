@@ -647,7 +647,7 @@ namespace Prg_Moadian.Bulk
                         ["Tax17"] = header.Tax17,
                         ["Cdcd"] = header.Cdcd,
                         ["Date_N"] = record.DATE_N ?? 0,
-                        ["Number"] = header.Inno!.Substring(_sazman.YEA.ToString().Length + 2),
+                        ["Number"] = record?.NUMBER > 0 ? record.NUMBER : _fn.SafeRemoveFirstFour(header.Inno),
                         ["Tag"] = tag,
                         ["Sstid"] = body.Sstid,
                         ["Sstt"] = body.Sstt,

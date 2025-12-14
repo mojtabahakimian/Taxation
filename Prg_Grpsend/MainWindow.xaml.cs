@@ -332,95 +332,98 @@ namespace Prg_Grpsend
             FACTOR_DATA?.Clear();
 
             string condition = IsDenafaraz ? "2" : "13";
+            byte apitypesent = Convert.ToBoolean(RD_MAINAPI.IsChecked ?? false) ? (byte)1 : (byte)0;
 
-            // بررسی اینکه آیا کاربر می‌خواهد فاکتورهای ارسال شده را هم ببیند
+            string apiSqlCondition = (apitypesent == 1)
+                ? "dbo.TAXDTL.ApiTypeSent = 1"
+                : "(dbo.TAXDTL.ApiTypeSent = 0 OR dbo.TAXDTL.ApiTypeSent IS NULL)";
+
             bool includeSentInvoices = RD_INCLUDE_SENT?.IsChecked ?? false;
 
-            // اگر کاربر فاکتورهای ارسال شده را هم می‌خواهد، شرط NOT EXISTS را حذف می‌کنیم
-            string notExistsCondition = includeSentInvoices ? "" : @"AND NOT EXISTS (
-                                                                SELECT 1
-                                                                FROM dbo.TAXDTL
-                                                                WHERE
-                                                                    dbo.TAXDTL.NUMBER = dbo.HEAD_LST.NUMBER AND  -- شرط اتصال دو جدول
-                                                                    dbo.TAXDTL.ApiTypeSent = 1 AND             -- شرط نوع API ارسال سامانه اصلی
-                                                                    dbo.TAXDTL.Ins = 1 AND                     -- موضوع صورتحساب
-                                                                    dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING') -- شرط وضعیت‌های ارسال شده یا در انتظار
-                                                            )";
+            string notExistsCondition = includeSentInvoices ? "" : $@"AND NOT EXISTS (
+                                                                          SELECT 1
+                                                                          FROM dbo.TAXDTL
+                                                                          WHERE
+                                                                              dbo.TAXDTL.NUMBER = dbo.HEAD_LST.NUMBER AND
+                                                                              dbo.TAXDTL.Ins = 1 AND
+                                                                              dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING') AND
+                                                                              {apiSqlCondition}
+                                                                      )";
 
             string SQL = $@"SELECT
-                                                            dbo.HEAD_LST.NUMBER1,
-                                                            dbo.HEAD_LST.TAH,
-                                                            dbo.HEAD_LST.NUMBER,
-                                                            dbo.HEAD_LST.DATE_N,
-                                                            dbo.HEAD_LST.MAS,
-                                                            dbo.HEAD_LST.N_S,
-                                                            dbo.HEAD_LST.CUST_NO,
-                                                            dbo.CUST_HESAB.NAME,
-                                                            dbo.CUST_HESAB.ECODE,
-                                                            dbo.CUST_HESAB.MCODEM,
-                                                            dbo.HEAD_LST.MOLAH,
-                                                            dbo.HEAD_LST.M_NAGHD,
-                                                            dbo.HEAD_LST.MABL_VAR,
-                                                            dbo.HEAD_LST.MOIN_VAR,
-                                                            dbo.HEAD_LST.MABL_HAV,
-                                                            dbo.HEAD_LST.MOIN_HAV,
-                                                            dbo.HEAD_LST.MABL_HAZ,
-                                                            dbo.HEAD_LST.MOIN_HAZ,
-                                                            dbo.HEAD_LST.TAKHFIF,
-                                                            dbo.HEAD_LST.MOIN_KHF,
-                                                            dbo.HEAD_LST.TAG,
-                                                            dbo.DEPART.DEPNAME,
-                                                            dbo.SHIFT.SHNAME,
-                                                            dbo.CUSTKIND.CUSTKNAME,
-                                                            dbo.HEAD_LST.USER_NAME,
-                                                            dbo.HEAD_LST.SHARAYET,
-                                                            dbo.HEAD_LST.MBAA,
-                                                            dbo.HEAD_LST.HMBAA,
-                                                            dbo.HEAD_LST.TICMBAA,
-                                                            dbo.HEAD_LST.TKHF,
-                                                            dbo.HEAD_LST.OKF,
-                                                            dbo.HEAD_LST.JAY,
-                                                            dbo.HEAD_LST.SGN1,
-                                                            dbo.HEAD_LST.SGN2,
-                                                            dbo.HEAD_LST.SGN3,
-                                                            dbo.HEAD_LST.sgn1usid,
-                                                            dbo.HEAD_LST.sgn2usid,
-                                                            dbo.HEAD_LST.sgn3usid,
-                                                            dbo.HEAD_LST.CRT,
-                                                            dbo.HEAD_LST.UID,
-                                                            dbo.PRICE_ELAMIE.PEPNAME,
-                                                            dbo.PRICE_ELAMIETF.PENAME,
-                                                            dbo.PRICE_PAYNO.PPAME,
-                                                            dbo.HEAD_LST_EXTENDED.inty,
-                                                            dbo.HEAD_LST_EXTENDED.inp,
-                                                            dbo.HEAD_LST_EXTENDED.ins AS ext_ins, -- تغییر نام مستعار برای جلوگیری از تداخل احتمالی با منطق TAXDTL.Ins
-                                                            dbo.HEAD_LST_EXTENDED.irtaxid,
-                                                            dbo.HEAD_LST_EXTENDED.insp,
-                                                            dbo.HEAD_LST_EXTENDED.cap,
-                                                            dbo.HEAD_LST_EXTENDED.setm
-                                                        FROM
-                                                            dbo.HEAD_LST
-                                                        LEFT OUTER JOIN
-                                                            dbo.HEAD_LST_EXTENDED ON dbo.HEAD_LST.NUMBER = dbo.HEAD_LST_EXTENDED.NUMBER
-                                                        LEFT OUTER JOIN
-                                                            dbo.PRICE_PAYNO ON dbo.HEAD_LST.MODAT_PPID = dbo.PRICE_PAYNO.PPID
-                                                        LEFT OUTER JOIN
-                                                            dbo.PRICE_ELAMIETF ON dbo.HEAD_LST.PEID = dbo.PRICE_ELAMIETF.PEID
-                                                        LEFT OUTER JOIN
-                                                            dbo.CUSTKIND ON dbo.HEAD_LST.CUST_KIND = dbo.CUSTKIND.CUST_COD
-                                                        LEFT OUTER JOIN
-                                                            dbo.PRICE_ELAMIE ON dbo.HEAD_LST.PEPID = dbo.PRICE_ELAMIE.PEPID
-                                                        LEFT OUTER JOIN
-                                                            dbo.DEPART ON dbo.HEAD_LST.DEPATMAN = dbo.DEPART.DEPATMAN
-                                                        LEFT OUTER JOIN
-                                                            dbo.SHIFT ON dbo.HEAD_LST.SHIFT = dbo.SHIFT.SHIFT_ID
-                                                        LEFT OUTER JOIN
-                                                            dbo.CUST_HESAB ON dbo.HEAD_LST.CUST_NO = dbo.CUST_HESAB.hes
-                                                        WHERE
-                                                            (dbo.HEAD_LST.TAG = {condition}) AND
-                                                            (dbo.HEAD_LST_EXTENDED.irtaxid IS NULL OR dbo.HEAD_LST_EXTENDED.irtaxid = N'0' OR dbo.HEAD_LST_EXTENDED.irtaxid = N'') -- اونهایی که صورت حساب مرجع شون خالیه
-                                                            {notExistsCondition}
-                                                        ORDER BY dbo.HEAD_LST.NUMBER1,dbo.HEAD_LST.NUMBER DESC";
+                        dbo.HEAD_LST.NUMBER1,
+                        dbo.HEAD_LST.TAH,
+                        dbo.HEAD_LST.NUMBER,
+                        dbo.HEAD_LST.DATE_N,
+                        dbo.HEAD_LST.MAS,
+                        dbo.HEAD_LST.N_S,
+                        dbo.HEAD_LST.CUST_NO,
+                        dbo.CUST_HESAB.NAME,
+                        dbo.CUST_HESAB.ECODE,
+                        dbo.CUST_HESAB.MCODEM,
+                        dbo.HEAD_LST.MOLAH,
+                        dbo.HEAD_LST.M_NAGHD,
+                        dbo.HEAD_LST.MABL_VAR,
+                        dbo.HEAD_LST.MOIN_VAR,
+                        dbo.HEAD_LST.MABL_HAV,
+                        dbo.HEAD_LST.MOIN_HAV,
+                        dbo.HEAD_LST.MABL_HAZ,
+                        dbo.HEAD_LST.MOIN_HAZ,
+                        dbo.HEAD_LST.TAKHFIF,
+                        dbo.HEAD_LST.MOIN_KHF,
+                        dbo.HEAD_LST.TAG,
+                        dbo.DEPART.DEPNAME,
+                        dbo.SHIFT.SHNAME,
+                        dbo.CUSTKIND.CUSTKNAME,
+                        dbo.HEAD_LST.USER_NAME,
+                        dbo.HEAD_LST.SHARAYET,
+                        dbo.HEAD_LST.MBAA,
+                        dbo.HEAD_LST.HMBAA,
+                        dbo.HEAD_LST.TICMBAA,
+                        dbo.HEAD_LST.TKHF,
+                        dbo.HEAD_LST.OKF,
+                        dbo.HEAD_LST.JAY,
+                        dbo.HEAD_LST.SGN1,
+                        dbo.HEAD_LST.SGN2,
+                        dbo.HEAD_LST.SGN3,
+                        dbo.HEAD_LST.sgn1usid,
+                        dbo.HEAD_LST.sgn2usid,
+                        dbo.HEAD_LST.sgn3usid,
+                        dbo.HEAD_LST.CRT,
+                        dbo.HEAD_LST.UID,
+                        dbo.PRICE_ELAMIE.PEPNAME,
+                        dbo.PRICE_ELAMIETF.PENAME,
+                        dbo.PRICE_PAYNO.PPAME,
+                        dbo.HEAD_LST_EXTENDED.inty,
+                        dbo.HEAD_LST_EXTENDED.inp,
+                        dbo.HEAD_LST_EXTENDED.ins AS ext_ins,
+                        dbo.HEAD_LST_EXTENDED.irtaxid,
+                        dbo.HEAD_LST_EXTENDED.insp,
+                        dbo.HEAD_LST_EXTENDED.cap,
+                        dbo.HEAD_LST_EXTENDED.setm
+                    FROM
+                        dbo.HEAD_LST
+                    LEFT OUTER JOIN
+                        dbo.HEAD_LST_EXTENDED ON dbo.HEAD_LST.NUMBER = dbo.HEAD_LST_EXTENDED.NUMBER
+                    LEFT OUTER JOIN
+                        dbo.PRICE_PAYNO ON dbo.HEAD_LST.MODAT_PPID = dbo.PRICE_PAYNO.PPID
+                    LEFT OUTER JOIN
+                        dbo.PRICE_ELAMIETF ON dbo.HEAD_LST.PEID = dbo.PRICE_ELAMIETF.PEID
+                    LEFT OUTER JOIN
+                        dbo.CUSTKIND ON dbo.HEAD_LST.CUST_KIND = dbo.CUSTKIND.CUST_COD
+                    LEFT OUTER JOIN
+                        dbo.PRICE_ELAMIE ON dbo.HEAD_LST.PEPID = dbo.PRICE_ELAMIE.PEPID
+                    LEFT OUTER JOIN
+                        dbo.DEPART ON dbo.HEAD_LST.DEPATMAN = dbo.DEPART.DEPATMAN
+                    LEFT OUTER JOIN
+                        dbo.SHIFT ON dbo.HEAD_LST.SHIFT = dbo.SHIFT.SHIFT_ID
+                    LEFT OUTER JOIN
+                        dbo.CUST_HESAB ON dbo.HEAD_LST.CUST_NO = dbo.CUST_HESAB.hes
+                     WHERE
+                         (dbo.HEAD_LST.TAG = {condition}) AND
+                         (dbo.HEAD_LST_EXTENDED.irtaxid IS NULL OR dbo.HEAD_LST_EXTENDED.irtaxid = N'0' OR dbo.HEAD_LST_EXTENDED.irtaxid = N'') -- اونهایی که صورت حساب مرجع شون خالیه
+                         {notExistsCondition}
+                     ORDER BY dbo.HEAD_LST.NUMBER1,dbo.HEAD_LST.NUMBER DESC";
 
             var MasterHead = dbms.DoGetDataSQL<HEAD_LST>(SQL).ToList();
             foreach (var item in MasterHead)
@@ -435,6 +438,7 @@ namespace Prg_Grpsend
                 filterService.ClearFilters();
                 ActiveFilters.Clear();
                 ApplyCumulativeFilter();
+                SYNCFUSION_DG.ClearFilters();
                 SYNCFUSION_DG.View.Refresh();
             }
             catch { }

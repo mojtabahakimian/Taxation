@@ -72,7 +72,7 @@
                 <RadioButton x:Name="RD_SANDBOXAPI" GroupName="APITYPE" IsChecked="True" Content="تستی SandBox" Margin="5"/>
             </DockPanel>
             <DockPanel x:Name="DockPanel_SentType" FlowDirection="RightToLeft" Margin="0,10,0,0">
-                <Label Content="⚠️ نمایش فاکتورها :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontWeight="Bold" />
+                <Label Content="نمایش فاکتورها :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontWeight="Bold" />
                 <RadioButton x:Name="RD_NOT_SENT_ONLY" GroupName="SENTTYPE" IsChecked="True" Content="فقط فاکتورهای ارسال نشده" Margin="5" Checked="RD_SENT_TYPE_Changed"/>
                 <RadioButton x:Name="RD_INCLUDE_SENT" GroupName="SENTTYPE" Content="⚠️ همه فاکتورها (شامل ارسال شده)" Margin="5" Foreground="#FFD20000" FontWeight="Bold" Checked="RD_SENT_TYPE_Changed"/>
                 <Button Content="دریافت مجدد داده ها" Style="{StaticResource MaterialDesignFlatButton}" HorizontalAlignment="Left" FontSize="12" Click="Button_Click_1"/>

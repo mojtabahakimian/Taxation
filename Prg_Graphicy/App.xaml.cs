@@ -28,9 +28,9 @@ namespace Prg_Graphicy
             // [0 | False] = SandBox Testy
             // [1 | True] = Main
 
-            string[] defaultargs = new string[] { "default_value" };
-            args = args.Length > 0 ? args : defaultargs;
-            args[0] = "10470_2_m"; //شماره حواله
+            //string[] defaultargs = new string[] { "default_value" };
+            //args = args.Length > 0 ? args : defaultargs;
+            //args[0] = "10470_2_m"; //شماره حواله
 
             #region Prepair_Get_Input_Text_Passed_And+
             if (args.Length > 0)
