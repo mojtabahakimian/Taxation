@@ -435,6 +435,7 @@ namespace Prg_Grpsend
                 filterService.ClearFilters();
                 ActiveFilters.Clear();
                 ApplyCumulativeFilter();
+                SYNCFUSION_DG.View.Refresh();
             }
             catch { }
         }

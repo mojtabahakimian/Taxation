@@ -138,7 +138,7 @@
             }
             else if (ex is NullReferenceException || ex.Message.Contains("Object reference not set to an instance of an object", StringComparison.InvariantCultureIgnoreCase))
             {
-                return "خطا در پردازش اطلاعات فاکتور (NullRef) : اطلاعات ناقص یا خالی وجود دارد. لطفاً از کامل بودن اطلاعات مشتری مانند کدملی/شناسه ملی، کالا و سربرگ فاکتور اطمینان حاصل کنید.";
+                return "خطا در پردازش اطلاعات (NullRef) : اطلاعات ناقص یا خالی وجود دارد.";
             }
             //else
             //{
