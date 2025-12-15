@@ -268,7 +268,7 @@ namespace Prg_Moadian.Bulk
 
             // 5. تعیین ECODE_M و CODEMELI_M
             string srcEcode = lines.First().ECODE;
-            string ECODE_M = null, CODEMELI_M = lines.First().MCODEM;
+            string ECODE_M = null, CODEMELI_M = null;//= lines.First().MCODEM;
             if (headExt.inty == 1)
             {
                 // بررسی خالی نبودن کد اقتصادی برای نوع اول صورتحساب
