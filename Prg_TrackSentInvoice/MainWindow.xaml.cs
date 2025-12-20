@@ -21,6 +21,8 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -1955,5 +1957,302 @@ namespace Prg_TrackSentInvoice
                 IsOtherProccessingNow = false;
             }
         }
+
+        private void Label_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (INVOCIE_DTGR.SelectedItem is not null)
+            {
+                IsOtherProccessingNow = true;
+                try
+                {
+                    var selectedItem = INVOCIE_DTGR.SelectedItem as TRACK_TAXDTL;
+                    string taxid = selectedItem.Taxid;
+                    int isMainApi = (bool)selectedItem.ApiTypeSent ? 1 : 0;
+                    string baseUid = selectedItem.UID;
+
+                    // 1. دریافت اطلاعات کامل از دیتابیس
+                    // مشابه لاجیک Resend، باید ردیف‌های کامل را بگیریم
+                    var originalInvoiceRows = dbms.DoGetDataSQL<FULL_TAXDTL>(@"
+                                                SELECT *
+                                                FROM dbo.TAXDTL
+                                                WHERE Taxid = @taxid AND ApiTypeSent = @api AND Uid = @baseUid
+                                                ORDER BY CRT, IDD
+                                            ", new { taxid, api = isMainApi, baseUid });
+
+                    if (!originalInvoiceRows.Any())
+                    {
+                        // Fallback: شاید UID تغییر کرده یا کاربر روی ردیفی کلیک کرده که UID دقیق ندارد (مثلا ردیف خلاصه نیست)
+                        // سعی میکنیم با TaxId بگیریم
+                        originalInvoiceRows = dbms.DoGetDataSQL<FULL_TAXDTL>(@"
+                                                SELECT *
+                                                FROM dbo.TAXDTL
+                                                WHERE Taxid = @taxid AND ApiTypeSent = @api
+                                                ORDER BY CRT DESC, IDD
+                                            ", new { taxid, api = isMainApi });
+                    }
+
+                    if (!originalInvoiceRows.Any())
+                    {
+                        new Msgwin(false, "اطلاعات جزئیات صورتحساب یافت نشد.").ShowDialog();
+                        return;
+                    }
+
+                    // چون ممکن است چندین تلاش ارسال با یک تکس آی دی باشد (که نباید باشد ولی محض اطمینان)،
+                    // ما آخرین تلاش (بر اساس CRT) را در نظر میگیریم یا همان که کاربر انتخاب کرده.
+                    // اگر کاربر روی گرید کلیک کرده، ما UID آن ردیف را داریم.
+                    // پس فیلتر روی UID که در بالا انجام دادیم صحیح است.
+
+                    var header = CreateHeaderFromFullTaxDtl(originalInvoiceRows.First());
+                    var bodies = CreateBodyListFromFullTaxDtl(originalInvoiceRows.ToList());
+
+                    // 2. فراخوانی متد اعتبارسنجی
+                    var result = InvoiceValidator.Validate(header, bodies);
+
+                    // 3. نمایش نتایج
+                    var rows = new List<object>();
+                    int r = 1;
+
+                    // افزودن خطاها
+                    foreach (var err in result.Errors)
+                    {
+                        rows.Add(new { ROW_U = r++, CODE_U = "⛔", MessageText_U = err });
+                    }
+
+                    // افزودن هشدارها
+                    foreach (var warn in result.Warnings)
+                    {
+                        rows.Add(new { ROW_U = r++, CODE_U = "⚠️", MessageText_U = warn });
+                    }
+
+                    if (result.IsValid && !result.Warnings.Any())
+                    {
+                        rows.Add(new { ROW_U = r++, CODE_U = "✅", MessageText_U = "تایید نهایی: تمامی بررسی‌های محاسباتی و ساختاری با موفقیت انجام شد." });
+                    }
+
+                    string color = result.IsValid ? "#FF00AA00" : "#FFFF0000"; // سبز یا قرمز
+                    // اگر فقط هشدار باشد، رنگ نارنجی شاید بهتر باشد، اما سبز هم بد نیست چون معتبر است.
+
+                    if (result.IsValid && result.Warnings.Any()) color = "#DD000000"; 
+
+                    new MsgListwin(false, rows, color).ShowDialog();
+
+                }
+                catch (Exception ex)
+                {
+                    CL_Generaly.DoWritePRGLOG("Error in ReValidation", ex);
+                    new Msgwin(false, "خطا در انجام عملیات اعتبارسنجی").ShowDialog();
+                }
+                finally
+                {
+                    IsOtherProccessingNow = false;
+                }
+            }
+        }
+
+        private bool Obsolete_ReValidate()
+        {
+            try
+            {
+                if (INVOCIE_DTGR.SelectedItem is not TRACK_TAXDTL selected)
+                {
+                    new Msgwin(false, "هیچ صورتحسابی انتخاب نشده است.").ShowDialog();
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(selected.Taxid))
+                {
+                    new Msgwin(false, "شناسه مالیاتی صورتحساب خالی است و امکان بررسی وجود ندارد.").ShowDialog();
+                    return false;
+                }
+
+                var details = dbms.DoGetDataSQL<TAXDTL>($"SELECT * FROM dbo.TAXDTL WHERE Taxid = N'{selected.Taxid}'").ToList();
+                if (details is null || details.Count == 0)
+                {
+                    new Msgwin(false, "هیچ سطری برای این صورتحساب در پایگاه داده پیدا نشد.").ShowDialog();
+                    return false;
+                }
+
+                var header = details.First();
+                decimal SumOrZero(Func<TAXDTL, decimal?> selector) => details.Sum(d => selector(d) ?? 0m);
+
+                var report = new StringBuilder();
+                var warnings = new List<string>();
+                var oks = new List<string>();
+
+                static bool IsValidNumeric(string? value, int length)
+                {
+                    return !string.IsNullOrWhiteSpace(value)
+                           && value.Length == length
+                           && value.All(char.IsDigit);
+                }
+
+                void Check(bool condition, string okMessage, string warningMessage)
+                {
+                    if (condition)
+                    {
+                        oks.Add(okMessage);
+                    }
+                    else
+                    {
+                        warnings.Add(warningMessage);
+                    }
+                }
+
+                // تعداد سطرها
+                if (selected.LineCount.HasValue && selected.LineCount != details.Count)
+                {
+                    warnings.Add($"تعداد سطرهای ثبت شده ({details.Count}) با تعداد ذخیره شده ({selected.LineCount}) همخوانی ندارد.");
+                }
+                else
+                {
+                    oks.Add($"تعداد سطرها ({details.Count}) با رکورد انتخابی هماهنگ است.");
+                }
+
+                // مغایرت جمع مبالغ مهم با سربرگ
+                void CheckTotal(string title, decimal expected, decimal actual)
+                {
+                    if (Math.Round(expected, 2) != Math.Round(actual, 2))
+                    {
+                        warnings.Add($"جمع {title} سطرها ({actual:N0}) با مقدار سربرگ ({expected:N0}) برابر نیست.");
+                    }
+                    else
+                    {
+                        oks.Add($"جمع {title} سطرها ({actual:N0}) با سربرگ برابر است.");
+                    }
+                }
+
+                CheckTotal("مبلغ قبل از تخفیف (Prdis)", header.Tprdis ?? 0m, SumOrZero(d => d.Prdis));
+                CheckTotal("تخفیف (Dis)", header.Tdis ?? 0m, SumOrZero(d => d.Dis));
+                CheckTotal("مبلغ پس از تخفیف (Adis)", header.Tadis ?? 0m, SumOrZero(d => d.Adis));
+                CheckTotal("مالیات/عوارض (Vam)", header.Tvam ?? 0m, SumOrZero(d => d.Vam));
+                CheckTotal("جمع صورتحساب (Tbill)", header.Tbill ?? 0m, SumOrZero(d => d.Tsstam));
+
+                var headerNet = header.Tadis ?? 0m;
+                var headerVat = header.Tvam ?? 0m;
+                var headerOtherDuties = header.Todam ?? 0m;
+                var recomputedHeaderBill = Math.Round(headerNet + headerVat + headerOtherDuties, 2);
+                if (Math.Round(header.Tbill ?? 0m, 2) != recomputedHeaderBill)
+                {
+                    warnings.Add($"جمع نهایی سربرگ (Tbill={header.Tbill:N0}) با مجموع خالص+مالیات+عوارض ({recomputedHeaderBill:N0}) برابر نیست.");
+                }
+                else
+                {
+                    oks.Add("جمع نهایی سربرگ با اجزای آن همخوانی دارد.");
+                }
+
+                Check(IsValidNumeric(header.Tins, 11), "کد اقتصادی فروشنده (Tins) معتبر است.", "کد اقتصادی فروشنده (Tins) خالی یا ۱۱ رقمی نیست.");
+                if (!string.IsNullOrWhiteSpace(header.Tinb))
+                {
+                    Check(IsValidNumeric(header.Tinb, 11), "کد اقتصادی خریدار (Tinb) صحیح به نظر می‌رسد.", "کد اقتصادی خریدار (Tinb) باید ۱۱ رقمی و فقط عدد باشد.");
+                }
+                else if (string.IsNullOrWhiteSpace(header.Bpn))
+                {
+                    warnings.Add("هیچ شناسه‌ای برای خریدار (Tinb/Bpn) ثبت نشده است.");
+                }
+                else
+                {
+                    Check(IsValidNumeric(header.Bpn, 10), "کد ملی/شناسه خریدار (Bpn) وارد شده است.", "کد ملی/شناسه خریدار (Bpn) باید ۱۰ رقمی باشد.");
+                }
+
+                if (header.Ins is 2 or 3 or 4)
+                {
+                    Check(!string.IsNullOrWhiteSpace(header.Irtaxid), "شناسه مرجع برای صورتحساب اصلاحی/ابطالی درج شده است.", "برای صورتحساب‌های غیر اصلی، شناسه مرجع (Irtaxid) الزامی است.");
+                }
+
+                Check(!string.IsNullOrWhiteSpace(header.Inno), "شماره فاکتور داخلی ثبت شده است.", "شماره فاکتور داخلی (Inno) خالی است.");
+                Check(header.Inty is >= 1 and <= 3, "نوع صورتحساب (Inty) در بازه مجاز است.", "نوع صورتحساب (Inty) خارج از بازه مجاز ۱ تا ۳ است.");
+                Check(header.Inp is >= 1 and <= 7, "الگوی صورتحساب (Inp) صحیح است.", "الگوی صورتحساب (Inp) خارج از بازه مجاز است.");
+                Check(header.Ins is >= 1 and <= 4, "موضوع صورتحساب (Ins) معتبر است.", "موضوع صورتحساب (Ins) خارج از بازه مجاز است.");
+
+                foreach (var line in details.Select((d, index) => (d, index)))
+                {
+                    var row = line.index + 1;
+                    var d = line.d;
+
+                    if (string.IsNullOrWhiteSpace(d.Sstid))
+                    {
+                        warnings.Add($"ردیف {row}: کد کالا/خدمت (Sstid) خالی است.");
+                    }
+
+                    if ((d.Am ?? 0) <= 0 || (d.Fee ?? 0) <= 0)
+                    {
+                        warnings.Add($"ردیف {row}: مقدار یا فی صفر/منفی است.");
+                    }
+
+                    var prdis = d.Prdis ?? 0m;
+                    var dis = d.Dis ?? 0m;
+                    var adis = d.Adis ?? 0m;
+                    var vra = d.Vra ?? 0m;
+                    var vam = d.Vam ?? 0m;
+                    var total = d.Tsstam ?? 0m;
+
+                    if (Math.Round(prdis - dis, 2) != Math.Round(adis, 2))
+                    {
+                        warnings.Add($"ردیف {row}: مبلغ پس از تخفیف (Adis) با مبلغ قبل از تخفیف منهای تخفیف برابر نیست.");
+                    }
+
+                    if (dis > prdis)
+                    {
+                        warnings.Add($"ردیف {row}: تخفیف (Dis) از مبلغ قبل از تخفیف (Prdis) بیشتر است.");
+                    }
+
+                    var expectedVat = Math.Round(adis * vra / 100m, 2);
+                    if (Math.Abs(expectedVat - Math.Round(vam, 2)) > 1)
+                    {
+                        warnings.Add($"ردیف {row}: مبلغ مالیات/عوارض (Vam) با نرخ اعمال‌شده ({vra}٪) سازگار نیست (انتظار {expectedVat:N0}).");
+                    }
+
+                    var expectedTotal = Math.Round(adis + vam, 2);
+                    if (Math.Abs(expectedTotal - Math.Round(total, 2)) > 1)
+                    {
+                        warnings.Add($"ردیف {row}: جمع ردیف (Tsstam) با مبلغ پس از تخفیف و مالیات هم‌خوان نیست.");
+                    }
+
+                    if (vra == 0 && vam != 0)
+                    {
+                        warnings.Add($"ردیف {row}: نرخ مالیات صفر است ولی مبلغ مالیات/عوارض ثبت شده است.");
+                    }
+                }
+
+                var referenceText = selected.RefrenceNumber ?? string.Empty;
+                report.AppendLine($"بازاعتبارسنجی کامل برای صورت‌حساب {selected.Taxid} ({referenceText}):\n");
+
+                if (warnings.Count == 0)
+                {
+                    report.AppendLine("هیچ مغایرتی در جمع مبالغ، شناسه‌ها و اقلام دیده نشد. اگر کارپوشه هنوز خالی است، زمان بیشتری برای نهایی شدن صورتحساب نیاز است یا سامانه را بعداً دوباره بررسی کنید.");
+                }
+                else
+                {
+                    report.AppendLine("هشدارها:");
+                    foreach (var w in warnings)
+                    {
+                        report.AppendLine($"- {w}");
+                    }
+                }
+
+                if (oks.Count > 0)
+                {
+                    report.AppendLine("\nبررسی‌های پاس شده:");
+                    foreach (var ok in oks)
+                    {
+                        report.AppendLine($"- {ok}");
+                    }
+                }
+
+                report.AppendLine("\nیادآوری: حتی با پاسخ SUCCESS ممکن است در زمان قطعی یا تأخیر سامانه، نمایش صورتحساب در کارپوشه به تعویق بیفتد.");
+
+                Msgwin msgwin = new Msgwin(false, report.ToString());
+                msgwin.Height = 500;
+                msgwin.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                new Msgwin(false, "خطا در بازاعتبارسنجی.").ShowDialog();
+                CL_Generaly.DoWritePRGLOG("AnalyzeInvoice_Click", ex);
+            }
+
+            return true;
+        }
+
     }
 }
