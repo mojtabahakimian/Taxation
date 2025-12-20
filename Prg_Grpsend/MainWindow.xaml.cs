@@ -433,15 +433,16 @@ namespace Prg_Grpsend
 
             ROWCOUNT_TEXTBLK.Text = (FACTOR_DATA?.Count ?? 0).ToString();
 
-            try
-            {
-                filterService.ClearFilters();
-                ActiveFilters.Clear();
-                ApplyCumulativeFilter();
-                SYNCFUSION_DG.ClearFilters();
-                SYNCFUSION_DG.View.Refresh();
-            }
-            catch { }
+            ////Clear Any Filter:
+            //try
+            //{
+            //    filterService.ClearFilters();
+            //    ActiveFilters.Clear();
+            //    ApplyCumulativeFilter();
+            //    SYNCFUSION_DG.ClearFilters();
+            //    SYNCFUSION_DG.View.Refresh();
+            //}
+            //catch { }
         }
 
         #region FilterBy
