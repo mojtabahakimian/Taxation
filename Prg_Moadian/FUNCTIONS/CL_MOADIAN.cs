@@ -392,7 +392,15 @@ namespace Prg_Moadian.FUNCTIONS
                 {
                     item.MEGH_MAR = Math.Round((decimal)item.MEGH_MAR, 4);
 
-                    item.MEGHk = item.MEGH_MAR; //مقدار مرجوعی رو میذاریم جای مقدار کالا
+                    // در برگشت از فروش باید «مقدار باقی‌مانده نزد خریدار» ارسال شود نه مقدار مرجوعی
+                    var remaining = Math.Round((decimal)(item.MEGHk - item.MEGH_MAR), 4);
+
+                    if (remaining < 0)
+                    {
+                        throw new NullyExceptiony($"مقدار مرجوعی برای کالا بیشتر از مقدار فروش است (کالا: {item.KALA}).");
+                    }
+
+                    item.MEGHk = remaining; // مقدار کالا پس از کسر مرجوعی
                 }
                 else
                 {
@@ -434,7 +442,7 @@ namespace Prg_Moadian.FUNCTIONS
 
                 if (!L_DRV_TBL_US.Any())
                 {
-                    throw new NullyExceptiony($"صورت حساب برگشتی با شماره {NUMBER} شامل هیچ کالایی جهت ارسال نمی باشد.");
+                    throw new NullyExceptiony($"صورت حساب برگشتی با شماره {NUMBER} پس از کسر اقلام مرجوعی کالای باقی‌مانده‌ای ندارد؛ در صورت برگشت کامل باید ابطالی ثبت شود.");
                 }
             }
 
