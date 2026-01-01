@@ -140,7 +140,7 @@
                     <!--<Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
                     <Label Content=" * به طور پیش فرض در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
 
-                    <Label Content=" * فقط میتوان فاکتور هایی را ارسال کرد که شماره صورت حساب مرجع آنها خالی باشد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                    <Label Content=" * باتوجه به محدودیت و دسترسی کاربر وارد شده , به فاکتور فروش , میتواند فاکتور های زیر را ببیند."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
 
                     <Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
                     <Label Content=" * اگر تاریخ سفارشی را اعمال کنید , بعدا باید مسئله تاریخ را در نظر بگیرید که تاریخ صورت حساب های اصلاح/ابطالی/برگشتی باید بعد از تاریخ صورت حساب (اصلی فروش) مرجع باشد ."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
