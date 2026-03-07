@@ -33,6 +33,8 @@
         public string mu { get; set; }
         public decimal? vra { get; set; }
         public decimal? MEGH_MAR { get; set; }
+        public double? N_KOL { get; set; }
+        public long? JAY { get; set; }
 
     }
 }
