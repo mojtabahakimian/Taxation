@@ -226,6 +226,8 @@ namespace Prg_Moadian.FUNCTIONS
                                        "));
             }
 
+            var list_extendedUnits = dbms.DoGetDataSQL<TCOD_VAHED_EXTENDED>("SELECT IDD,NAME_MO FROM dbo.TCOD_VAHED_EXTENDED").ToList();
+
             var _contin = true;
             // چک کن واحد و شناسه کالا درست باشه
             foreach (var item in L_DRV_TBL_US)
@@ -235,6 +237,10 @@ namespace Prg_Moadian.FUNCTIONS
                     CL_ERRLST.ERROR_BODY_LST.Add(new CL_ERRLST.ER_BOD_MODEL { CODE = item.CODE, SSTID = item.sstid });
                     _contin = false;
                 }
+
+                // مقداردهی یا اصلاح واحد مودیان (mu) بر اساس نام واحد کالا
+                item.mu = TheFunctions.GetMoadianUnitByName(item.VNAMES, list_extendedUnits, item.mu);
+
                 if (string.IsNullOrEmpty(item.mu))
                 {
                     CL_ERRLST.ERROR_BODY_LST.Add(new CL_ERRLST.ER_BOD_MODEL { CODE = item.CODE, MU = item.mu });

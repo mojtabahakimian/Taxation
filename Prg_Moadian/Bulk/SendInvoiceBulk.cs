@@ -480,6 +480,12 @@ namespace Prg_Moadian.Bulk
                 #endregion
             };
 
+            var list_extendedUnits = _db.DoGetDataSQL<TCOD_VAHED_EXTENDED>("SELECT IDD,NAME_MO FROM dbo.TCOD_VAHED_EXTENDED").ToList();
+            foreach (var l in lines)
+            {
+                l.mu = CL_MOADIAN.TheFunctions.GetMoadianUnitByName(l.VNAMES, list_extendedUnits, l.mu);
+            }
+
             // آماده‌سازی Body
             var bodies = lines.Select(l => new InvoiceBodyDto
             {

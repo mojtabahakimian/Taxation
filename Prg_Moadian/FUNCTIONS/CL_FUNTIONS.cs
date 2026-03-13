@@ -10,11 +10,131 @@ using System.Text.RegularExpressions;
 using TaxCollectData.Library.Business;
 using TaxCollectData.Library.Dto.Content;
 using static Prg_Moadian.CNNMANAGER.TaxModel;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Prg_Moadian.FUNCTIONS
 {
     public class CL_FUNTIONS
     {
+        // متد قدرتمند برای یکسان‌سازی متون فارسی
+        private static readonly Dictionary<string, string[]> _unitAliases = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "عدد",     new[] { "دانه", "nos", "no", "pcs", "piece" } },
+            { "کیلوگرم", new[] { "کیلو", "کیلوگرم", "kg", "kilo", "kilogram" } },
+            { "گرم",     new[] { "gr", "gram" } },
+            { "متر",     new[] { "m", "meter" } },
+            { "لیتر",    new[] { "l", "lit", "liter" } },
+            { "کارتن",   new[] { "ctn", "carton", "mastercase", "master case" } },
+            { "بسته",    new[] { "pack", "pck", "pkg" } },
+            { "جفت",     new[] { "pair", "pr" } },
+            { "دوجین",   new[] { "dozen", "dz" } },
+        };
+
+        private static string NormalizePersian(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return input;
+            return input
+                .Replace('ي', 'ی')
+                .Replace('ك', 'ک')
+                .Replace('ة', 'ه')
+                .Replace('ؤ', 'و')
+                .Replace('إ', 'ا')
+                .Replace('أ', 'ا')
+                .Replace('\u200C', ' ')
+                .Replace(" ", "")
+                .Trim()
+                .ToLowerInvariant();
+        }
+
+        private static int LevenshteinDistance(string s, string t)
+        {
+            int n = s.Length, m = t.Length;
+            var d = new int[n + 1, m + 1];
+            for (int i = 0; i <= n; i++) d[i, 0] = i;
+            for (int j = 0; j <= m; j++) d[0, j] = j;
+            for (int i = 1; i <= n; i++)
+                for (int j = 1; j <= m; j++)
+                    d[i, j] = Math.Min(
+                        Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                        d[i - 1, j - 1] + (s[i - 1] == t[j - 1] ? 0 : 1));
+            return d[n, m];
+        }
+
+        private static double FuzzyScore(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return 0;
+            // اگر یکی substring دیگری بود، امتیاز بالا بده
+            if (a.Contains(b) || b.Contains(a))
+                return 0.90;
+            int maxLen = Math.Max(a.Length, b.Length);
+            return 1.0 - (double)LevenshteinDistance(a, b) / maxLen;
+        }
+
+        public string GetMoadianUnitByName(string internalUnitName, List<TCOD_VAHED_EXTENDED> extendedUnits, string currentMu)
+        {
+            if (string.IsNullOrWhiteSpace(internalUnitName) || extendedUnits == null || !extendedUnits.Any())
+                return currentMu;
+
+            var normalized = NormalizePersian(internalUnitName);
+
+            // 1. Exact Match
+            var exactMatch = extendedUnits.FirstOrDefault(x =>
+                string.Equals(NormalizePersian(x.NAME_MO), normalized, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null)
+                return exactMatch.IDD.ToString();
+
+            // 2. Alias Match
+            foreach (var (canonical, aliases) in _unitAliases)
+            {
+                var normalizedCanonical = NormalizePersian(canonical);
+                var allForms = aliases.Select(NormalizePersian).Append(normalizedCanonical);
+
+                if (!allForms.Any(f => string.Equals(f, normalized, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                var aliasMatch = extendedUnits.FirstOrDefault(x =>
+                {
+                    var n = NormalizePersian(x.NAME_MO);
+                    return !string.IsNullOrWhiteSpace(n) &&
+                           allForms.Any(f => string.Equals(n, f, StringComparison.OrdinalIgnoreCase) ||
+                                             n.Contains(f) || f.Contains(n));
+                });
+
+                if (aliasMatch != null)
+                    return aliasMatch.IDD.ToString();
+            }
+
+            // 3. Fuzzy Match
+            const double threshold = 0.75;
+
+            var best = extendedUnits
+                .Where(x => !string.IsNullOrWhiteSpace(x.NAME_MO))
+                .Select(x =>
+                {
+                    var n = NormalizePersian(x.NAME_MO);
+                    // امتیاز را هم با کل نام و هم با هر توکن (کلمه) محاسبه می‌کنیم
+                    var tokens = x.NAME_MO.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                           .Select(NormalizePersian);
+                    double score = Math.Max(
+                        FuzzyScore(normalized, n),
+                        tokens.Max(t => FuzzyScore(normalized, t))
+                    );
+                    return new { Unit = x, Score = score };
+                })
+                .Where(x => x.Score >= threshold)
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            if (best != null)
+                return best.Unit.IDD.ToString();
+
+            // 4. Fallback
+            return currentMu;
+        }
+
+
+
+
         public string SafeRemoveFirstFour(string text)
         {
             // ۱. اگر نال یا خالی بود -> برگرداندن نال یا خالی
