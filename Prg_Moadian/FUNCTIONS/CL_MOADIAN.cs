@@ -2,6 +2,7 @@
 using Prg_Moadian.SQLMODELS;
 using Prg_Moadian.Generaly;
 using static Prg_Moadian.Generaly.CL_Generaly;
+using static Prg_Moadian.Generaly.VahedMuMapper;
 using System.Text.Json;
 using static Prg_Moadian.CNNMANAGER.TaxModel;
 using Prg_Moadian.Service;
@@ -215,16 +216,22 @@ namespace Prg_Moadian.FUNCTIONS
             }
             else //دنافراز
             {
-                L_DRV_TBL_US.AddRange(dbms.DoGetDataSQL<DRV_TBL>($@"SELECT        dbo.HEAD_LST.NUMBER, dbo.HEAD_LST.TAG, dbo.HEAD_LST.DATE_N, dbo.INVO_LST.MABL, dbo.INVO_LST.MABL_K, dbo.INVO_LST.N_MOIN, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt, 
-                                    dbo.INVO_LST.IMBAA, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn, dbo.CUST_HESAB.MCODEM, dbo.CUST_HESAB.tob, dbo.INVO_LST.CODE, dbo.STUF_DEF.sstid, dbo.STUF_DEF.mu, 
-                                    ISNULL(dbo.STUF_DEF.NAME, N' ') + N' ' + ISNULL(dbo.INVO_LST.MANDAH, N' ') AS KALA, dbo.INVO_LST.MEGHk, dbo.STUF_DEF.vra, dbo.CUST_HESAB.ECODE,dbo.INVO_LST.MEGH_MAR
+                L_DRV_TBL_US.AddRange(dbms.DoGetDataSQL<DRV_TBL>($@"SELECT        dbo.HEAD_LST.NUMBER, dbo.HEAD_LST.TAG, dbo.HEAD_LST.DATE_N, dbo.INVO_LST.MABL, dbo.INVO_LST.MABL_K, dbo.INVO_LST.N_MOIN, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt,
+                                    dbo.INVO_LST.IMBAA, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn, dbo.CUST_HESAB.MCODEM, dbo.CUST_HESAB.tob, dbo.INVO_LST.CODE, dbo.STUF_DEF.sstid, dbo.STUF_DEF.mu,
+                                    ISNULL(dbo.STUF_DEF.NAME, N' ') + N' ' + ISNULL(dbo.INVO_LST.MANDAH, N' ') AS KALA, dbo.INVO_LST.MEGHk, dbo.STUF_DEF.vra, dbo.CUST_HESAB.ECODE, dbo.INVO_LST.MEGH_MAR,
+                                    dbo.TCOD_VAHEDS.NAMES AS VNAMES
                                     FROM            dbo.HEAD_LST INNER JOIN
                                                              dbo.INVO_LST ON dbo.HEAD_LST.NUMBER = dbo.INVO_LST.NUMBER AND dbo.HEAD_LST.TAG = dbo.INVO_LST.TAG INNER JOIN
                                                              dbo.CUST_HESAB ON dbo.HEAD_LST.CUST_NO = dbo.CUST_HESAB.hes INNER JOIN
                                                              dbo.STUF_DEF ON dbo.INVO_LST.CODE = dbo.STUF_DEF.CODE
+                                                             LEFT OUTER JOIN dbo.TCOD_VAHEDS ON dbo.INVO_LST.VAHED_K = dbo.TCOD_VAHEDS.CODE
                                     WHERE        (dbo.HEAD_LST.NUMBER = {NUMBER}) AND (dbo.HEAD_LST.TAG = {TAG})
                                        "));
             }
+
+            // نگاشت واحد کالا (VAHED_K) به واحد مودیان (mu) بر اساس TCOD_VAHEDS.NAMES
+            var _extUnits = dbms.DoGetDataSQL<TCOD_VAHED_EXTENDED>("SELECT IDD, NAME_MO FROM dbo.TCOD_VAHED_EXTENDED").ToList();
+            VahedMuMapper.ResolveAll(L_DRV_TBL_US, _extUnits);
 
             var _contin = true;
             // چک کن واحد و شناسه کالا درست باشه

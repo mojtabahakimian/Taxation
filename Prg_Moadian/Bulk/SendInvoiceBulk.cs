@@ -4,6 +4,7 @@ using Prg_Moadian.CNNMANAGER;
 using Prg_Moadian.FUNCTIONS;
 using Prg_Moadian.Generaly;
 using Prg_Moadian.Service;
+using static Prg_Moadian.Generaly.VahedMuMapper;
 using Prg_Moadian.SQLMODELS;
 using System;
 using System.Collections.Generic;
@@ -566,17 +567,25 @@ namespace Prg_Moadian.Bulk
             }
             else //دنافراز
             {
-                sql = ($@"SELECT        dbo.HEAD_LST.NUMBER, dbo.HEAD_LST.TAG, dbo.HEAD_LST.DATE_N, dbo.INVO_LST.MABL, dbo.INVO_LST.MABL_K, dbo.INVO_LST.N_MOIN, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt, 
-                                    dbo.INVO_LST.IMBAA, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn, dbo.CUST_HESAB.MCODEM, dbo.CUST_HESAB.tob, dbo.INVO_LST.CODE, dbo.STUF_DEF.sstid, dbo.STUF_DEF.mu, 
-                                    ISNULL(dbo.STUF_DEF.NAME, N' ') + N' ' + ISNULL(dbo.INVO_LST.MANDAH, N' ') AS KALA, dbo.INVO_LST.MEGHk, dbo.STUF_DEF.vra, dbo.CUST_HESAB.ECODE,dbo.INVO_LST.MEGH_MAR
+                sql = ($@"SELECT        dbo.HEAD_LST.NUMBER, dbo.HEAD_LST.TAG, dbo.HEAD_LST.DATE_N, dbo.INVO_LST.MABL, dbo.INVO_LST.MABL_K, dbo.INVO_LST.N_MOIN, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt,
+                                    dbo.INVO_LST.IMBAA, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn, dbo.CUST_HESAB.MCODEM, dbo.CUST_HESAB.tob, dbo.INVO_LST.CODE, dbo.STUF_DEF.sstid, dbo.STUF_DEF.mu,
+                                    ISNULL(dbo.STUF_DEF.NAME, N' ') + N' ' + ISNULL(dbo.INVO_LST.MANDAH, N' ') AS KALA, dbo.INVO_LST.MEGHk, dbo.STUF_DEF.vra, dbo.CUST_HESAB.ECODE, dbo.INVO_LST.MEGH_MAR,
+                                    dbo.TCOD_VAHEDS.NAMES AS VNAMES
                                     FROM            dbo.HEAD_LST INNER JOIN
                                                              dbo.INVO_LST ON dbo.HEAD_LST.NUMBER = dbo.INVO_LST.NUMBER AND dbo.HEAD_LST.TAG = dbo.INVO_LST.TAG INNER JOIN
                                                              dbo.CUST_HESAB ON dbo.HEAD_LST.CUST_NO = dbo.CUST_HESAB.hes INNER JOIN
                                                              dbo.STUF_DEF ON dbo.INVO_LST.CODE = dbo.STUF_DEF.CODE
+                                                             LEFT OUTER JOIN dbo.TCOD_VAHEDS ON dbo.INVO_LST.VAHED_K = dbo.TCOD_VAHEDS.CODE
                                     WHERE        (dbo.HEAD_LST.NUMBER = {number}) AND (dbo.HEAD_LST.TAG = {tag}) ");
             }
 
-            return _db.DoGetDataSQL<DRV_TBL>(string.Format(sql, number, tag)).ToList();
+            var lines = _db.DoGetDataSQL<DRV_TBL>(string.Format(sql, number, tag)).ToList();
+
+            // نگاشت واحد کالا (VAHED_K) به واحد مودیان (mu) بر اساس TCOD_VAHEDS.NAMES
+            var extUnits = _db.DoGetDataSQL<TCOD_VAHED_EXTENDED>("SELECT IDD, NAME_MO FROM dbo.TCOD_VAHED_EXTENDED").ToList();
+            VahedMuMapper.ResolveAll(lines, extUnits);
+
+            return lines;
         }
 
         private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag)
