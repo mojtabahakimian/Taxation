@@ -131,25 +131,26 @@
 
                 </TabPanel>
             </TabPanel>
-            <Label Content="نکات قبل از ارسال" FontWeight="Bold" FlowDirection="RightToLeft" FontSize="13"/>
-            <TabPanel FlowDirection="RightToLeft" >
-                <StackPanel>
-                    <Label Content=" * درصورت خالی گذاشتن نوع صورت حساب یا روش تسویه , سیستم از اطلاعات ثبت شده در فاکتور , مقادیر را برمیدارد." VerticalContentAlignment="Center" Foreground="#FFD20000"/>
-                    <!--<Label Content=" * در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
-                    <Label Content=" * فقط میتوان فاکتور هایی را ارسال کرد که شماره صورت حساب مرجع آنها خالی باشد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
-                    <!--<Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
-                    <Label Content=" * به طور پیش فرض در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+            <Expander Header="نکات قبل از ارسال" FlowDirection="RightToLeft" Margin="5">
+                <TabPanel FlowDirection="RightToLeft" >
+                    <StackPanel>
+                        <Label Content=" * درصورت خالی گذاشتن نوع صورت حساب یا روش تسویه , سیستم از اطلاعات ثبت شده در فاکتور , مقادیر را برمیدارد." VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                        <!--<Label Content=" * در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
+                        <Label Content=" * فقط میتوان فاکتور هایی را ارسال کرد که شماره صورت حساب مرجع آنها خالی باشد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                        <!--<Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
+                        <Label Content=" * به طور پیش فرض در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
 
-                    <Label Content=" * باتوجه به محدودیت و دسترسی کاربر وارد شده , به فاکتور فروش , میتواند فاکتور های زیر را ببیند."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                        <Label Content=" * باتوجه به محدودیت و دسترسی کاربر وارد شده , به فاکتور فروش , میتواند فاکتور های زیر را ببیند."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
 
-                    <Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
-                    <Label Content=" * اگر تاریخ سفارشی را اعمال کنید , بعدا باید مسئله تاریخ را در نظر بگیرید که تاریخ صورت حساب های اصلاح/ابطالی/برگشتی باید بعد از تاریخ صورت حساب (اصلی فروش) مرجع باشد ."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                        <Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                        <Label Content=" * اگر تاریخ سفارشی را اعمال کنید , بعدا باید مسئله تاریخ را در نظر بگیرید که تاریخ صورت حساب های اصلاح/ابطالی/برگشتی باید بعد از تاریخ صورت حساب (اصلی فروش) مرجع باشد ."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
 
-                    <Label x:Name="LBL_WARNING_RESEND" Content=" ⚠️⚠️⚠️ هشدار: ارسال مجدد فاکتورهای قبلاً ارسال شده ممکن است منجر به تکراری شدن صورتحساب در سامانه مودیان شود! این گزینه فقط در شرایط خاص استفاده شود."
-                           VerticalContentAlignment="Center" Foreground="#FFFF0000" FontWeight="Bold" FontSize="12"
-                           Visibility="Collapsed" Background="#33FF0000"/>
-                </StackPanel>
-            </TabPanel>
+                        <Label x:Name="LBL_WARNING_RESEND" Content=" ⚠️⚠️⚠️ هشدار: ارسال مجدد فاکتورهای قبلاً ارسال شده ممکن است منجر به تکراری شدن صورتحساب در سامانه مودیان شود! این گزینه فقط در شرایط خاص استفاده شود."
+               VerticalContentAlignment="Center" Foreground="#FFFF0000" FontWeight="Bold" FontSize="12"
+               Visibility="Collapsed" Background="#33FF0000"/>
+                    </StackPanel>
+                </TabPanel>
+            </Expander>
 
             <Button Click="Button_Click" Margin="10" Width="300" Content="اتخاب همه آیتم های موجود" HorizontalAlignment="Right" Style="{StaticResource MaterialDesignOutlinedButton}" />
 
