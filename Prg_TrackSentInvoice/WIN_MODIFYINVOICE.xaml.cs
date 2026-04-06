@@ -778,15 +778,15 @@ VALUES
                 var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
                 var serverInfo = TaxApiService.Instance.TaxApis.GetServerInformation();
 
-                var serverUtcNow = serverInfo != null
-                    ? DateTimeOffset.FromUnixTimeMilliseconds(serverInfo.ServerTime).UtcDateTime
-                    : DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
+                var serverNow = serverInfo != null
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(serverInfo.ServerTime)
+                    : new DateTimeOffset(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, TimeSpan.Zero);
 
-                var now = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
+                var nowIran = TimeZoneInfo.ConvertTime(serverNow, iranTZ);
 
-                var taxidNew = taxService.RequestTaxId(_memoryId, now);
-                long indatim = TaxService.ConvertDateToLong(now);
-                long indatim2 = TaxService.ConvertDateToLong(now);
+                var taxidNew = taxService.RequestTaxId(_memoryId, nowIran.DateTime);
+                long indatim = serverNow.ToUnixTimeMilliseconds();
+                long indatim2 = serverNow.ToUnixTimeMilliseconds();
 
                 ////indatim = TimeSync.GetMoadianTimestamp();
                 ////indatim2 = TimeSync.GetMoadianTimestamp();
