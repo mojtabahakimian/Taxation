@@ -746,10 +746,16 @@ VALUES
 
             ReCalculateTotals();
 
-            if (!TotalsAreConsistent(out var why))
+
+            if (!IsEbtali && !TotalsAreConsistent(out var why))
             {
-                new Msgwin(false, "قواعد جمع/رُندینگ رعایت نشده: " + why).Show();
-                return;
+                new Msgwin(false, "قواعد جمع/رُندینگ رعایت نشده: " + why).ShowDialog();
+
+                var msgwin2 = new Msgwin(true, "آیا با این وجود می‌خواهید ادامه دهید؟"); msgwin2.ShowDialog();
+                if (msgwin2.DialogResult != true)
+                {
+                    return;
+                }
             }
 
             AMALIAT();
@@ -785,8 +791,13 @@ VALUES
                 var now = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
 
                 var taxidNew = taxService.RequestTaxId(_memoryId, now);
-                long indatim = TaxService.ConvertDateToLong(now);
-                long indatim2 = TaxService.ConvertDateToLong(now);
+
+                // برای جلوگیری از خطای 2002، زمان صورتحساب را دقیقاً از زمان سرور بگیریم
+                // (در صورت نبود serverInfo از UTC فعلی با skew استفاده می‌کنیم).
+                long indatim = serverInfo != null
+                    ? serverInfo.ServerTime
+                    : TaxService.ConvertDateToLong(serverUtcNow);
+                long indatim2 = indatim;
 
                 ////indatim = TimeSync.GetMoadianTimestamp();
                 ////indatim2 = TimeSync.GetMoadianTimestamp();
