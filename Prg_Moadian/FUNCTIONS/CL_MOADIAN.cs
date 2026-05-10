@@ -78,111 +78,115 @@ namespace Prg_Moadian.FUNCTIONS
 
             var _newsaz = dbms.DoGetDataSQL<SAZMAN>("SELECT MOADINA_SCNUM , YEA , MEMORYID,MEMORYIDsand,PRIVIATEKEY,Dcertificate FROM dbo.SAZMAN").FirstOrDefault();
 
-            PrivateKey_Path_US = _newsaz.PRIVIATEKEY.Replace("-----BEGIN PRIVATE KEY-----\r\n", "").Replace("\r\n-----END PRIVATE KEY-----\r\n", "").Trim();
-
-            if (CL_MOADIAN.TaxURL == "https://tp.tax.gov.ir/req/api/")
-            {
-                MemoryID = _newsaz.MEMORYID.Trim(); //حافظه مالیاتی اصلی
-            }
-            else
-            {
-                MemoryID = _newsaz.MEMORYIDsand.Trim(); //حافظه مالیاتی تستی سندباکس
-            }
-
+            TaxService? taxService = default;
             string? privateKey = PrivateKey_Path_US;
 
-            #region Prepair_Get_Input_Text_Passed_And
-            if (args.Length > 0)
+            if (true) //easey way for debug to avoid api request temporary
             {
-                // Access the first command-line argument (index 0)
-                string? input = args[0];
-                if (!(input is null))
-                {
+                PrivateKey_Path_US = _newsaz.PRIVIATEKEY.Replace("-----BEGIN PRIVATE KEY-----\r\n", "").Replace("\r\n-----END PRIVATE KEY-----\r\n", "").Trim();
 
-                    if (!string.IsNullOrEmpty(input) && input.Length != 0)
+                if (CL_MOADIAN.TaxURL == "https://tp.tax.gov.ir/req/api/")
+                {
+                    MemoryID = _newsaz.MEMORYID.Trim(); //حافظه مالیاتی اصلی
+                }
+                else
+                {
+                    MemoryID = _newsaz.MEMORYIDsand.Trim(); //حافظه مالیاتی تستی سندباکس
+                }
+
+
+                #region Prepair_Get_Input_Text_Passed_And
+                if (args.Length > 0)
+                {
+                    // Access the first command-line argument (index 0)
+                    string? input = args[0];
+                    if (!(input is null))
                     {
-                        string[]? NUMBER_AND_TAG = input.Split('_');
-                        // Check if the input was split into two parts
-                        if (NUMBER_AND_TAG.Length == 3)
+
+                        if (!string.IsNullOrEmpty(input) && input.Length != 0)
                         {
-                            NUMBER = Int64.Parse(NUMBER_AND_TAG[0]);
-                            TAG = Int32.Parse(NUMBER_AND_TAG[1]);
-                            CALLER_NAME = NUMBER_AND_TAG[2].ToLower(); //نرم افزاری که اون رو صدا زده
+                            string[]? NUMBER_AND_TAG = input.Split('_');
+                            // Check if the input was split into two parts
+                            if (NUMBER_AND_TAG.Length == 3)
+                            {
+                                NUMBER = Int64.Parse(NUMBER_AND_TAG[0]);
+                                TAG = Int32.Parse(NUMBER_AND_TAG[1]);
+                                CALLER_NAME = NUMBER_AND_TAG[2].ToLower(); //نرم افزاری که اون رو صدا زده
+                            }
                         }
                     }
                 }
-            }
-            else
-            {
-                Console.WriteLine("No input provided."); return;
-            }
-            #endregion
-
-
-            //////MOADINA_SCNUM این حذف شد چون کاریش نداریم
-
-            if (_newsaz != null && _newsaz.YEA > 0)
-            {
-                ////StarterInnoNumber = _newsaz.YEA.ToString() + "00" + NUMBER;
-                StarterInnoNumber = TheFunctions.GenerateFixedLengthInno(_newsaz.YEA.ToString(), NUMBER);
-            }
-
-            ////TheFunctions.SendSampleInvoiceTest1(MemoryID, privateKey, TaxURL);////return; //Just Test and Get Back--------------------------------------------------------------------------|
-
-            #region TTTTEEEESSSSTTTT
-            //TaxApiService.Instance.Init(MemoryID, new SignatoryConfig(privateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxURL);
-            //ServerInformationModel serverInformationModel = TaxApiService.Instance.TaxApis.GetServerInformation();
-            //TokenModel tokenModel = TaxApiService.Instance.TaxApis.RequestToken();
-
-
-            //var economicCodeInformation8 = TaxApiService.Instance.TaxApis.GetEconomicCodeInformation("10840014242"); // یزد سپار
-            //var economicCodeInformation9 = TaxApiService.Instance.TaxApis.GetEconomicCodeInformation("411375646679");
-            //var economicCodeInformation10 = TaxApiService.Instance.TaxApis.GetEconomicCodeInformation("10840011810");
-            //var fiscalInformation = TaxApiService.Instance.TaxApis.GetFiscalInformation(MemoryID);
-            #endregion
-
-            //Let's Go
-            TaxService? taxService = default;
-            try
-            {
-                taxService = new TaxService(MemoryID, privateKey, TaxURL);
-                //CL_Generaly.DoGetwriteAppenLog("TaxService Passed");
-            }
-            catch (Exception)
-            {
-                CL_ERRLST.ERROR_MAIN_LST.FirstOrDefault(e => e.ER_ID == 1).ER_HAPPENED = true;
-                //CL_Generaly.DoGetwriteAppenLog("ER_ID == 1");
-                return;
-            }
-            try
-            {
-                RequestTokenModel? model = taxService.RequestToken();
-                //CL_Generaly.DoGetwriteAppenLog("taxService.RequestToken Passed");
-            }
-            catch (Exception er)
-            {
-                if (CL_MOADIAN.TaxURL is "https://tp.tax.gov.ir/req/api/") //اصلی
+                else
                 {
-                    throw new NullyExceptiony("Authentication is not completed or incorrect entered");
+                    Console.WriteLine("No input provided."); return;
                 }
-                else if (CL_MOADIAN.TaxURL is "https://sandboxrc.tax.gov.ir/req/api/") //آزمایشی
+                #endregion
+
+
+                //////MOADINA_SCNUM این حذف شد چون کاریش نداریم
+
+                if (_newsaz != null && _newsaz.YEA > 0)
                 {
-                    if (er.Message is "امضای بسته صحیح نمی باشد")
+                    ////StarterInnoNumber = _newsaz.YEA.ToString() + "00" + NUMBER;
+                    StarterInnoNumber = TheFunctions.GenerateFixedLengthInno(_newsaz.YEA.ToString(), NUMBER);
+                }
+
+                ////TheFunctions.SendSampleInvoiceTest1(MemoryID, privateKey, TaxURL);////return; //Just Test and Get Back--------------------------------------------------------------------------|
+
+                #region TTTTEEEESSSSTTTT
+                //TaxApiService.Instance.Init(MemoryID, new SignatoryConfig(privateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxURL);
+                //ServerInformationModel serverInformationModel = TaxApiService.Instance.TaxApis.GetServerInformation();
+                //TokenModel tokenModel = TaxApiService.Instance.TaxApis.RequestToken();
+
+
+                //var economicCodeInformation8 = TaxApiService.Instance.TaxApis.GetEconomicCodeInformation("10840014242"); // یزد سپار
+                //var economicCodeInformation9 = TaxApiService.Instance.TaxApis.GetEconomicCodeInformation("411375646679");
+                //var economicCodeInformation10 = TaxApiService.Instance.TaxApis.GetEconomicCodeInformation("10840011810");
+                //var fiscalInformation = TaxApiService.Instance.TaxApis.GetFiscalInformation(MemoryID);
+                #endregion
+
+                //Let's Go
+                try
+                {
+                    taxService = new TaxService(MemoryID, privateKey, TaxURL);
+                    //CL_Generaly.DoGetwriteAppenLog("TaxService Passed");
+                }
+                catch (Exception)
+                {
+                    CL_ERRLST.ERROR_MAIN_LST.FirstOrDefault(e => e.ER_ID == 1).ER_HAPPENED = true;
+                    //CL_Generaly.DoGetwriteAppenLog("ER_ID == 1");
+                    return;
+                }
+                try
+                {
+                    RequestTokenModel? model = taxService.RequestToken();
+                    //CL_Generaly.DoGetwriteAppenLog("taxService.RequestToken Passed");
+                }
+                catch (Exception er)
+                {
+                    if (CL_MOADIAN.TaxURL is "https://tp.tax.gov.ir/req/api/") //اصلی
                     {
-                        try
-                        {
-                            DoGetwriteAppenLog($"From SendingInvoice :{er.Message}  : \n" +
-                            $"TaxURL : {CL_MOADIAN.TaxURL} \n" +
-                            $"MemoryTax : {CL_MOADIAN.MemoryID}\n" +
-                            $"{er.InnerException}");
-                        }
-                        catch (Exception) { }
-                        //throw new NullyExceptiony("Memory Tax is not Match");
+                        throw new NullyExceptiony("Authentication is not completed or incorrect entered");
                     }
-                    throw new NullyExceptiony("Memory Tax is Incorrect");
+                    else if (CL_MOADIAN.TaxURL is "https://sandboxrc.tax.gov.ir/req/api/") //آزمایشی
+                    {
+                        if (er.Message is "امضای بسته صحیح نمی باشد")
+                        {
+                            try
+                            {
+                                DoGetwriteAppenLog($"From SendingInvoice :{er.Message}  : \n" +
+                                $"TaxURL : {CL_MOADIAN.TaxURL} \n" +
+                                $"MemoryTax : {CL_MOADIAN.MemoryID}\n" +
+                                $"{er.InnerException}");
+                            }
+                            catch (Exception) { }
+                            //throw new NullyExceptiony("Memory Tax is not Match");
+                        }
+                        throw new NullyExceptiony("Memory Tax is Incorrect");
+                    }
+                    //CL_Generaly.DoGetwriteAppenLog("ER_ID == 1");
+                    return;
                 }
-                //CL_Generaly.DoGetwriteAppenLog("ER_ID == 1");
-                return;
             }
 
 
@@ -215,6 +219,23 @@ namespace Prg_Moadian.FUNCTIONS
             }
             else //دنافراز
             {
+                #region MAYBE_LATER
+                //این کد کامنت شده رو بعدا اگر سر واحد توی دنافراز مشکل داشت , بیا جایگزین بکن
+                //چون میاد روی عنوان متنی نام کالا رو میاره و اجازه میده جستجو فازی روش انجام بشه تا معادل واحد مودیانش پیدا بشه , برای کالا هایی که چندین واحد دارند
+                {
+                    //L_DRV_TBL_US.AddRange(dbms.DoGetDataSQL<DRV_TBL>($@"SELECT        dbo.HEAD_LST.NUMBER, dbo.HEAD_LST.TAG, dbo.HEAD_LST.DATE_N, dbo.INVO_LST.MABL, dbo.INVO_LST.MABL_K, dbo.INVO_LST.N_MOIN, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt, 
+                    //                dbo.INVO_LST.IMBAA, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn, dbo.CUST_HESAB.MCODEM, dbo.CUST_HESAB.tob, dbo.INVO_LST.CODE, dbo.STUF_DEF.sstid, dbo.STUF_DEF.mu, 
+                    //                dbo.TCOD_VAHEDS.NAMES AS VNAMES, ISNULL(dbo.STUF_DEF.NAME, N' ') + N' ' + ISNULL(dbo.INVO_LST.MANDAH, N' ') AS KALA, dbo.INVO_LST.MEGHk, dbo.STUF_DEF.vra, dbo.CUST_HESAB.ECODE,dbo.INVO_LST.MEGH_MAR, dbo.INVO_LST.N_KOL, dbo.INVO_LST.JAY
+                    //                FROM            dbo.HEAD_LST INNER JOIN
+                    //                                         dbo.INVO_LST ON dbo.HEAD_LST.NUMBER = dbo.INVO_LST.NUMBER AND dbo.HEAD_LST.TAG = dbo.INVO_LST.TAG INNER JOIN
+                    //                                         dbo.CUST_HESAB ON dbo.HEAD_LST.CUST_NO = dbo.CUST_HESAB.hes INNER JOIN
+                    //                                         dbo.STUF_DEF ON dbo.INVO_LST.CODE = dbo.STUF_DEF.CODE LEFT OUTER JOIN
+                    //                                         dbo.TCOD_VAHEDS ON dbo.INVO_LST.VAHED_K = dbo.TCOD_VAHEDS.CODE
+                    //                WHERE        (dbo.HEAD_LST.NUMBER = {NUMBER}) AND (dbo.HEAD_LST.TAG = {TAG})
+                    //                   "));
+                }
+                #endregion
+
                 L_DRV_TBL_US.AddRange(dbms.DoGetDataSQL<DRV_TBL>($@"SELECT        dbo.HEAD_LST.NUMBER, dbo.HEAD_LST.TAG, dbo.HEAD_LST.DATE_N, dbo.INVO_LST.MABL, dbo.INVO_LST.MABL_K, dbo.INVO_LST.N_MOIN, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt, 
                                     dbo.INVO_LST.IMBAA, dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn, dbo.CUST_HESAB.MCODEM, dbo.CUST_HESAB.tob, dbo.INVO_LST.CODE, dbo.STUF_DEF.sstid, dbo.STUF_DEF.mu, 
                                     ISNULL(dbo.STUF_DEF.NAME, N' ') + N' ' + ISNULL(dbo.INVO_LST.MANDAH, N' ') AS KALA, dbo.INVO_LST.MEGHk, dbo.STUF_DEF.vra, dbo.CUST_HESAB.ECODE,dbo.INVO_LST.MEGH_MAR, dbo.INVO_LST.N_KOL, dbo.INVO_LST.JAY

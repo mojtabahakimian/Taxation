@@ -63,11 +63,44 @@ namespace Prg_Moadian.FUNCTIONS
         private static double FuzzyScore(string a, string b)
         {
             if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return 0;
-            // اگر یکی substring دیگری بود، امتیاز بالا بده
-            if (a.Contains(b) || b.Contains(a))
-                return 0.90;
+
             int maxLen = Math.Max(a.Length, b.Length);
+            int minLen = Math.Min(a.Length, b.Length);
+
+            // جلوگیری از خطای طول بیش از حد کوتاه برای زیررشته‌ها
+            if (a.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                b.IndexOf(a, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // نسبت طول زیررشته به کل رشته
+                double ratio = (double)minLen / maxLen;
+
+                // فقط در صورتی که طول زیررشته بخش قابل توجهی از کل رشته باشد، امتیاز بالا بده
+                if (ratio >= 0.7)
+                {
+                    return 0.90;
+                }
+
+                // در غیر این صورت، امتیاز بر اساس نسبت طول به عنوان جایزه کوچکی محاسبه می‌شود
+                return 0.5 + (ratio * 0.3);
+            }
+
             return 1.0 - (double)LevenshteinDistance(a, b) / maxLen;
+        }
+
+        private static string StripNumericSuffix(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return input;
+
+            // پشتیبانی از هر دو نوع عدد: ASCII (0-9) و فارسی (۰-۹)
+            var result = System.Text.RegularExpressions.Regex
+                .Replace(
+                    input.Trim(),
+                    @"\s*[0-9۰-۹][0-9۰-۹\.\,/]*$",
+                    "",
+                    System.Text.RegularExpressions.RegexOptions.None)
+                .Trim();
+
+            return string.IsNullOrWhiteSpace(result) ? input.Trim() : result;
         }
 
         public string GetMoadianUnitByName(string internalUnitName, List<TCOD_VAHED_EXTENDED> extendedUnits, string currentMu)
@@ -75,36 +108,66 @@ namespace Prg_Moadian.FUNCTIONS
             if (string.IsNullOrWhiteSpace(internalUnitName) || extendedUnits == null || !extendedUnits.Any())
                 return currentMu;
 
-            var normalized = NormalizePersian(internalUnitName);
+            // *** STEP 0: جدا کردن نسبت عددی از نام واحد ***
+            // "کارتن2.16" → "کارتن" | "پالت1.08" → "پالت"
+            string cleanedName = StripNumericSuffix(internalUnitName);
+            if (string.IsNullOrWhiteSpace(cleanedName))
+                return currentMu;
 
+            var normalized = NormalizePersian(cleanedName);
+
+            // ─────────────────────────────────────────────
             // 1. Exact Match
+            // ─────────────────────────────────────────────
             var exactMatch = extendedUnits.FirstOrDefault(x =>
                 string.Equals(NormalizePersian(x.NAME_MO), normalized, StringComparison.OrdinalIgnoreCase));
+
             if (exactMatch != null)
                 return exactMatch.IDD.ToString();
 
+            // ─────────────────────────────────────────────
             // 2. Alias Match
+            // ─────────────────────────────────────────────
             foreach (var (canonical, aliases) in _unitAliases)
             {
                 var normalizedCanonical = NormalizePersian(canonical);
-                var allForms = aliases.Select(NormalizePersian).Append(normalizedCanonical);
+                var allForms = aliases.Select(NormalizePersian).Append(normalizedCanonical).ToList();
 
+                // آیا ورودی با یکی از فرم‌های این alias گروه match می‌کند؟
                 if (!allForms.Any(f => string.Equals(f, normalized, StringComparison.OrdinalIgnoreCase)))
                     continue;
 
                 var aliasMatch = extendedUnits.FirstOrDefault(x =>
                 {
                     var n = NormalizePersian(x.NAME_MO);
-                    return !string.IsNullOrWhiteSpace(n) &&
-                           allForms.Any(f => string.Equals(n, f, StringComparison.OrdinalIgnoreCase) ||
-                                             n.Contains(f) || f.Contains(n));
+                    if (string.IsNullOrWhiteSpace(n)) return false;
+
+                    return allForms.Any(f =>
+                    {
+                        // 2a. Exact
+                        if (string.Equals(n, f, StringComparison.OrdinalIgnoreCase))
+                            return true;
+
+                        // 2b. Substring — فقط اگر نسبت طول کافی باشد (جلوگیری از "تن" ⊂ "کارتن")
+                        if (n.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            f.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            double ratio = (double)Math.Min(n.Length, f.Length) /
+                                                   Math.Max(n.Length, f.Length);
+                            return ratio >= 0.7;
+                        }
+
+                        return false;
+                    });
                 });
 
                 if (aliasMatch != null)
                     return aliasMatch.IDD.ToString();
             }
 
+            // ─────────────────────────────────────────────
             // 3. Fuzzy Match
+            // ─────────────────────────────────────────────
             const double threshold = 0.75;
 
             var best = extendedUnits
@@ -112,13 +175,16 @@ namespace Prg_Moadian.FUNCTIONS
                 .Select(x =>
                 {
                     var n = NormalizePersian(x.NAME_MO);
-                    // امتیاز را هم با کل نام و هم با هر توکن (کلمه) محاسبه می‌کنیم
-                    var tokens = x.NAME_MO.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                                           .Select(NormalizePersian);
-                    double score = Math.Max(
-                        FuzzyScore(normalized, n),
-                        tokens.Max(t => FuzzyScore(normalized, t))
-                    );
+                    var tokens = x.NAME_MO
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(NormalizePersian)
+                        .ToList();
+
+                    double score = FuzzyScore(normalized, n);
+
+                    if (tokens.Any())
+                        score = Math.Max(score, tokens.Max(t => FuzzyScore(normalized, t)));
+
                     return new { Unit = x, Score = score };
                 })
                 .Where(x => x.Score >= threshold)
@@ -128,7 +194,9 @@ namespace Prg_Moadian.FUNCTIONS
             if (best != null)
                 return best.Unit.IDD.ToString();
 
-            // 4. Fallback
+            // ─────────────────────────────────────────────
+            // 4. Fallback — بازگشت مقدار فعلی
+            // ─────────────────────────────────────────────
             return currentMu;
         }
 
