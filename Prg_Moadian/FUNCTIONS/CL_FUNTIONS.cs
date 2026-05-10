@@ -23,6 +23,8 @@ namespace Prg_Moadian.FUNCTIONS
             { "کیلوگرم", new[] { "کیلو", "کیلوگرم", "kg", "kilo", "kilogram" } },
             { "گرم",     new[] { "gr", "gram" } },
             { "متر",     new[] { "m", "meter" } },
+            { "متر مربع", new[] { "مترمربع", "متر  مربع", "m2", "sqm", "sq m", "squaremeter", "square meter" } },
+            { "متر مکعب", new[] { "مترمکعب", "متر مكعب", "m3", "cbm", "cubicmeter", "cubic meter" } },
             { "لیتر",    new[] { "l", "lit", "liter" } },
             { "کارتن",   new[] { "ctn", "carton", "mastercase", "master case" } },
             { "بسته",    new[] { "pack", "pck", "pkg" } },
