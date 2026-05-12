@@ -79,12 +79,12 @@ namespace Prg_Moadian.FUNCTIONS
             var _newsaz = dbms.DoGetDataSQL<SAZMAN>("SELECT MOADINA_SCNUM , YEA , MEMORYID,MEMORYIDsand,PRIVIATEKEY,Dcertificate FROM dbo.SAZMAN").FirstOrDefault();
 
             TaxService? taxService = default;
-            string? privateKey = PrivateKey_Path_US;
+            string? privateKey = null;
 
             if (true) //easey way for debug to avoid api request temporary
             {
                 PrivateKey_Path_US = _newsaz.PRIVIATEKEY.Replace("-----BEGIN PRIVATE KEY-----\r\n", "").Replace("\r\n-----END PRIVATE KEY-----\r\n", "").Trim();
-
+                privateKey = PrivateKey_Path_US;
                 if (CL_MOADIAN.TaxURL == "https://tp.tax.gov.ir/req/api/")
                 {
                     MemoryID = _newsaz.MEMORYID.Trim(); //حافظه مالیاتی اصلی
