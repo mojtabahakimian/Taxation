@@ -778,29 +778,26 @@ VALUES
 
                 //// TaxService آماده
                 var taxService = new TaxService(_memoryId, _privateKey, TaxURL);
+                // constructor داخل TaxService یک‌بار GetServerInformation() می‌خواند و
+                // نتیجه را در TokenLifeTime.ServerUtcTime ذخیره می‌کند.
                 var _ = taxService.RequestToken(); //// اعتبارسنجی
 
                 //// تاریخ و TaxId جدید
                 var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-                var serverInfo = TaxApiService.Instance.TaxApis.GetServerInformation();
 
-                var serverUtcNow = serverInfo != null
-                    ? DateTimeOffset.FromUnixTimeMilliseconds(serverInfo.ServerTime).UtcDateTime
+                // از زمان سروری که constructor همین لحظه گرفته استفاده می‌کنیم
+                // (فراخوانی مجدد GetServerInformation ممکن است پاسخ cache شده قدیمی برگرداند
+                //  و باعث خطای 200201 شود).
+                var serverUtcNow = TokenLifeTime.ServerUtcTime != default(DateTime)
+                    ? TokenLifeTime.ServerUtcTime
                     : DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
 
                 var now = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
 
                 var taxidNew = taxService.RequestTaxId(_memoryId, now);
 
-                // برای جلوگیری از خطای 2002، زمان صورتحساب را دقیقاً از زمان سرور بگیریم
-                // (در صورت نبود serverInfo از UTC فعلی با skew استفاده می‌کنیم).
-                long indatim = serverInfo != null
-                    ? serverInfo.ServerTime
-                    : TaxService.ConvertDateToLong(serverUtcNow);
+                long indatim = TaxService.ConvertDateToLong(serverUtcNow);
                 long indatim2 = indatim;
-
-                ////indatim = TimeSync.GetMoadianTimestamp();
-                ////indatim2 = TimeSync.GetMoadianTimestamp();
 
                 //بروز رسانی آیتم های حیاتی تغییر یافته برای ارسال جدید:
                 foreach (var taxrow in TAXDTL_DATA)
