@@ -650,6 +650,15 @@ namespace Prg_Moadian.FUNCTIONS
             header.Taxid = L_TAXDTL_US.First().Taxid; //شماره منحصر به فرد مالیاتی
             header.Indatim = (long)L_TAXDTL_US.First().Indatim_Sec; //تاریخ و زمان صدور صورتحساب (میلادی)
             header.Indati2m = (long)L_TAXDTL_US.First().Indati2m_Sec; //تاریخ و زمان ایجاد صورتحساب (میلادی)
+            if (L_TAXDTL_US.First().Ins is 2 or 3 or 4) // اصلاحی/ابطالی/برگشتی
+            {
+                // زمان از اختلاف همگام‌شده با سرور مودیان گرفته می‌شود تا به ساعت سیستم کاربر وابسته نباشد.
+                var sendTimeSec = TimeSync.GetMoadianTimestamp();
+
+                // در ارسال‌های مجدد، زمان ذخیره‌شده ممکن است قدیمی شود و خطای 0200201 بدهد.
+                header.Indatim = sendTimeSec;
+                header.Indati2m = sendTimeSec;
+            }
 
             header.Inty = Convert.ToInt32(L_TAXDTL_US.First().Inty); //(انواع صورتحساب الکترونیکی 1و2و3) نوع صورتحساب
             header.Inno = L_TAXDTL_US.First().Inno; //سریال صورتحساب  //NUMBER	 HEAD_LST

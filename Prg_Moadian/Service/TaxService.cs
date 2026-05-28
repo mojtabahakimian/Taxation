@@ -25,6 +25,7 @@ namespace Prg_Moadian.Service
         {
             TaxApiService.Instance.Init(MemoryId, new SignatoryConfig(PrivateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxUrl);
             ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
+            TimeSync.SyncWithServer(serverInformation.ServerTime);
 
             TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverInformation.ServerTime).UtcDateTime;
             TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
