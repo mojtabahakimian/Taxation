@@ -405,6 +405,13 @@ VALUES
                 {
                     var originalTaxDtl = dbms.DoGetDataSQL<TAXDTL>("SELECT TOP 1 Am FROM TAXDTL WHERE IDD = @idd AND Sstid = @sstid", new { idd = ROW.IDD, sstid = ROW.Sstid }).FirstOrDefault();
 
+                    if (originalTaxDtl == null)
+                    {
+                        new Msgwin(false, "ردیف اصلی صورتحساب برای مقایسه مقدار یافت نشد").Show();
+                        DG_HEAD_INVOICE_CANCEL_EDIT();
+                        return;
+                    }
+
                     if (ROW.Am > originalTaxDtl.Am)
                     {
                         new Msgwin(false, "مقدار در صورتحساب برگشتی نمی‌تواند از مقدار اصلی بیشتر باشد").Show();
@@ -781,13 +788,14 @@ VALUES
                 // constructor: GetServerInformation() → TimeSync.SyncWithServer() → offset به‌روز می‌شود
                 var _ = taxService.RequestToken(); //// اعتبارسنجی
 
-                //// تاریخ و TaxId جدید — از TimeSync استفاده می‌کنیم تا همیشه زمان سرور + offset جاری داشته باشیم
+                //// تاریخ و TaxId جدید — یک snapshot مشترک تا taxidNew و indatim دقیقاً یک لحظه باشند
                 var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-                var now = TimeZoneInfo.ConvertTimeFromUtc(TimeSync.UtcNow, iranTZ);
+                var nowUtcOffset = DateTimeOffset.UtcNow.Add(TimeSync.TimeOffset);
+                var now = TimeZoneInfo.ConvertTimeFromUtc(nowUtcOffset.UtcDateTime, iranTZ);
 
                 var taxidNew = taxService.RequestTaxId(_memoryId, now);
 
-                long indatim = TimeSync.GetMoadianTimestamp();
+                long indatim = nowUtcOffset.ToUnixTimeMilliseconds();
                 long indatim2 = indatim;
 
                 //بروز رسانی آیتم های حیاتی تغییر یافته برای ارسال جدید:
