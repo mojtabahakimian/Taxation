@@ -62,6 +62,10 @@ namespace Prg_Moadian.Service
 
         public TaxModel.SendInvoicesModel SendInvoices(TaxModel.InvoiceModel.Header header, List<TaxModel.InvoiceModel.Body> body, List<TaxModel.InvoiceModel.Payment> payment)
         {
+            // به‌روزرسانی اختلاف ساعت با سرور قبل از هر ارسال برای جلوگیری از drift در اجرای طولانی‌مدت برنامه
+            ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
+            TimeSync.SyncWithServer(serverInformation.ServerTime);
+
             List<InvoiceDto> list = new List<InvoiceDto>();
             List<InvoiceBodyDto> list2 = new List<InvoiceBodyDto>();
             List<PaymentDto> list3 = new List<PaymentDto>();
