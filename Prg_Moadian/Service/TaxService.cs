@@ -25,9 +25,15 @@ namespace Prg_Moadian.Service
         {
             TaxApiService.Instance.Init(MemoryId, new SignatoryConfig(PrivateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxUrl);
             ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
-            TimeSync.SyncWithServer(serverInformation.ServerTime);
 
-            TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverInformation.ServerTime).UtcDateTime;
+            var serverTimeMs = serverInformation.ServerTime;
+            var localTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            // اگر SDK زمان قدیمی کش‌شده برگرداند (اختلاف > ۵ ساعت)، از ساعت محلی استفاده می‌کنیم
+            if (Math.Abs(serverTimeMs - localTimeMs) > (long)TimeSpan.FromHours(5).TotalMilliseconds)
+                serverTimeMs = localTimeMs;
+
+            TimeSync.SyncWithServer(serverTimeMs);
+            TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
             TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
         }
 
