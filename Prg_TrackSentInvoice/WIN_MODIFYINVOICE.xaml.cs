@@ -778,25 +778,16 @@ VALUES
 
                 //// TaxService آماده
                 var taxService = new TaxService(_memoryId, _privateKey, TaxURL);
-                // constructor داخل TaxService یک‌بار GetServerInformation() می‌خواند و
-                // نتیجه را در TokenLifeTime.ServerUtcTime ذخیره می‌کند.
+                // constructor: GetServerInformation() → TimeSync.SyncWithServer() → offset به‌روز می‌شود
                 var _ = taxService.RequestToken(); //// اعتبارسنجی
 
-                //// تاریخ و TaxId جدید
+                //// تاریخ و TaxId جدید — از TimeSync استفاده می‌کنیم تا همیشه زمان سرور + offset جاری داشته باشیم
                 var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-
-                // از زمان سروری که constructor همین لحظه گرفته استفاده می‌کنیم
-                // (فراخوانی مجدد GetServerInformation ممکن است پاسخ cache شده قدیمی برگرداند
-                //  و باعث خطای 200201 شود).
-                var serverUtcNow = TokenLifeTime.ServerUtcTime != default(DateTime)
-                    ? TokenLifeTime.ServerUtcTime
-                    : DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
-
-                var now = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
+                var now = TimeZoneInfo.ConvertTimeFromUtc(TimeSync.UtcNow, iranTZ);
 
                 var taxidNew = taxService.RequestTaxId(_memoryId, now);
 
-                long indatim = TaxService.ConvertDateToLong(serverUtcNow);
+                long indatim = TimeSync.GetMoadianTimestamp();
                 long indatim2 = indatim;
 
                 //بروز رسانی آیتم های حیاتی تغییر یافته برای ارسال جدید:
