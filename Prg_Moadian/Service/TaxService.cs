@@ -21,13 +21,25 @@ namespace Prg_Moadian.Service
 {
     public class TaxService
     {
+        private static readonly object _initLock = new object();
+
         public TaxService(string MemoryId, string PrivateKey, string TaxUrl)
         {
-            TaxApiService.Instance.Init(MemoryId, new SignatoryConfig(PrivateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxUrl);
-            ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
+            lock (_initLock)
+            {
+                TaxApiService.Instance.Init(MemoryId, new SignatoryConfig(PrivateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxUrl);
+                ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
 
-            TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverInformation.ServerTime).UtcDateTime;
-            TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
+                var serverTimeMs = serverInformation.ServerTime;
+                var localTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                // اگر SDK زمان قدیمی کش‌شده برگرداند (اختلاف > ۵ ساعت)، از ساعت محلی استفاده می‌کنیم
+                if (Math.Abs(serverTimeMs - localTimeMs) > (long)TimeSpan.FromHours(5).TotalMilliseconds)
+                    serverTimeMs = localTimeMs;
+
+                TimeSync.SyncWithServer(serverTimeMs);
+                TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
+                TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
+            }
         }
 
         public TaxModel.RequestTokenModel RequestToken()
@@ -44,8 +56,7 @@ namespace Prg_Moadian.Service
 
         public string RequestTaxId(string memoryId, DateTime date)
         {
-            Random random = new Random();
-            long serial = random.Next(999999999);
+            long serial = Random.Shared.Next(999999999);
             return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
         }
 

@@ -403,7 +403,14 @@ VALUES
 
                 if (ROW?.Ins == 4) //برگشتی
                 {
-                    var originalTaxDtl = dbms.DoGetDataSQL<TAXDTL>($"SELECT TOP 1 Am FROM TAXDTL WHERE IDD = {ROW.IDD} AND Sstid = '{ROW.Sstid}'").FirstOrDefault();
+                    var originalTaxDtl = dbms.DoGetDataSQL<TAXDTL>("SELECT TOP 1 Am FROM TAXDTL WHERE IDD = @idd AND Sstid = @sstid", new { idd = ROW.IDD, sstid = ROW.Sstid }).FirstOrDefault();
+
+                    if (originalTaxDtl == null)
+                    {
+                        new Msgwin(false, "ردیف اصلی صورتحساب برای مقایسه مقدار یافت نشد").Show();
+                        DG_HEAD_INVOICE_CANCEL_EDIT();
+                        return;
+                    }
 
                     if (ROW.Am > originalTaxDtl.Am)
                     {
@@ -778,29 +785,18 @@ VALUES
 
                 //// TaxService آماده
                 var taxService = new TaxService(_memoryId, _privateKey, TaxURL);
+                // constructor: GetServerInformation() → TimeSync.SyncWithServer() → offset به‌روز می‌شود
                 var _ = taxService.RequestToken(); //// اعتبارسنجی
 
-                //// تاریخ و TaxId جدید
+                //// تاریخ و TaxId جدید — یک snapshot مشترک تا taxidNew و indatim دقیقاً یک لحظه باشند
                 var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-                var serverInfo = TaxApiService.Instance.TaxApis.GetServerInformation();
-
-                var serverUtcNow = serverInfo != null
-                    ? DateTimeOffset.FromUnixTimeMilliseconds(serverInfo.ServerTime).UtcDateTime
-                    : DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
-
-                var now = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
+                var nowUtcOffset = DateTimeOffset.UtcNow.Add(TimeSync.TimeOffset);
+                var now = TimeZoneInfo.ConvertTimeFromUtc(nowUtcOffset.UtcDateTime, iranTZ);
 
                 var taxidNew = taxService.RequestTaxId(_memoryId, now);
 
-                // برای جلوگیری از خطای 2002، زمان صورتحساب را دقیقاً از زمان سرور بگیریم
-                // (در صورت نبود serverInfo از UTC فعلی با skew استفاده می‌کنیم).
-                long indatim = serverInfo != null
-                    ? serverInfo.ServerTime
-                    : TaxService.ConvertDateToLong(serverUtcNow);
+                long indatim = nowUtcOffset.ToUnixTimeMilliseconds();
                 long indatim2 = indatim;
-
-                ////indatim = TimeSync.GetMoadianTimestamp();
-                ////indatim2 = TimeSync.GetMoadianTimestamp();
 
                 //بروز رسانی آیتم های حیاتی تغییر یافته برای ارسال جدید:
                 foreach (var taxrow in TAXDTL_DATA)
@@ -913,7 +909,7 @@ VALUES
                         Payments = payments
                     };
                     string jsonData = JsonSerializer.Serialize(jsonObject);
-                    string combinedFilePath = System.IO.Path.Combine(directoryPath, $"{DateTime.Now.ToString("yyyy-mm-dd-ss-fff")}-Combined.json");
+                    string combinedFilePath = System.IO.Path.Combine(directoryPath, $"{DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss-fff")}-Combined.json");
                     File.WriteAllText(combinedFilePath, jsonData);
                 }
                 catch { }
@@ -959,96 +955,110 @@ VALUES
 
                 try
                 {
-                    //{ درج در جدول مالیات در دیتابیس 
-                    foreach (var src_item in TAXDTL_DATA)
-                    {
-                        var IDD_OF_TAXDTL = TheFunctions.GetNewIDD();
-
-                        const string insertSql = @"INSERT INTO dbo.TAXDTL (
+                    //{ درج در جدول مالیات در دیتابیس (با یک تراکنش تا ردیف‌های ناقص نماند)
+                    const string insertSql = @"INSERT INTO dbo.TAXDTL (
 Taxid, Indatim, Indati2m, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, NUMBER, TAG, DATE_N)
 VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @NUMBER, @TAG, @DATE_N);";
 
-                        var p = new
+                    using (var db = new SqlConnection(CL_CCNNMANAGER.CONNECTION_STR))
+                    {
+                        db.Open();
+                        using (var txn = db.BeginTransaction())
                         {
-                            Taxid = CL_MOADIAN.SafeString(taxidNew, 22),
-                            Indatim = (DateTime?)null,
-                            Indati2m = (DateTime?)null,
-                            src_item.Indatim_Sec,
-                            src_item.Indati2m_Sec,
-                            src_item.Inty,
-                            Inno = CL_MOADIAN.SafeString(src_item.Inno, 10),
-                            Irtaxid = CL_MOADIAN.SafeString(src_item.Irtaxid, 22), //src_item.Irtaxid
-                            src_item.Inp,
-                            src_item.Ins,
-                            Tins = CL_MOADIAN.SafeString(src_item.Tins, 14),
-                            src_item.Tob,
-                            Bid = CL_MOADIAN.SafeString(src_item.Bid, 12),
-                            Tinb = CL_MOADIAN.SafeString(src_item.Tinb, 14) ?? string.Empty,
-                            Sbc = CL_MOADIAN.SafeString(src_item.Sbc, 10),
-                            Bpc = CL_MOADIAN.SafeString(src_item.Bpc, 10),
-                            src_item.Ft,
-                            Bpn = CL_MOADIAN.SafeString(src_item.Bpn, 9),
-                            Scln = CL_MOADIAN.SafeString(src_item.Scln, 14),
-                            Scc = CL_MOADIAN.SafeString(src_item.Scc, 5),
-                            Crn = CL_MOADIAN.SafeString(src_item.Crn, 12),
-                            Billid = CL_MOADIAN.SafeString(src_item.Billid, 19),
-                            src_item.Tprdis,
-                            src_item.Tdis,
-                            src_item.Tadis,
-                            src_item.Tvam,
-                            src_item.Todam,
-                            src_item.Tbill,
-                            src_item.Setm,
-                            src_item.Cap,
-                            src_item.Insp,
-                            src_item.Tvop,
-                            src_item.Tax17,
-                            src_item.Cdcd,
-                            src_item.Tonw,
-                            src_item.Torv,
-                            src_item.Tocv,
-                            Sstid = CL_MOADIAN.SafeString(src_item.Sstid, 13),
-                            Sstt = CL_MOADIAN.SafeString(src_item.Sstt, 400),
-                            Mu = CL_MOADIAN.SafeDecimal(src_item.Mu),
-                            src_item.Am,
-                            src_item.Fee,
-                            src_item.Cfee,
-                            Cut = CL_MOADIAN.SafeString(src_item.Cut, 3),
-                            src_item.Exr,
-                            src_item.Prdis,
-                            src_item.Dis,
-                            src_item.Adis,
-                            src_item.Vra,
-                            src_item.Vam,
-                            Odt = CL_MOADIAN.SafeString(src_item.Odt, 255),
-                            src_item.Odr,
-                            src_item.Odam,
-                            Olt = CL_MOADIAN.SafeString(src_item.Olt, 255),
-                            src_item.Olr,
-                            src_item.Olam,
-                            src_item.Consfee,
-                            src_item.Spro,
-                            src_item.Bros,
-                            src_item.Tcpbs,
-                            src_item.Cop,
-                            src_item.Vop,
-                            Bsrn = CL_MOADIAN.SafeString(src_item.Bsrn, 12),
-                            src_item.Tsstam,
-                            src_item.Nw,
-                            src_item.Ssrv,
-                            src_item.Sscv,
-                            IDD = IDD_OF_TAXDTL,
-                            UID = CL_MOADIAN.SafeString(src_item.UID, 100),
-                            RefrenceNumber = CL_MOADIAN.SafeString(src_item.RefrenceNumber, 100),
-                            TheStatus = "PENDING",
-                            ApiTypeSent = _apitypesent,
-                            SentTaxMemory = CL_MOADIAN.SafeString(_memoryId, 12),
-                            src_item?.NUMBER,
-                            src_item?.TAG,
-                            DATE_N = src_item?.DATE_N
-                        };
-
-                        dbms.DoExecuteSQL(insertSql, p);
+                            try
+                            {
+                                foreach (var src_item in TAXDTL_DATA)
+                                {
+                                    var IDD_OF_TAXDTL = TheFunctions.GetNewIDD();
+                                    var p = new
+                                    {
+                                        Taxid = CL_MOADIAN.SafeString(taxidNew, 22),
+                                        Indatim = (DateTime?)null,
+                                        Indati2m = (DateTime?)null,
+                                        src_item.Indatim_Sec,
+                                        src_item.Indati2m_Sec,
+                                        src_item.Inty,
+                                        Inno = CL_MOADIAN.SafeString(src_item.Inno, 10),
+                                        Irtaxid = CL_MOADIAN.SafeString(src_item.Irtaxid, 22),
+                                        src_item.Inp,
+                                        src_item.Ins,
+                                        Tins = CL_MOADIAN.SafeString(src_item.Tins, 14),
+                                        src_item.Tob,
+                                        Bid = CL_MOADIAN.SafeString(src_item.Bid, 12),
+                                        Tinb = CL_MOADIAN.SafeString(src_item.Tinb, 14) ?? string.Empty,
+                                        Sbc = CL_MOADIAN.SafeString(src_item.Sbc, 10),
+                                        Bpc = CL_MOADIAN.SafeString(src_item.Bpc, 10),
+                                        src_item.Ft,
+                                        Bpn = CL_MOADIAN.SafeString(src_item.Bpn, 9),
+                                        Scln = CL_MOADIAN.SafeString(src_item.Scln, 14),
+                                        Scc = CL_MOADIAN.SafeString(src_item.Scc, 5),
+                                        Crn = CL_MOADIAN.SafeString(src_item.Crn, 12),
+                                        Billid = CL_MOADIAN.SafeString(src_item.Billid, 19),
+                                        src_item.Tprdis,
+                                        src_item.Tdis,
+                                        src_item.Tadis,
+                                        src_item.Tvam,
+                                        src_item.Todam,
+                                        src_item.Tbill,
+                                        src_item.Setm,
+                                        src_item.Cap,
+                                        src_item.Insp,
+                                        src_item.Tvop,
+                                        src_item.Tax17,
+                                        src_item.Cdcd,
+                                        src_item.Tonw,
+                                        src_item.Torv,
+                                        src_item.Tocv,
+                                        Sstid = CL_MOADIAN.SafeString(src_item.Sstid, 13),
+                                        Sstt = CL_MOADIAN.SafeString(src_item.Sstt, 400),
+                                        Mu = CL_MOADIAN.SafeDecimal(src_item.Mu),
+                                        src_item.Am,
+                                        src_item.Fee,
+                                        src_item.Cfee,
+                                        Cut = CL_MOADIAN.SafeString(src_item.Cut, 3),
+                                        src_item.Exr,
+                                        src_item.Prdis,
+                                        src_item.Dis,
+                                        src_item.Adis,
+                                        src_item.Vra,
+                                        src_item.Vam,
+                                        Odt = CL_MOADIAN.SafeString(src_item.Odt, 255),
+                                        src_item.Odr,
+                                        src_item.Odam,
+                                        Olt = CL_MOADIAN.SafeString(src_item.Olt, 255),
+                                        src_item.Olr,
+                                        src_item.Olam,
+                                        src_item.Consfee,
+                                        src_item.Spro,
+                                        src_item.Bros,
+                                        src_item.Tcpbs,
+                                        src_item.Cop,
+                                        src_item.Vop,
+                                        Bsrn = CL_MOADIAN.SafeString(src_item.Bsrn, 12),
+                                        src_item.Tsstam,
+                                        src_item.Nw,
+                                        src_item.Ssrv,
+                                        src_item.Sscv,
+                                        IDD = IDD_OF_TAXDTL,
+                                        UID = CL_MOADIAN.SafeString(src_item.UID, 100),
+                                        RefrenceNumber = CL_MOADIAN.SafeString(src_item.RefrenceNumber, 100),
+                                        TheStatus = "PENDING",
+                                        ApiTypeSent = _apitypesent,
+                                        SentTaxMemory = CL_MOADIAN.SafeString(_memoryId, 12),
+                                        src_item?.NUMBER,
+                                        src_item?.TAG,
+                                        DATE_N = src_item?.DATE_N
+                                    };
+                                    db.Execute(insertSql, p, txn);
+                                }
+                                txn.Commit();
+                            }
+                            catch
+                            {
+                                txn.Rollback();
+                                throw;
+                            }
+                        }
                     }
                     //آماده سازی داده ها }
 
@@ -1110,7 +1120,7 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
             {
                 string _msger = null;
                 //var _qre0 = dbms.DoGetDataSQL<ES1>($"SELECT TheError,TheStatus FROM dbo.TAXDTL WHERE TheStatus <> N'PENDING' AND TheError <> N'' AND RefrenceNumber = N'{FactorInfoSent.ReferenceNumber}' ").ToList();
-                var _qre0 = dbms.DoGetDataSQL<ES1>($"SELECT TheError,TheStatus FROM dbo.TAXDTL WHERE RefrenceNumber = N'{_ReferenceNumber_}' ").ToList();
+                var _qre0 = dbms.DoGetDataSQL<ES1>("SELECT TheError,TheStatus FROM dbo.TAXDTL WHERE RefrenceNumber = @ref", new { @ref = _ReferenceNumber_ }).ToList();
                 foreach (var item in _qre0)
                 {
                     if (!string.IsNullOrEmpty(item.TheError) && !string.IsNullOrWhiteSpace(item.TheError))
