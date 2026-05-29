@@ -1,5 +1,7 @@
 ﻿using Azure;
+using Dapper;
 using Microsoft.Identity.Client;
+using Microsoft.Data.SqlClient;
 using Prg_Moadian.CNNMANAGER;
 using Prg_Moadian.FUNCTIONS;
 using Prg_Moadian.Generaly;
@@ -618,23 +620,15 @@ namespace Prg_Moadian.Bulk
 
         private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag)
         {
-            // مرتب‌سازی مطابق با ایندکس
-            var pairs = sent.Select((dto, idx) => new { dto, records = recordsSets[idx], resp = responses.ElementAt(idx) });
-
-            foreach (var pair in pairs)
+            const int dbCommandTimeoutSeconds = 300;
+            var responsesList = responses.ToList();
+            var totalRows = sent.Sum(dto => dto.Body.Count);
+            if (totalRows == 0)
             {
-                var header = pair.dto.Header;
-                var uid = pair.resp.Uid;
-                var refNum = pair.resp.ReferenceNumber;
-                var status = uid != null ? "PENDING" : "FAILED";
+                return;
+            }
 
-                for (int i = 0; i < pair.dto.Body.Count; i++)
-                {
-                    var body = pair.dto.Body[i];
-                    var record = pair.records[i];   // اینجا ردیف TAXDTL متناظر
-                    var idd = _fn.GetNewIDD();
-
-                    var sql = @"
+            var sql = @"
                      INSERT INTO dbo.TAXDTL
                      (
                          Taxid, Indatim_Sec, Indati2m_Sec, Inty, Inno, Inp, Ins, Tins, Tob,
@@ -653,58 +647,97 @@ namespace Prg_Moadian.Bulk
                          @Number, @Tag, @Sstid, @Sstt, @Mu, @Am, @Fee, @Prdis, @Dis, @Adis, @Vra, @Vam, @Tsstam,
                          @UID, @Ref, @Status, @Api, @Mem, @IDD, N'Bulk'
                      )";
-                    var p = new Dictionary<string, object>
+
+            using (var db = new SqlConnection(CL_CCNNMANAGER.CONNECTION_STR))
+            {
+                db.Open();
+                using (var txn = db.BeginTransaction())
+                {
+                    try
                     {
-                        ["Taxid"] = header.Taxid,
-                        ["Ind1"] = header.Indatim,
-                        ["Ind2"] = header.Indati2m,
-                        ["Inty"] = header.Inty,
-                        ["Inno"] = header.Inno,
-                        ["Inp"] = header.Inp,
-                        ["Ins"] = header.Ins,
-                        ["Tins"] = header.Tins,
-                        ["Tob"] = header.Tob,
-                        ["Bid"] = header.Bid,
-                        ["Tinb"] = header.Tinb ?? string.Empty,
-                        ["Sbc"] = header.Sbc,
-                        ["Bpc"] = header.Bpc,
-                        ["Ft"] = header.Ft,
-                        ["Crn"] = header.Crn,
-                        ["Billid"] = header.Billid,
-                        ["Tprdis"] = header.Tprdis,
-                        ["Tdis"] = header.Tdis,
-                        ["Tadis"] = header.Tadis,
-                        ["Tvam"] = header.Tvam,
-                        ["Todam"] = header.Todam,
-                        ["Tbill"] = header.Tbill,
-                        ["Setm"] = header.Setm,
-                        ["Cap"] = header.Cap,
-                        ["Insp"] = header.Insp,
-                        ["Tvop"] = header.Tvop,
-                        ["Tax17"] = header.Tax17,
-                        ["Cdcd"] = header.Cdcd,
-                        ["Date_N"] = record.DATE_N ?? 0,
-                        ["Number"] = record?.NUMBER > 0 ? record.NUMBER : _fn.SafeRemoveFirstFour(header.Inno),
-                        ["Tag"] = tag,
-                        ["Sstid"] = body.Sstid,
-                        ["Sstt"] = body.Sstt,
-                        ["Mu"] = body.Mu,
-                        ["Am"] = body.Am,
-                        ["Fee"] = body.Fee,
-                        ["Prdis"] = body.Prdis,
-                        ["Dis"] = body.Dis,
-                        ["Adis"] = body.Adis,
-                        ["Vra"] = body.Vra,
-                        ["Vam"] = body.Vam,
-                        ["Tsstam"] = body.Tsstam,
-                        ["UID"] = uid,
-                        ["Ref"] = refNum,
-                        ["Status"] = status,
-                        ["Api"] = _isSandbox ? 0 : 1,
-                        ["Mem"] = _memoryId,
-                        ["IDD"] = idd
-                    };
-                    _db.DoExecuteSQL(sql, p);
+                        var nextIdd = db.ExecuteScalar<int>(
+                            "SELECT ISNULL(MAX(IDD), 0) + 1 FROM dbo.TAXDTL WITH (UPDLOCK, HOLDLOCK);",
+                            transaction: txn,
+                            commandTimeout: dbCommandTimeoutSeconds);
+
+                        // مرتب‌سازی مطابق با ایندکس
+                        var pairs = sent.Select((dto, idx) => new { dto, records = recordsSets[idx], resp = responsesList[idx] });
+
+                        foreach (var pair in pairs)
+                        {
+                            var header = pair.dto.Header;
+                            var uid = pair.resp.Uid;
+                            var refNum = pair.resp.ReferenceNumber;
+                            var status = uid != null ? "PENDING" : "FAILED";
+
+                            for (int i = 0; i < pair.dto.Body.Count; i++)
+                            {
+                                var body = pair.dto.Body[i];
+                                var record = pair.records[i];   // اینجا ردیف TAXDTL متناظر
+                                var idd = nextIdd++;
+
+                                var p = new Dictionary<string, object>
+                                {
+                                    ["Taxid"] = header.Taxid,
+                                    ["Ind1"] = header.Indatim,
+                                    ["Ind2"] = header.Indati2m,
+                                    ["Inty"] = header.Inty,
+                                    ["Inno"] = header.Inno,
+                                    ["Inp"] = header.Inp,
+                                    ["Ins"] = header.Ins,
+                                    ["Tins"] = header.Tins,
+                                    ["Tob"] = header.Tob,
+                                    ["Bid"] = header.Bid,
+                                    ["Tinb"] = header.Tinb ?? string.Empty,
+                                    ["Sbc"] = header.Sbc,
+                                    ["Bpc"] = header.Bpc,
+                                    ["Ft"] = header.Ft,
+                                    ["Crn"] = header.Crn,
+                                    ["Billid"] = header.Billid,
+                                    ["Tprdis"] = header.Tprdis,
+                                    ["Tdis"] = header.Tdis,
+                                    ["Tadis"] = header.Tadis,
+                                    ["Tvam"] = header.Tvam,
+                                    ["Todam"] = header.Todam,
+                                    ["Tbill"] = header.Tbill,
+                                    ["Setm"] = header.Setm,
+                                    ["Cap"] = header.Cap,
+                                    ["Insp"] = header.Insp,
+                                    ["Tvop"] = header.Tvop,
+                                    ["Tax17"] = header.Tax17,
+                                    ["Cdcd"] = header.Cdcd,
+                                    ["Date_N"] = record.DATE_N ?? 0,
+                                    ["Number"] = record?.NUMBER > 0 ? record.NUMBER : _fn.SafeRemoveFirstFour(header.Inno),
+                                    ["Tag"] = tag,
+                                    ["Sstid"] = body.Sstid,
+                                    ["Sstt"] = body.Sstt,
+                                    ["Mu"] = body.Mu,
+                                    ["Am"] = body.Am,
+                                    ["Fee"] = body.Fee,
+                                    ["Prdis"] = body.Prdis,
+                                    ["Dis"] = body.Dis,
+                                    ["Adis"] = body.Adis,
+                                    ["Vra"] = body.Vra,
+                                    ["Vam"] = body.Vam,
+                                    ["Tsstam"] = body.Tsstam,
+                                    ["UID"] = uid,
+                                    ["Ref"] = refNum,
+                                    ["Status"] = status,
+                                    ["Api"] = _isSandbox ? 0 : 1,
+                                    ["Mem"] = _memoryId,
+                                    ["IDD"] = idd
+                                };
+                                db.Execute(sql, p, txn, commandTimeout: dbCommandTimeoutSeconds);
+                            }
+                        }
+
+                        txn.Commit();
+                    }
+                    catch
+                    {
+                        txn.Rollback();
+                        throw;
+                    }
                 }
             }
         }

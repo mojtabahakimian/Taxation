@@ -960,6 +960,8 @@ VALUES
 Taxid, Indatim, Indati2m, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, NUMBER, TAG, DATE_N)
 VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @NUMBER, @TAG, @DATE_N);";
 
+                    const int dbCommandTimeoutSeconds = 300;
+
                     using (var db = new SqlConnection(CL_CCNNMANAGER.CONNECTION_STR))
                     {
                         db.Open();
@@ -967,9 +969,14 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                         {
                             try
                             {
+                                var nextIdd = db.ExecuteScalar<int>(
+                                    "SELECT ISNULL(MAX(IDD), 0) + 1 FROM dbo.TAXDTL WITH (UPDLOCK, HOLDLOCK);",
+                                    transaction: txn,
+                                    commandTimeout: dbCommandTimeoutSeconds);
+
                                 foreach (var src_item in TAXDTL_DATA)
                                 {
-                                    var IDD_OF_TAXDTL = TheFunctions.GetNewIDD();
+                                    var IDD_OF_TAXDTL = nextIdd++;
                                     var p = new
                                     {
                                         Taxid = CL_MOADIAN.SafeString(taxidNew, 22),
@@ -1049,7 +1056,7 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                                         src_item?.TAG,
                                         DATE_N = src_item?.DATE_N
                                     };
-                                    db.Execute(insertSql, p, txn);
+                                    db.Execute(insertSql, p, txn, commandTimeout: dbCommandTimeoutSeconds);
                                 }
                                 txn.Commit();
                             }
