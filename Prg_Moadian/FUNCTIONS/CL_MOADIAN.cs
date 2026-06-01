@@ -687,6 +687,8 @@ namespace Prg_Moadian.FUNCTIONS
             header.Tonw = Convert.ToDecimal(L_TAXDTL_US.First().Tonw); //مجموع وزن خالص
             header.Torv = Convert.ToDecimal(L_TAXDTL_US.First().Torv); //مجموع ارزش ریالی
             header.Tocv = Convert.ToDecimal(L_TAXDTL_US.First().Tocv); //مجموع ارزش ارزی
+            // قاعده ارسال صورتحساب - رفع خطای 00107 سامانه مودیان
+            header.Inrules = _HEAD_EXTENDED?.inrules ?? 1;
 
             List<TaxModel.InvoiceModel.Body>? bodies = new List<TaxModel.InvoiceModel.Body>();
             foreach (var item in L_TAXDTL_US)

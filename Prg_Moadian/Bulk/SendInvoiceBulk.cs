@@ -203,8 +203,8 @@ namespace Prg_Moadian.Bulk
 
                 try
                 {
-                    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                            VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
+                    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid, inrules)
+                            VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT, 1);");
                 }
                 catch { }
 
@@ -399,12 +399,10 @@ namespace Prg_Moadian.Bulk
                 dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
             }
 
-            //var taxId = _taxService.RequestTaxId(_memoryId, dt);
-            //var ts = TaxService.ConvertDateToLong(dt);
-            // اعمال اختلاف زمانی سرور
-            var dtAdjusted = dt.Add(TokenLifeTime.ServerClockSkew); //جلوگیری از خطای تاریخ
-            var taxId = _taxService.RequestTaxId(_memoryId, dtAdjusted);
-            var ts = TaxService.ConvertDateToLong(dtAdjusted);
+            // تاریخ فاکتور تاریخچه‌ای است و نباید اختلاف ساعت سرور به آن اعمال شود
+            // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
+            var taxId = _taxService.RequestTaxId(_memoryId, dt);
+            var ts = TaxService.ConvertDateToLong(dt);
 
             // 1. دریافت شماره فاکتور (مثلاً 10391)
             long invoiceNum = long.Parse(number.ToString());
@@ -441,6 +439,8 @@ namespace Prg_Moadian.Bulk
                 Insp = headExt.insp,
                 Tvop = headExt.tvop,
                 Tax17 = headExt.tax17,
+                // قاعده ارسال صورتحساب - 1 = ارسال مستقیم از نرم‌افزار حسابداری (رفع خطا 00107)
+                Inrules = headExt.inrules ?? 1,
 
                 #region MINE
                 //Taxid = taxId, //شماره منحصر به فرد مالیاتی

@@ -681,6 +681,8 @@ namespace Prg_Moadian.FUNCTIONS
             try { dbms.DoExecuteSQL("ALTER TABLE HEAD_LST_EXTENDED ADD sscv float NULL"); } catch { }
             try { dbms.DoExecuteSQL("ALTER TABLE [dbo].[HEAD_LST_EXTENDED] ADD [CUT] nvarchar(3) NULL"); } catch { }
             try { dbms.DoExecuteSQL("ALTER TABLE [dbo].[HEAD_LST_EXTENDED] ADD [irtaxid] nvarchar(22) NULL"); } catch { }
+            // قاعده ارسال صورتحساب - رفع خطای 00107 سامانه مودیان
+            try { dbms.DoExecuteSQL("ALTER TABLE [dbo].[HEAD_LST_EXTENDED] ADD [inrules] int NULL DEFAULT 1"); } catch { }
 
             //CHANGE STUF_DEF
             try { dbms.DoExecuteSQL(@"ALTER TABLE dbo.STUF_DEF ADD sstid nvarchar(13) NULL ; ALTER TABLE dbo.STUF_DEF ADD vra float NULL"); } catch { }

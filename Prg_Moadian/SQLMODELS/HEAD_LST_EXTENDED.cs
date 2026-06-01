@@ -33,5 +33,8 @@
         public decimal? exr { get; set; }
         public decimal? sscv { get; set; }
         public decimal? ssrv { get; set; }
+        // قاعده ارسال صورتحساب - مورد نیاز سامانه مودیان (کد خطا 00107)
+        // مقدار پیش‌فرض: 1 (ارسال مستقیم از نرم‌افزار حسابداری)
+        public int? inrules { get; set; }
     }
 }

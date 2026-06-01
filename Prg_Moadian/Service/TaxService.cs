@@ -114,7 +114,9 @@ namespace Prg_Moadian.Service
                 Torv = ((header.Torv == 0m) ? null : new decimal?(header.Torv)),
                 Tprdis = header.Tprdis,
                 Tvam = header.Tvam,
-                Tvop = header.Tvop
+                Tvop = header.Tvop,
+                // قاعده ارسال صورتحساب - 1 = ارسال مستقیم از نرم‌افزار حسابداری (رفع خطا 00107)
+                Inrules = header.Inrules ?? 1
             };
             foreach (TaxModel.InvoiceModel.Body item in body)
             {
