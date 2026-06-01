@@ -83,9 +83,6 @@
                 public decimal Torv { get; set; }
 
                 public decimal Tocv { get; set; }
-
-                // قاعده ارسال صورتحساب (inrules) - کد خطا 00107
-                public int? Inrules { get; set; }
             }
 
             public class Body

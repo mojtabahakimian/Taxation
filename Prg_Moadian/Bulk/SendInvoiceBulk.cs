@@ -203,8 +203,8 @@ namespace Prg_Moadian.Bulk
 
                 try
                 {
-                    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid, inrules)
-                            VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT, 1);");
+                    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
+                            VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
                 }
                 catch { }
 
@@ -439,8 +439,6 @@ namespace Prg_Moadian.Bulk
                 Insp = headExt.insp,
                 Tvop = headExt.tvop,
                 Tax17 = headExt.tax17,
-                // قاعده ارسال صورتحساب - 1 = ارسال مستقیم از نرم‌افزار حسابداری (رفع خطا 00107)
-                Inrules = headExt.inrules ?? 1,
 
                 #region MINE
                 //Taxid = taxId, //شماره منحصر به فرد مالیاتی
