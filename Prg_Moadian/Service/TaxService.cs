@@ -31,14 +31,15 @@ namespace Prg_Moadian.Service
                 ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
 
                 var serverTimeMs = serverInformation.ServerTime;
-                var localTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                // اگر SDK زمان قدیمی کش‌شده برگرداند (اختلاف > ۵ ساعت)، از ساعت محلی استفاده می‌کنیم
-                if (Math.Abs(serverTimeMs - localTimeMs) > (long)TimeSpan.FromHours(5).TotalMilliseconds)
-                    serverTimeMs = localTimeMs;
-
-                TimeSync.SyncWithServer(serverTimeMs);
-                TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
-                TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
+                // SDK هیچ caching‌ای ندارد — هر بار HTTP call می‌زند، پس ServerTime همیشه معتبر است.
+                // این زمان برای جبران ساعت اشتباه سیستم‌های مشتری استفاده می‌شود (فقط برای عملیات
+                // real-time مثل اصلاحی/ابطالی — نه برای تاریخ تاریخچه‌ای فاکتور که از DATE_N می‌آید).
+                if (serverTimeMs > 0)
+                {
+                    TimeSync.SyncWithServer(serverTimeMs);
+                    TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
+                    TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
+                }
             }
         }
 
