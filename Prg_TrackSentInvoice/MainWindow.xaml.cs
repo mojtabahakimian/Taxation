@@ -1401,18 +1401,19 @@ namespace Prg_TrackSentInvoice
                     isMainApi = false;
                 }
 
-                // اجرا روی background thread تا UI فریز نکند
-                (successCount, failCount) = await Task.Run(() =>
+                // فقط اتصال اولیه (HTTP) در background — بقیه روی UI thread
+                var taxService = await Task.Run(() =>
                 {
-                var taxService = new TaxService(memoryId, privateKey, TaxURL);
-                taxService.RequestToken();
-                int ok = 0, fail = 0;
+                    var svc = new TaxService(memoryId, privateKey, TaxURL);
+                    svc.RequestToken();
+                    return svc;
+                });
 
                 foreach (var taxid in uniqueTaxids)
                 {
                     try
                     {
-                        Dispatcher.Invoke(() => STATUS_LABEL.Content = $"در حال پردازش فاکتور با شماره مالیاتی: {taxid}");
+                        STATUS_LABEL.Content = $"در حال پردازش فاکتور با شماره مالیاتی: {taxid}";
 
                         // ۱) UID نسخهٔ پایه (اولین ارسالِ غیر ResendDuplicate) را بگیر
                         var baseUid = dbms.DoGetDataSQL<string>(@"
@@ -1423,7 +1424,6 @@ namespace Prg_TrackSentInvoice
                                                 ORDER BY CRT ASC
                                             ", new { taxid, api = Convert.ToInt32(isMainApi) }).FirstOrDefault();
 
-                        // اگر به هر دلیل چیزی برنگشت، بیفت روی اولین UID موجود (fallback بی‌خطر)
                         if (string.IsNullOrEmpty(baseUid))
                         {
                             baseUid = dbms.DoGetDataSQL<string>(@"
@@ -1434,7 +1434,6 @@ namespace Prg_TrackSentInvoice
                                                 ", new { taxid, api = Convert.ToInt32(isMainApi) }).FirstOrDefault();
                         }
 
-                        // ۲) کل ردیف‌های همان گروه را بگیر (و ترتیب ثابت بده)
                         var originalInvoiceRows = dbms.DoGetDataSQL<FULL_TAXDTL>(@"
                                                 SELECT *
                                                 FROM dbo.TAXDTL
@@ -1442,11 +1441,10 @@ namespace Prg_TrackSentInvoice
                                                 ORDER BY CRT, IDD
                                             ", new { taxid, api = Convert.ToInt32(isMainApi), baseUid });
 
-
                         if (!originalInvoiceRows.Any())
                         {
                             CL_Generaly.DoWritePRGLOG($"Skipping TaxID {taxid} as no records were found in TAXDTL.", null);
-                            fail++;
+                            failCount++;
                             continue;
                         }
 
@@ -1472,20 +1470,20 @@ namespace Prg_TrackSentInvoice
                             if (string.IsNullOrEmpty(TheHead?.Crn) || TheHead?.Crn == "0")
                             {
                                 if (TheHead?.Crn != null)
-                                    TheHead.Crn = null; //شناسه یکتای ثبت قرار داد فروشنده
+                                    TheHead.Crn = null;
                             }
-                            if (TheHead?.Irtaxid != null) //جلوگیری از مقدار خالی یا Space
+                            if (TheHead?.Irtaxid != null)
                             {
                                 if (string.IsNullOrWhiteSpace(TheHead?.Irtaxid))
                                 {
-                                    if (TheHead?.Inp != 7) //الگوی صورتحساب => صادرات نیست
+                                    if (TheHead?.Inp != 7)
                                         TheHead.Irtaxid = null;
                                 }
                             }
                         }
                         foreach (var item in bodies)
                         {
-                            if (item?.Cut != null) //نوع ارز — از DB می‌آید، ممکن است whitespace باشد
+                            if (item?.Cut != null)
                             {
                                 if (string.IsNullOrWhiteSpace(item?.Cut))
                                     item.Cut = null;
@@ -1515,31 +1513,15 @@ namespace Prg_TrackSentInvoice
                         {
                             string directoryPath = @"C:\CORRECT\SENTS";
                             if (!Directory.Exists(directoryPath))
-                            {
                                 Directory.CreateDirectory(directoryPath);
-                            }
-                            // Create a custom JSON object to hold header, bodies, and payments
-                            var jsonObject = new
-                            {
-                                Header = header,
-                                Bodies = bodies,
-                                Payments = payments
-                            };
-
-                            // Serialize the custom JSON object to JSON
-                            string jsonData = System.Text.Json.JsonSerializer.Serialize(jsonObject);
-                            // Define the file path for the combined JSON file
-                            string combinedFilePath = Path.Combine(directoryPath, $"{DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss-fff")}-Combined.json");
-
-                            File.WriteAllText(combinedFilePath, jsonData);
+                            string jsonData = System.Text.Json.JsonSerializer.Serialize(new { Header = header, Bodies = bodies, Payments = payments });
+                            File.WriteAllText(Path.Combine(directoryPath, $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff}-Combined.json"), jsonData);
                         }
-                        catch (Exception ex)
-                        {
-                            CL_Generaly.DoWritePRGLOG($"JSON log failed for TaxID {taxid}", ex);
-                        }
+                        catch (Exception ex) { CL_Generaly.DoWritePRGLOG($"JSON log failed for TaxID {taxid}", ex); }
                         #endregion
 
-                        var sendResult = taxService.SendInvoices(header, bodies, payments);
+                        // فقط HTTP call در background
+                        var sendResult = await Task.Run(() => taxService.SendInvoices(header, bodies, payments));
 
                         foreach (var originalRow in originalInvoiceRows)
                         {
@@ -1554,19 +1536,16 @@ namespace Prg_TrackSentInvoice
                             newLogRow.TheConfirmationReferenceId = null;
                             newLogRow.TheSuccess = false;
                             newLogRow.REMARKS = TruncateString($"ResendDuplicate|{windowsUser}|{DateTime.Now:yy/MM/dd HH:mm}", 49);
-
                             InsertNewTaxDtlRecord(newLogRow);
                         }
-                        ok++;
+                        successCount++;
                     }
                     catch (Exception ex)
                     {
-                        fail++;
+                        failCount++;
                         CL_Generaly.DoWritePRGLOG($"Failed to resend invoice with TaxID {taxid}", ex);
                     }
                 }
-                return (ok, fail);
-                }); // end Task.Run
             }
             catch (Exception ex)
             {
