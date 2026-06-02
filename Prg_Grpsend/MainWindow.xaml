@@ -20,7 +20,6 @@
             <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True" ScrollViewer.CanContentScroll="True" VirtualizingPanel.VirtualizationMode="Recycling"/>
         </ItemsPanelTemplate>
 
-        <!-- Style for SfDataGrid -->
         <Style x:Key="KDG" TargetType="syncfusion:SfDataGrid">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -30,7 +29,6 @@
             <Setter Property="GridLinesVisibility" Value="Horizontal" />
         </Style>
 
-        <!-- Modified Column Header Style -->
         <Style x:Key="KDGHeader" TargetType="syncfusion:GridHeaderCellControl">
             <Setter Property="Background" Value="#FFF0F2F5" />
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -63,24 +61,18 @@
     <Grid FlowDirection="RightToLeft">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <!-- Header & App Bar -->
+            <RowDefinition Height="Auto" MinHeight="250"/>
             <RowDefinition Height="Auto"/>
-            <!-- Settings Area -->
-            <RowDefinition Height="*"/>
-            <!-- Data Grid Area -->
+            <RowDefinition Height="*" MinHeight="150"/>
             <RowDefinition Height="Auto"/>
-            <!-- Status Bar -->
         </Grid.RowDefinitions>
 
-        <!-- HEADER APP BAR -->
         <materialDesign:ColorZone Grid.Row="0" Mode="Standard" Padding="20,16" materialDesign:ElevationAssist.Elevation="Dp2" Background="White">
             <TextBlock Text="اعمال تنظیمات صورت‌حساب (فاکتور) های ارسالی" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Foreground="{DynamicResource PrimaryHueMidBrush}" FontWeight="Bold" />
         </materialDesign:ColorZone>
 
-        <!-- MAIN SETTINGS AREA -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="16">
-                <!-- Changed Background to White and BorderBrush to a safe Hex Color -->
+            <StackPanel Margin="16,16,16,0">
                 <Border Background="White" CornerRadius="8" Margin="0,0,0,8" Padding="16"
                         BorderBrush="#FFE0E0E0" BorderThickness="1">
                     <Grid>
@@ -94,7 +86,6 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <!-- Group 1: Environment & Scope -->
                         <DockPanel Grid.Row="0" Grid.Column="0" Margin="0,0,16,16">
                             <TextBlock DockPanel.Dock="Top" Text="محیط ارسال سامانه" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,8" />
                             <WrapPanel>
@@ -112,10 +103,8 @@
                             </WrapPanel>
                         </DockPanel>
 
-                        <!-- Separator -->
                         <Separator Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,16" Background="#FFE0E0E0" />
 
-                        <!-- Group 2: Invoice Metadata -->
                         <DockPanel Grid.Row="2" Grid.Column="0" Margin="0,0,16,0">
                             <TextBlock DockPanel.Dock="Top" Text="مشخصات صورت‌حساب" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,12" />
                             <WrapPanel>
@@ -146,9 +135,8 @@
                             </WrapPanel>
                         </DockPanel>
 
-                        <!-- Group 3: Selection Limits & Dates -->
                         <DockPanel Grid.Row="2" Grid.Column="1" Margin="16,0,0,0">
-                            <TextBlock DockPanel.Dock="Top" Text="مدحدوه انتخاب و تاریخ‌گذاری" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,12" />
+                            <TextBlock DockPanel.Dock="Top" Text="محدوده انتخاب و تاریخ‌گذاری" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,12" />
                             <WrapPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,24,16">
                                     <RadioButton x:Name="RD_SELECTIVE" IsChecked="True" GroupName="CHS" Content="انتخاب دستی" Margin="0,0,16,0" Checked="RD_SELECTIVE_Checked" VerticalAlignment="Center"/>
@@ -172,7 +160,6 @@
                     </Grid>
                 </Border>
 
-                <!-- Information & Warnings Expander -->
                 <Expander Header="نکات و راهنمای قبل از ارسال" Margin="0,8,0,0" Background="Transparent" BorderBrush="#FFE0E0E0" BorderThickness="1">
                     <StackPanel Margin="16,8,16,16">
                         <TextBlock Text="• اگر نوع صورت‌حساب یا روش تسویه را خالی بگذارید، مقادیر از خود فاکتور برداشته می‌شود." Margin="0,4" Opacity="0.8"/>
@@ -189,7 +176,6 @@
                     </StackPanel>
                 </Expander>
 
-                <!-- Action Bar -->
                 <Grid Margin="0,16,0,0">
                     <Button Click="Button_Click" Content="انتخاب همه آیتم‌های موجود" HorizontalAlignment="Right" Style="{StaticResource MaterialDesignOutlinedButton}" Height="40" Padding="24,0"/>
                     <Button x:Name="BTN_SENDGRP" Click="BTN_SENDGRP_Click" HorizontalAlignment="Left" Width="280" Height="40"
@@ -204,8 +190,24 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- DATA GRID AREA -->
-        <Border Grid.Row="2" Margin="16,8,16,16" BorderBrush="#FFE0E0E0" BorderThickness="1" CornerRadius="8" Background="White">
+        <GridSplitter Grid.Row="2" 
+                      Height="16" 
+                      HorizontalAlignment="Stretch" 
+                      VerticalAlignment="Center" 
+                      Background="Transparent" 
+                      Margin="16,4,16,4" 
+                      Cursor="SizeNS" 
+                      ShowsPreview="True">
+            <GridSplitter.Template>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border Background="Transparent">
+                        <Border Height="4" Background="#FFBDBDBD" CornerRadius="2" Width="40" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </GridSplitter.Template>
+        </GridSplitter>
+
+        <Border Grid.Row="3" Margin="16,0,16,16" BorderBrush="#FFE0E0E0" BorderThickness="1" CornerRadius="8" Background="White">
             <syncfusion:SfDataGrid x:Name="SYNCFUSION_DG" Margin="1"
                     ContextMenu="{StaticResource DataGridContextMenu}"
                     ItemsSource="{Binding FACTOR_DATA}" 
@@ -312,8 +314,7 @@
             </syncfusion:SfDataGrid>
         </Border>
 
-        <!-- STATUS BAR -->
-        <materialDesign:ColorZone Grid.Row="3" Mode="Standard" Padding="16,8" materialDesign:ElevationAssist.Elevation="Dp4" Panel.ZIndex="1" BorderBrush="#FFE0E0E0" BorderThickness="0,1,0,0" Background="White">
+        <materialDesign:ColorZone Grid.Row="4" Mode="Standard" Padding="16,8" materialDesign:ElevationAssist.Elevation="Dp4" Panel.ZIndex="1" BorderBrush="#FFE0E0E0" BorderThickness="0,1,0,0" Background="White">
             <DockPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                     <TextBlock Text="تعداد رکوردها:" VerticalAlignment="Center" Opacity="0.7" FontWeight="Medium"/>
