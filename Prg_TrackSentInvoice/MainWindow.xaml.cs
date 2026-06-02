@@ -1459,18 +1459,61 @@ namespace Prg_TrackSentInvoice
                         var bodies = CreateBodyListFromFullTaxDtl(originalInvoiceRows.ToList());
                         var payments = new List<InvoiceModel.Payment>();
 
-                        // تمیزکاری header — body قبلاً در CreateBodyListFromFullTaxDtl پاک‌سازی شده
+                        #region Cleaning_RestoreValiding
                         if (header is InvoiceModel.Header TheHead)
                         {
-                            if (string.IsNullOrWhiteSpace(TheHead.Bpn) || TheHead.Bpn == "0")
-                                TheHead.Bpn = null;
-                            if (string.IsNullOrWhiteSpace(TheHead.Scc) || TheHead.Scc == "0")
-                                TheHead.Scc = null;
-                            if (string.IsNullOrEmpty(TheHead.Crn) || TheHead.Crn == "0")
-                                TheHead.Crn = null;
-                            if (string.IsNullOrWhiteSpace(TheHead.Irtaxid) && TheHead.Inp != 7)
-                                TheHead.Irtaxid = null;
+                            //Matter {
+                            if (TheHead?.Bpn != null) //شماره گذرنامه خریدار
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Bpn) || TheHead?.Bpn == "0")
+                                    TheHead.Bpn = null;
+                            }
+                            if (TheHead?.Scc != null) //کد گمرک محل اظهار فروشنده
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Scc) || TheHead?.Scc == "0")
+                                    TheHead.Scc = null;
+                            }
+                            //Matter }
+                            if (string.IsNullOrEmpty(TheHead?.Crn) || TheHead?.Crn == "0")
+                            {
+                                if (TheHead?.Crn != null)
+                                    TheHead.Crn = null; //شناسه یکتای ثبت قرار داد فروشنده
+                            }
+                            if (TheHead?.Irtaxid != null) //جلوگیری از مقدار خالی یا Space
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Irtaxid))
+                                {
+                                    if (TheHead?.Inp != 7) //الگوی صورتحساب => صادرات نیست
+                                        TheHead.Irtaxid = null;
+                                }
+                            }
                         }
+                        foreach (var item in bodies)
+                        {
+                            if (item?.Cut != null) //نوع ارز — از DB می‌آید، ممکن است whitespace باشد
+                            {
+                                if (string.IsNullOrWhiteSpace(item?.Cut))
+                                    item.Cut = null;
+                            }
+                            if (item?.Cfee == null) item.Cfee = 0;
+                            if (string.IsNullOrWhiteSpace(item?.Odt)) item.Odt = "0";
+                            if (item?.Odr == null) item.Odr = 0;
+                            if (item?.Odam == null) item.Odam = 0;
+                            if (string.IsNullOrWhiteSpace(item?.Olt)) item.Olt = "0";
+                            if (item?.Olr == null) item.Olr = 0;
+                            if (item?.Olam == null) item.Olam = 0;
+                            if (item?.Consfee == null) item.Consfee = 0;
+                            if (item?.Spro == null) item.Spro = 0;
+                            if (item?.Bros == null) item.Bros = 0;
+                            if (item?.Tcpbs == null) item.Tcpbs = 0;
+                            if (item?.Cop == null) item.Cop = 0;
+                            if (item?.Vop == null) item.Vop = 0;
+                            if (string.IsNullOrWhiteSpace(item?.Bsrn)) item.Bsrn = null;
+                            if (item?.Nw == null || item.Nw == 0) item.Nw = 0;
+                            if (item?.Ssrv == null || item.Ssrv == 0) item.Ssrv = 0;
+                            if (item?.Sscv == null || item.Sscv == 0) item.Sscv = 0;
+                        }
+                        #endregion
 
                         #region JSON_LOG
                         try
