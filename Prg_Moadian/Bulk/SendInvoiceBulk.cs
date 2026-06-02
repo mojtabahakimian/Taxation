@@ -164,7 +164,8 @@ namespace Prg_Moadian.Bulk
                     foreach (var dto in batch)
                     {
                         // استخراج شماره از Inno
-                        var num = long.Parse(dto.Header.Inno!.Substring(_sazman.YEA.ToString().Length + 2));
+                        var numStr = dto.Header.Inno?.Substring(_sazman.YEA.ToString().Length) ?? "0";
+                        var num = long.TryParse(numStr, out var p) ? p : 0;
                         //result.Failures[num] = ex.Message;
 
                         result.Failures[num] = friendly;
@@ -403,13 +404,10 @@ namespace Prg_Moadian.Bulk
             // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
             var ts = TaxService.ConvertDateToLong(dt);
 
-            // 1. دریافت شماره فاکتور (مثلاً 10391)
-            long invoiceNum = long.Parse(number.ToString());
-            // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
-            string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
-            // 3. serial TaxId = همان عدد Inno → رفع هشدار 1300501 (عدم تطابق serial)
-            // سریال‌های قدیمی رندوم ≤ 999,999,999 بودند؛ serial جدید ≥ 1,404,000,000 → بدون تداخل
-            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
+            // 1. تولید Inno و serial یکجا — serial همان عدد Inno است (رفع هشدار 1300501)
+            long invoiceNum = (long)number;
+            (string finalInno, long innoSerial) = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
+            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, innoSerial);
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto

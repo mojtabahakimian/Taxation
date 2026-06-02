@@ -103,8 +103,10 @@ namespace Prg_Moadian.FUNCTIONS
 
             header.Inty = Convert.ToInt32(RS_ROW.First().Inty); //(انواع صورتحساب الکترونیکی 1و2و3) نوع صورتحساب
             header.Inno = RS_ROW.First().Inno; //سریال صورتحساب  //NUMBER	 HEAD_LST
-            // serial TaxId = همان عدد Inno → رفع هشدار 1300501
-            var src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, dt, long.Parse(header.Inno));
+            // serial TaxId = همان عدد Inno (رفع هشدار 1300501)
+            // اگر Inno از فرمت قدیمی (هگز یا null) باشد، از serial رندوم استفاده می‌شود (فقط هشدار، نه رد)
+            long innoSerial = long.TryParse(header.Inno, out long parsed) ? parsed : Random.Shared.NextInt64(1, 999_999_999);
+            var src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, dt, innoSerial);
             header.Taxid = src_taxid; //شماره منحصر به فرد مالیاتی
             header.Irtaxid = RS_ROW.First().Taxid; //شماره منحصر به فرد مالیاتی صورتحساب مرجع
             header.Inp = Convert.ToInt32(RS_ROW.First().Inp); //الگوی صورتحساب

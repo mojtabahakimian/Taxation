@@ -214,34 +214,19 @@ namespace Prg_Moadian.FUNCTIONS
             // ۳. پرش از ۴ کاراکتر اول و گرفتن بقیه
             return text.Substring(4);
         }
-        // در کلاس CL_FUNTIONS اضافه یا جایگزین کنید
-        public string GenerateFixedLengthInno(string year, long invoiceNumber)
+        public (string Inno, long Serial) GenerateFixedLengthInno(string year, long invoiceNumber)
         {
-            // طول ثابت طبق استاندارد: 10 کاراکتر 
             const int FixedLength = 10;
-            int yearLen = year.Length; // معمولاً 4
-            int serialLen = FixedLength - yearLen; // 6
+            int serialLen = FixedLength - year.Length; // معمولاً 6
+            long maxInvoice = (long)Math.Pow(10, serialLen) - 1; // 999,999
 
-            // 1. تلاش برای ساخت ده‌دهی (روش قدیم شما)
-            string decimalSerial = invoiceNumber.ToString();
+            if (invoiceNumber < 1 || invoiceNumber > maxInvoice)
+                throw new InvalidOperationException(
+                    $"شماره فاکتور {invoiceNumber} باید بین 1 و {maxInvoice} باشد " +
+                    $"(سریال {serialLen} رقمی با سال {year}).");
 
-            if (decimalSerial.Length <= serialLen)
-            {
-                // اگر جا می‌شود (مثلاً 10391 در 6 رقم)، با صفر پر کن: 1404010391
-                return year + decimalSerial.PadLeft(serialLen, '0');
-            }
-            else
-            {
-                // 2. اگر جا نمی‌شود (مثلاً 1000000 که 7 رقم است)، سوئیچ به هگز
-                // 1000000 در هگز می‌شود F4240 (پنج رقم) که راحت جا می‌شود.
-                string hexSerial = invoiceNumber.ToString("X"); // حروف بزرگ
-
-                // بررسی نهایی که حتی هگز هم سرریز نکند (بعید است تا 16 میلیون)
-                if (hexSerial.Length > serialLen)
-                    throw new Exception($"Serial number {invoiceNumber} is too large even for Hex!");
-
-                return year + hexSerial.PadLeft(serialLen, '0');
-            }
+            string inno = year + invoiceNumber.ToString().PadLeft(serialLen, '0');
+            return (inno, long.Parse(inno));
         }
         public static string CODEUN(string cody)
         {

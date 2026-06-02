@@ -36,29 +36,37 @@ namespace Prg_Moadian.Service
                 // real-time مثل اصلاحی/ابطالی — نه برای تاریخ تاریخچه‌ای فاکتور که از DATE_N می‌آید).
                 if (serverTimeMs > 0)
                 {
-                    TimeSync.SyncWithServer(serverTimeMs);
-                    TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
-                    TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
+                    var serverUtc = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
+                    var skew = serverUtc - DateTime.UtcNow;
+                    // اگر اختلاف بیشتر از 12 ساعت بود، پاسخ سرور ناهنجار است — sync انجام نمی‌شود
+                    if (Math.Abs(skew.TotalHours) < 12)
+                    {
+                        TimeSync.SyncWithServer(serverTimeMs);
+                        TokenLifeTime.ServerUtcTime = serverUtc;
+                        TokenLifeTime.ServerClockSkew = skew;
+                    }
                 }
             }
         }
 
         public TaxModel.RequestTokenModel RequestToken()
         {
-            TokenModel tokenModel = TaxApiService.Instance.TaxApis.RequestToken();
-            var TMRT = new TaxModel.RequestTokenModel();
-            if (tokenModel?.ExpiresIn != null)
+            lock (_initLock)
             {
-                TMRT.ExpireIn = tokenModel.ExpiresIn;
+                TokenModel tokenModel = TaxApiService.Instance.TaxApis.RequestToken();
+                var TMRT = new TaxModel.RequestTokenModel();
+                if (tokenModel?.ExpiresIn != null)
+                    TMRT.ExpireIn = tokenModel.ExpiresIn;
+                TMRT.Token = tokenModel.Token;
+                return TMRT;
             }
-            TMRT.Token = tokenModel.Token;
-            return TMRT;
         }
 
         public string RequestTaxId(string memoryId, DateTime date)
         {
             long serial = Random.Shared.Next(999999999);
-            return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
+            lock (_initLock)
+                return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
         }
 
         public static long ConvertDateToLong(DateTime dateTime)
@@ -180,7 +188,9 @@ namespace Prg_Moadian.Service
             });
 
             TaxModel.SendInvoicesModel sendInvoicesModel = new TaxModel.SendInvoicesModel();
-            HttpResponse<AsyncResponseModel> httpResponse = TaxApiService.Instance.TaxApis.SendInvoices(list, null);
+            HttpResponse<AsyncResponseModel> httpResponse;
+            lock (_initLock)
+                httpResponse = TaxApiService.Instance.TaxApis.SendInvoices(list, null);
             const string serverSideErrorMessage = "خطا در ارتباط با سامانه مودیان رخ داد و مشکل از سمت سرورهای سامانه است. لطفاً بعداً دوباره تلاش کنید.";
             HashSet<PacketResponse>? packetResponses = httpResponse.Body?.Result;
             if (packetResponses == null || !packetResponses.Any())
@@ -217,7 +227,9 @@ namespace Prg_Moadian.Service
         {
             List<string> list = new List<string>();
             list.Add(referenceCode);
-            List<InquiryResultModel> list2 = TaxApiService.Instance.TaxApis.InquiryByReferenceId(list);
+            List<InquiryResultModel> list2;
+            lock (_initLock)
+                list2 = TaxApiService.Instance.TaxApis.InquiryByReferenceId(list);
             TaxModel.InquiryByReferenceIdModel inquiryByReferenceIdModel = new TaxModel.InquiryByReferenceIdModel();
             if (list2 == null || !list2.Any())
             {
@@ -231,8 +243,8 @@ namespace Prg_Moadian.Service
 
         public string RequestTaxIdWithSpecificSerial(string memoryId, DateTime date, long serial)
         {
-            // اینجا دیگه رندوم نیست، دقیقاً سریالی که می‌خواهیم را می‌فرستیم
-            return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
+            lock (_initLock)
+                return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
         }
 
     }

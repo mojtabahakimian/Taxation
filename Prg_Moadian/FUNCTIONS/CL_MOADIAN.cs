@@ -39,7 +39,10 @@ namespace Prg_Moadian.FUNCTIONS
         /// <summary>
         /// شماره فاکتور دخالی یا شماره سریال داخلی صورت حساب مالیاتی که inno هست و باید ادامه سال قبل هم باشه
         /// </summary>
-        public static string StarterInnoNumber { get; set; } = "1";
+        public static string StarterInnoNumber { get; set; } = string.Empty;
+
+        /// <summary>serial عددی معادل StarterInnoNumber برای TaxId — همیشه با StarterInnoNumber در sync است</summary>
+        public static long StarterInnoSerial { get; private set; } = 0;
 
         public class ErrorResult_PROP
         {
@@ -127,8 +130,7 @@ namespace Prg_Moadian.FUNCTIONS
 
                 if (_newsaz != null && _newsaz.YEA > 0)
                 {
-                    ////StarterInnoNumber = _newsaz.YEA.ToString() + "00" + NUMBER;
-                    StarterInnoNumber = TheFunctions.GenerateFixedLengthInno(_newsaz.YEA.ToString(), NUMBER);
+                    (StarterInnoNumber, StarterInnoSerial) = TheFunctions.GenerateFixedLengthInno(_newsaz.YEA.ToString(), NUMBER);
                 }
 
                 ////TheFunctions.SendSampleInvoiceTest1(MemoryID, privateKey, TaxURL);////return; //Just Test and Get Back--------------------------------------------------------------------------|
@@ -311,6 +313,10 @@ namespace Prg_Moadian.FUNCTIONS
             string? src_taxid = null;
             long src_Indatim = 0;
             long src_Indati2m = 0;
+            if (StarterInnoSerial == 0)
+                throw new InvalidOperationException(
+                    $"StarterInnoSerial برای فاکتور {NUMBER} مقداردهی نشده — اطلاعات سازمان (SAZMAN/YEA) در پایگاه داده یافت نشد.");
+
             // تعیین DTBASE و src_Indatim
             switch (_HEAD_EXTENDED.ins) //نوع صورت حساب
             {
@@ -318,8 +324,8 @@ namespace Prg_Moadian.FUNCTIONS
                     var rDate = dbms.DoGetDataSQL<string>($"SELECT DATE_N FROM dbo.HEAD_LST_FBK WHERE NUMBER1 = {NUMBER}").FirstOrDefault();
                     DtNowBase = TheFunctions.GetGregorianDateTime(rDate);
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
-                    src_Indatim = TaxService.ConvertDateToLong(DtNowBase); //2.
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, StarterInnoSerial);
+                    src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 case 2: //اصلاحی
@@ -329,14 +335,14 @@ namespace Prg_Moadian.FUNCTIONS
                     var serverUtcNow = DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
                     DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, StarterInnoSerial);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 default:
                     DtNowBase = TheFunctions.GetGregorianDateTime(L_DRV_TBL_US.First().DATE_N.ToString());
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, StarterInnoSerial);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
             }
