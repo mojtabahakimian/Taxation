@@ -30,14 +30,48 @@ namespace Prg_Moadian.Service
                 TaxApiService.Instance.Init(MemoryId, new SignatoryConfig(PrivateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxUrl);
                 ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
 
-                var serverTimeMs = serverInformation.ServerTime;
-                var localTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                // اگر SDK زمان قدیمی کش‌شده برگرداند (اختلاف > ۵ ساعت)، از ساعت محلی استفاده می‌کنیم
-                if (Math.Abs(serverTimeMs - localTimeMs) > (long)TimeSpan.FromHours(5).TotalMilliseconds)
-                    serverTimeMs = localTimeMs;
+                // زمان دریافت شده از سرور مودیان
+                var moadianServerTimeMs = serverInformation.ServerTime;
+                var moadianServerUtc = DateTimeOffset.FromUnixTimeMilliseconds(moadianServerTimeMs).UtcDateTime;
 
-                TimeSync.SyncWithServer(serverTimeMs);
-                TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
+                // برای جلوگیری از مشکلات ناشی از کش شدن زمان در SDK و همچنین خراب بودن ساعت سیستم کلاینت،
+                // تلاش می‌کنیم زمان واقعی را از طریق یک هدر HTTP دریافت کنیم
+                DateTime trueUtcTime = DateTime.UtcNow;
+                try
+                {
+                    using (var client = new System.Net.Http.HttpClient())
+                    {
+                        client.Timeout = TimeSpan.FromSeconds(3);
+                        // دریافت زمان از یکی از سرورهای معتبر (مثلا خود سایت مالیات یا گوگل)
+                        // استفاده از آدرس خود کارپوشه مودیان که قطعا در صورت قطعی اینترنت (و وصل بودن اینترانت) در دسترس است
+                        var result = client.GetAsync("https://tp.tax.gov.ir", System.Net.Http.HttpCompletionOption.ResponseHeadersRead).Result;
+                        if (result.Headers.Date.HasValue)
+                        {
+                            trueUtcTime = result.Headers.Date.Value.UtcDateTime;
+                        }
+                    }
+                }
+                catch
+                {
+                    // در صورت قطعی اینترنت یا خطا، به زمان مودیان که گرفته‌ایم اعتماد می‌کنیم
+                    trueUtcTime = moadianServerUtc;
+                }
+
+                // اگر زمان مودیان با زمان واقعی اینترنت اختلاف زیادی داشت (مثلا کش شده بود)، از زمان اینترنت استفاده می‌کنیم
+                // در غیر این صورت به همان زمان سرور مودیان اعتماد می‌کنیم
+                if (Math.Abs((moadianServerUtc - trueUtcTime).TotalHours) > 1)
+                {
+                    TokenLifeTime.ServerUtcTime = trueUtcTime;
+                    var trueTimeMs = new DateTimeOffset(trueUtcTime).ToUnixTimeMilliseconds();
+                    TimeSync.SyncWithServer(trueTimeMs);
+                }
+                else
+                {
+                    TokenLifeTime.ServerUtcTime = moadianServerUtc;
+                    TimeSync.SyncWithServer(moadianServerTimeMs);
+                }
+
+                // محاسبه اختلاف ساعت سرور با ساعت محلی (خراب) سیستم کلاینت
                 TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
             }
         }
@@ -97,6 +131,7 @@ namespace Prg_Moadian.Service
                 Inty = header.Inty,
                 Irtaxid = ((header.Irtaxid == string.Empty) ? null : header.Irtaxid),
                 Sbc = ((header.Sbc == string.Empty) ? null : header.Sbc),
+                Srtx = ((header.Srtx == string.Empty) ? null : header.Srtx),
                 Scc = ((header.Scc == string.Empty) ? null : header.Scc),
                 Scln = ((header.Scln == string.Empty) ? null : header.Scln),
                 Setm = header.Setm,

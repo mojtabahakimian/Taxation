@@ -1644,8 +1644,8 @@ namespace Prg_TrackSentInvoice
         private void InsertNewTaxDtlRecord(FULL_TAXDTL src_item)
         {
             const string insertSql = @"INSERT INTO dbo.TAXDTL (
-            Taxid, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory,DATE_N, REMARKS, CRT)
-            VALUES (@Taxid, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @DATE_N , @REMARKS ,@CRT);";
+            Taxid, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Srtx, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory,DATE_N, REMARKS, CRT)
+            VALUES (@Taxid, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Srtx, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @DATE_N , @REMARKS ,@CRT);";
 
             var p = new
             {
@@ -1662,6 +1662,7 @@ namespace Prg_TrackSentInvoice
                 src_item.Bid,
                 src_item.Tinb,
                 src_item.Sbc,
+                src_item.Srtx,
                 src_item.Bpc,
                 src_item.Ft,
                 src_item.Bpn,
@@ -1750,6 +1751,7 @@ namespace Prg_TrackSentInvoice
             if (row.Bid != null) h.Bid = row.Bid;/*item.MCODEM*/ //شناسه ملی/ شماره ملی/ شناسه مشارکت مدنی/ کد فراگیر اتباع غیر ایرانی خریدار
             if (row.Tinb != null) h.Tinb = row.Tinb;/*item.MCODEM*/ // شماره اقتصادی خریدار
             if (row.Sbc != null) h.Sbc = row.Sbc; //کد شعبه فروشنده
+            if (row.Srtx != null) h.Srtx = row.Srtx;
             if (!string.IsNullOrEmpty(row.Bbc)) h.Bbc = row.Bbc; //کد شعبه خریدار
             if (!string.IsNullOrEmpty(row.Bpc)) h.Bpc = row.Bpc; //کد پستی خریدار
             if (row.Ft != null) h.Ft = row.Ft.Value; //نوع پرواز

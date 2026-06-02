@@ -64,6 +64,9 @@ namespace Prg_Moadian.SQLMODELS
         private string? _sbc;
         public string? Sbc { get => _sbc; set { if (_sbc == value) return; _sbc = value; OnPropertyChanged("Sbc"); } }
 
+        private string? _srtx;
+        public string? Srtx { get => _srtx; set { if (_srtx == value) return; _srtx = value; OnPropertyChanged("Srtx"); } }
+
         private string? _bpc;
         public string? Bpc { get => _bpc; set { if (_bpc == value) return; _bpc = value; OnPropertyChanged("Bpc"); } }
 

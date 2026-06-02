@@ -30,6 +30,7 @@ namespace Prg_Moadian.FUNCTIONS
                                           [Bid] [nvarchar] (12) COLLATE Arabic_CI_AS NULL,
                                           [Tinb] [nvarchar] (14) COLLATE Arabic_CI_AS NOT NULL,
                                           [Sbc] [nvarchar] (10) COLLATE Arabic_CI_AS NULL,
+                                          [Srtx] [nvarchar] (30) COLLATE Arabic_CI_AS NULL,
                                           [Bpc] [nvarchar] (10) COLLATE Arabic_CI_AS NULL,
                                           [Ft] [int] NULL,
                                           [Bpn] [nvarchar] (9) COLLATE Arabic_CI_AS NULL,
@@ -679,11 +680,14 @@ namespace Prg_Moadian.FUNCTIONS
 
             try { dbms.DoExecuteSQL("ALTER TABLE HEAD_LST_EXTENDED ADD exr float NULL"); } catch { }
             try { dbms.DoExecuteSQL("ALTER TABLE HEAD_LST_EXTENDED ADD sscv float NULL"); } catch { }
+            try { dbms.DoExecuteSQL("ALTER TABLE HEAD_LST_EXTENDED ADD srtx nvarchar(30) NULL"); } catch { }
             try { dbms.DoExecuteSQL("ALTER TABLE [dbo].[HEAD_LST_EXTENDED] ADD [CUT] nvarchar(3) NULL"); } catch { }
             try { dbms.DoExecuteSQL("ALTER TABLE [dbo].[HEAD_LST_EXTENDED] ADD [irtaxid] nvarchar(22) NULL"); } catch { }
 
             //CHANGE STUF_DEF
             try { dbms.DoExecuteSQL(@"ALTER TABLE dbo.STUF_DEF ADD sstid nvarchar(13) NULL ; ALTER TABLE dbo.STUF_DEF ADD vra float NULL"); } catch { }
+
+            try { dbms.DoExecuteSQL("ALTER TABLE dbo.TAXDTL ADD Srtx nvarchar(30) NULL"); } catch { }
 
             try { dbms.DoExecuteSQL(@"ALTER TABLE dbo.TAXDTL ALTER COLUMN UID NVARCHAR(100)"); } catch { }
 

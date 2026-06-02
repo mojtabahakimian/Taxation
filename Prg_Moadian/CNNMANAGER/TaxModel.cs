@@ -36,6 +36,8 @@
 
                 public string? Sbc { get; set; }
 
+                public string? Srtx { get; set; }
+
                 public string? Bpc { get; set; }
 
                 public string? Bbc { get; set; }

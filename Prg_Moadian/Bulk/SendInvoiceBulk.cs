@@ -428,6 +428,7 @@ namespace Prg_Moadian.Bulk
                 Bid = CODEMELI_M,
                 Tinb = ECODE_M,
                 Sbc = headExt.sbc,
+                Srtx = headExt.srtx,
                 Bbc = headExt.bbc,
                 Bpc = headExt.bpc,
                 Tprdis = lines.Sum(l => l.MABL_K ?? 0),
@@ -455,7 +456,8 @@ namespace Prg_Moadian.Bulk
                 //Tob = Convert.ToInt32(lines.First().tob), //نوع شخص خریدار
                 //Bid = CODEMELI_M, //شماره/شناسه ملی/شناسه مشارکت مدنی/کد فراگیر خریدار //MCODEM	SAZMAN
                 //Tinb = ECODE_M, //شماره اقتصادی خریدار //ECODE CUST_HESAB
-                //Sbc = headExt.sbc, //کد شعبه فروشنده //MCODEM	CUST_HESAB
+                //Sbc = headExt.sbc,
+                //Srtx = headExt.srtx,
                 //Bbc = headExt.bbc, //کد شعبه خریدار
                 //Bpc = headExt.bpc, //کد پستی خریدار
                 //Ft = 0, //نوع پرواز
@@ -530,6 +532,7 @@ namespace Prg_Moadian.Bulk
                 Bid = header.Bid,
                 Tinb = header.Tinb,
                 Sbc = header.Sbc,
+                Srtx = header.Srtx,
                 Bbc = header.Bbc,
                 Bpc = header.Bpc,
                 Tprdis = header.Tprdis,
@@ -638,7 +641,7 @@ namespace Prg_Moadian.Bulk
                      INSERT INTO dbo.TAXDTL
                      (
                          Taxid, Indatim_Sec, Indati2m_Sec, Inty, Inno, Inp, Ins, Tins, Tob,
-                         Bid, Tinb, Sbc, Bpc, Ft, Crn, Billid, Tprdis, Tdis, Tadis, Tvam,
+                         Bid, Tinb, Sbc, Srtx, Bpc, Ft, Crn, Billid, Tprdis, Tdis, Tadis, Tvam,
                          Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd,
                          DATE_N,
                          NUMBER, TAG, Sstid, Sstt, Mu, Am, Fee, Prdis, Dis, Adis, Vra, Vam, Tsstam,
@@ -647,7 +650,7 @@ namespace Prg_Moadian.Bulk
                      VALUES
                      (
                          @Taxid, @Ind1, @Ind2, @Inty, @Inno, @Inp, @Ins, @Tins, @Tob,
-                         @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam,
+                         @Bid, @Tinb, @Sbc, @Srtx, @Bpc, @Ft, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam,
                          @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd,
                          @Date_N,
                          @Number, @Tag, @Sstid, @Sstt, @Mu, @Am, @Fee, @Prdis, @Dis, @Adis, @Vra, @Vam, @Tsstam,
@@ -667,6 +670,7 @@ namespace Prg_Moadian.Bulk
                         ["Bid"] = header.Bid,
                         ["Tinb"] = header.Tinb ?? string.Empty,
                         ["Sbc"] = header.Sbc,
+                        ["Srtx"] = header.Srtx,
                         ["Bpc"] = header.Bpc,
                         ["Ft"] = header.Ft,
                         ["Crn"] = header.Crn,

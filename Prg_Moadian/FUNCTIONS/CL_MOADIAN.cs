@@ -550,6 +550,7 @@ namespace Prg_Moadian.FUNCTIONS
                     Bid = CODEMELI_M/*item.MCODEM*/, //شناسه ملی/ شماره ملی/ شناسه مشارکت مدنی/ کد فراگیر اتباع غیر ایرانی خریدار
                     Tinb = ECODE_M/*item.MCODEM*/, // شماره اقتصادی خریدار
                     Sbc = _HEAD_EXTENDED.sbc, //کد شعبه فروشنده
+                    Srtx = _HEAD_EXTENDED.srtx,
                     Bbc = (string.IsNullOrEmpty(_HEAD_EXTENDED.bbc) ? null : _HEAD_EXTENDED.bbc), //کد شعبه خریدار
                     Bpc = (string.IsNullOrEmpty(_HEAD_EXTENDED.bpc) ? null : _HEAD_EXTENDED?.bpc), //کد پستی خریدار
                     Ft = _HEAD_EXTENDED.ft, //نوع پرواز
@@ -664,6 +665,7 @@ namespace Prg_Moadian.FUNCTIONS
             header.Bid = L_TAXDTL_US.First().Bid; //شماره/شناسه ملی/شناسه مشارکت مدنی/کد فراگیر خریدار //MCODEM	SAZMAN
             header.Tinb = L_TAXDTL_US.First().Tinb; //شماره اقتصادی خریدار //ECODE CUST_HESAB
             header.Sbc = L_TAXDTL_US.First().Sbc; //کد شعبه فروشنده //MCODEM	CUST_HESAB
+            header.Srtx = L_TAXDTL_US.First().Srtx;
             header.Bbc = L_TAXDTL_US.First().Bbc; //کد شعبه خریدار
             header.Bpc = L_TAXDTL_US.First().Bpc; //کد پستی خریدار
             header.Ft = Convert.ToInt32(L_TAXDTL_US.First().Ft); //نوع پرواز
@@ -798,8 +800,8 @@ namespace Prg_Moadian.FUNCTIONS
                     IDD_OF_TAXDTL = TheFunctions.GetNewIDD();
 
                     const string insertSql = @"INSERT INTO dbo.TAXDTL (
-Taxid, Indatim, Indati2m, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, NUMBER, TAG, DATE_N)
-VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @NUMBER, @TAG, @DATE_N);";
+Taxid, Indatim, Indati2m, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Srtx, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, NUMBER, TAG, DATE_N)
+VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Srtx, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @NUMBER, @TAG, @DATE_N);";
 
                     var p = new
                     {
@@ -818,6 +820,7 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                         Bid = SafeString(src_item.Bid, 12),
                         Tinb = SafeString(src_item.Tinb, 14) ?? string.Empty,
                         Sbc = SafeString(src_item.Sbc, 10),
+                        Srtx = src_item.Srtx,
                         Bpc = SafeString(src_item.Bpc, 10),
                         src_item.Ft,
                         Bpn = SafeString(src_item.Bpn, 9),

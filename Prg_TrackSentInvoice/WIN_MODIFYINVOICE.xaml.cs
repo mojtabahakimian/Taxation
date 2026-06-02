@@ -334,7 +334,7 @@ VALUES
         }
         private void ReGetData()
         {
-            string SQLTEXT = $"SELECT Taxid, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Iinn, Acn, Trmn, Trn, Pcn, Pid, Pdt, Cdcn, Cdcd, Tonw, Torv, Tocv, Nw, Ssrv, Sscv, Pmt, PV, IDD, RefrenceNumber, TheConfirmationReferenceId, TheError, TheStatus, TheSuccess, CRT, UID, SentTaxMemory, ApiTypeSent, Indatim_Sec, Indati2m_Sec, NUMBER, TAG, DATE_N, REMARKS FROM dbo.TAXDTL " +
+            string SQLTEXT = $"SELECT Taxid, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Srtx, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Iinn, Acn, Trmn, Trn, Pcn, Pid, Pdt, Cdcn, Cdcd, Tonw, Torv, Tocv, Nw, Ssrv, Sscv, Pmt, PV, IDD, RefrenceNumber, TheConfirmationReferenceId, TheError, TheStatus, TheSuccess, CRT, UID, SentTaxMemory, ApiTypeSent, Indatim_Sec, Indati2m_Sec, NUMBER, TAG, DATE_N, REMARKS FROM dbo.TAXDTL " +
                 $"WHERE TheSuccess = {(IsSpecialF ? 0 : 1)} AND ApiTypeSent = {APITYPESENT_PARAM} AND Taxid = N'{TAXID_PARAM}'";
 
             if (IsSpecialF)
@@ -824,6 +824,7 @@ VALUES
                 header.Bid = HeadFirst.Bid; //شماره/شناسه ملی/شناسه مشارکت مدنی/کد فراگیر خریدار //MCODEM	SAZMAN
                 header.Tinb = HeadFirst.Tinb; //شماره اقتصادی خریدار //ECODE CUST_HESAB
                 header.Sbc = HeadFirst.Sbc; //کد شعبه فروشنده //MCODEM	CUST_HESAB
+                header.Srtx = HeadFirst.Srtx;
                 header.Bbc = HeadFirst.Bbc; //کد شعبه خریدار
                 header.Bpc = HeadFirst.Bpc; //کد پستی خریدار
                 header.Ft = Convert.ToInt32(HeadFirst.Ft); //نوع پرواز
@@ -957,8 +958,8 @@ VALUES
                 {
                     //{ درج در جدول مالیات در دیتابیس (با یک تراکنش تا ردیف‌های ناقص نماند)
                     const string insertSql = @"INSERT INTO dbo.TAXDTL (
-Taxid, Indatim, Indati2m, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, NUMBER, TAG, DATE_N)
-VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @NUMBER, @TAG, @DATE_N);";
+Taxid, Indatim, Indati2m, Indatim_Sec, Indati2m_Sec, Inty, Inno, Irtaxid, Inp, Ins, Tins, Tob, Bid, Tinb, Sbc, Srtx, Bpc, Ft, Bpn, Scln, Scc, Crn, Billid, Tprdis, Tdis, Tadis, Tvam, Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd, Tonw, Torv, Tocv, Sstid, Sstt, Mu, Am, Fee, Cfee, Cut, Exr, Prdis, Dis, Adis, Vra, Vam, Odt, Odr, Odam, Olt, Olr, Olam, Consfee, Spro, Bros, Tcpbs, Cop, Vop, Bsrn, Tsstam, Nw, Ssrv, Sscv, IDD, UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, NUMBER, TAG, DATE_N)
+VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, @Irtaxid, @Inp, @Ins, @Tins, @Tob, @Bid, @Tinb, @Sbc, @Srtx, @Bpc, @Ft, @Bpn, @Scln, @Scc, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam, @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd, @Tonw, @Torv, @Tocv, @Sstid, @Sstt, @Mu, @Am, @Fee, @Cfee, @Cut, @Exr, @Prdis, @Dis, @Adis, @Vra, @Vam, @Odt, @Odr, @Odam, @Olt, @Olr, @Olam, @Consfee, @Spro, @Bros, @Tcpbs, @Cop, @Vop, @Bsrn, @Tsstam, @Nw, @Ssrv, @Sscv, @IDD, @UID, @RefrenceNumber, @TheStatus, @ApiTypeSent, @SentTaxMemory, @NUMBER, @TAG, @DATE_N);";
 
                     using (var db = new SqlConnection(CL_CCNNMANAGER.CONNECTION_STR))
                     {
@@ -987,6 +988,7 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                                         Bid = CL_MOADIAN.SafeString(src_item.Bid, 12),
                                         Tinb = CL_MOADIAN.SafeString(src_item.Tinb, 14) ?? string.Empty,
                                         Sbc = CL_MOADIAN.SafeString(src_item.Sbc, 10),
+                                        Srtx = src_item.Srtx,
                                         Bpc = CL_MOADIAN.SafeString(src_item.Bpc, 10),
                                         src_item.Ft,
                                         Bpn = CL_MOADIAN.SafeString(src_item.Bpn, 9),
