@@ -1451,12 +1451,12 @@ namespace Prg_TrackSentInvoice
                         if (!originalInvoiceRows.Any())
                         {
                             CL_Generaly.DoWritePRGLOG($"Skipping TaxID {taxid} as no records were found in TAXDTL.", null);
-                            failCount++;
+                            fail++;
                             continue;
                         }
 
                         var header = CreateHeaderFromFullTaxDtl(originalInvoiceRows.First());
-                        var bodies = CreateBodyListFromFullTaxDtl((List<FULL_TAXDTL>)originalInvoiceRows);
+                        var bodies = CreateBodyListFromFullTaxDtl(originalInvoiceRows.ToList());
                         var payments = new List<InvoiceModel.Payment>();
 
                         // تمیزکاری header — body قبلاً در CreateBodyListFromFullTaxDtl پاک‌سازی شده
@@ -1497,7 +1497,7 @@ namespace Prg_TrackSentInvoice
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine("Error: " + ex.Message);
+                            CL_Generaly.DoWritePRGLOG($"JSON log failed for TaxID {taxid}", ex);
                         }
                         #endregion
 
