@@ -11,165 +11,202 @@
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
         xmlns:sfusion="clr-namespace:Syncfusion.UI.Xaml.Grid;assembly=Syncfusion.SfGrid.WPF" 
         WindowStartupLocation="CenterScreen" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered"
-        Title="ارسال گروهی صورت حساب به سامانه مودیان" Height="770" Width="1024">
+        Title="ارسال گروهی صورت حساب به سامانه مودیان" Height="800" Width="1100"
+        Background="#FFF4F6F8"
+        TextElement.Foreground="#FF1C1C1E">
+
     <Window.Resources>
         <ItemsPanelTemplate x:Key="VSP">
             <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True" ScrollViewer.CanContentScroll="True" VirtualizingPanel.VirtualizationMode="Recycling"/>
         </ItemsPanelTemplate>
-        <!-- Style for SfDataGrid -->
-        <Style x:Key="KDG"  TargetType="syncfusion:SfDataGrid">
 
-            <Setter Property="Background" Value="{StaticResource MaterialDesign.Brush.Background}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="RowHeight" Value="32" />
-            <Setter Property="HeaderRowHeight" Value="40" />
+        <!-- Style for SfDataGrid -->
+        <Style x:Key="KDG" TargetType="syncfusion:SfDataGrid">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="RowHeight" Value="38" />
+            <Setter Property="HeaderRowHeight" Value="48" />
             <Setter Property="SelectionMode" Value="Single" />
-            <Setter Property="GridLinesVisibility" Value="Both" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
         </Style>
+
         <!-- Modified Column Header Style -->
         <Style x:Key="KDGHeader" TargetType="syncfusion:GridHeaderCellControl">
-            <Setter Property="Background" Value="{StaticResource MaterialDesign.Brush.Background}" />
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="#FFF0F2F5" />
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="Height" Value="Auto"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="#FFE0E0E0"/>
         </Style>
 
         <ContextMenu x:Key="DataGridContextMenu" FontFamily="IRANYekanFN">
             <MenuItem Header="پالودن با این بخش" Click="FilterBySelection_Click">
                 <MenuItem.Icon>
-                    <materialDesign:PackIcon Kind="Filter"  FontSize="14" />
+                    <materialDesign:PackIcon Kind="Filter" FontSize="16" Foreground="{DynamicResource PrimaryHueMidBrush}" />
                 </MenuItem.Icon>
             </MenuItem>
-            <!--Filter Excluding Selection-->
             <MenuItem Header="پالودن بدون این بخش" Click="FilterExcludingSelection_Click" >
                 <MenuItem.Icon>
-                    <materialDesign:PackIcon Kind="FilterRemove" FontSize="14" />
+                    <materialDesign:PackIcon Kind="FilterRemove" FontSize="16" Foreground="{DynamicResource SecondaryHueMidBrush}" />
                 </MenuItem.Icon>
             </MenuItem>
             <Separator/>
             <MenuItem Header="حذف پالودن (فیلتر)" Click="RemoveFilterSort_Click" >
                 <MenuItem.Icon>
-                    <materialDesign:PackIcon Kind="FilterRemoveOutline" FontSize="14" />
+                    <materialDesign:PackIcon Kind="FilterRemoveOutline" FontSize="16" Opacity="0.6"/>
                 </MenuItem.Icon>
             </MenuItem>
-            <Separator/>
         </ContextMenu>
     </Window.Resources>
 
-    <Grid>
+    <Grid FlowDirection="RightToLeft">
         <Grid.RowDefinitions>
-            <RowDefinition Tag="0" Height="Auto"/>
-            <RowDefinition Tag="1" Height="Auto"/>
-            <RowDefinition Tag="2" MinHeight="5"/>
+            <RowDefinition Height="Auto"/>
+            <!-- Header & App Bar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Settings Area -->
+            <RowDefinition Height="*"/>
+            <!-- Data Grid Area -->
+            <RowDefinition Height="Auto"/>
+            <!-- Status Bar -->
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="10">
-            <Label Content="اعمال تنظیمات صورت حساب (فاکتور) های ارسالی" FontWeight="Bold" FlowDirection="RightToLeft" FontSize="14"/>
+        <!-- HEADER APP BAR -->
+        <materialDesign:ColorZone Grid.Row="0" Mode="Standard" Padding="20,16" materialDesign:ElevationAssist.Elevation="Dp2" Background="White">
+            <TextBlock Text="اعمال تنظیمات صورت‌حساب (فاکتور) های ارسالی" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Foreground="{DynamicResource PrimaryHueMidBrush}" FontWeight="Bold" />
+        </materialDesign:ColorZone>
 
-            <DockPanel FlowDirection="RightToLeft">
-                <Label Content="نوع انتخاب فاکتور ها :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-                <RadioButton x:Name="RD_MAINAPI" GroupName="APITYPE" Content="سامانه اصلی" Margin="5"/>
-                <RadioButton x:Name="RD_SANDBOXAPI" GroupName="APITYPE" IsChecked="True" Content="تستی SandBox" Margin="5"/>
-            </DockPanel>
-            <DockPanel x:Name="DockPanel_SentType" FlowDirection="RightToLeft" Margin="0,10,0,0">
-                <Label Content="نمایش فاکتورها :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontWeight="Bold" />
-                <RadioButton x:Name="RD_NOT_SENT_ONLY" GroupName="SENTTYPE" IsChecked="True" Content="فقط فاکتورهای ارسال نشده" Margin="5" Checked="RD_SENT_TYPE_Changed"/>
-                <RadioButton x:Name="RD_INCLUDE_SENT" GroupName="SENTTYPE" Content="⚠️ همه فاکتورها (شامل ارسال شده)" Margin="5" Foreground="#FFD20000" FontWeight="Bold" Checked="RD_SENT_TYPE_Changed"/>
-                <Button Content="دریافت مجدد داده ها" Style="{StaticResource MaterialDesignFlatButton}" HorizontalAlignment="Left" FontSize="12" Click="Button_Click_1"/>
-            </DockPanel>
-            <TabPanel FlowDirection="RightToLeft" Margin="0,10,0,0">
-                <DockPanel>
-                    <Label Content="نوع صورت حساب :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-                    <ComboBox x:Name="CMB_Inty" DisplayMemberPath="NAME" SelectedValuePath="ID" FlowDirection="RightToLeft" Width="150">
-                        <ComboBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"/>
-                            </ItemsPanelTemplate>
-                        </ComboBox.ItemsPanel>
-                    </ComboBox>
-                    <DockPanel Margin="10,0,0,0" Width="auto">
-                        <Label Content="الگوی صورت حساب :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-                        <Label Content="فروش" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" Width="50" Foreground="#FF03A9F4"/>
-                    </DockPanel>
-                    <DockPanel Margin="10,0,0,0">
-                        <Label Content="موضوع صورت حساب :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Width="120"/>
-                        <Label Content="اصلی" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" Width="50" Foreground="#FF03A9F4"/>
-                    </DockPanel>
-                </DockPanel>
-                <DockPanel>
-                    <Label Content="روش تسویه :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-                    <ComboBox x:Name="CMB_Setm" DisplayMemberPath="NAME" SelectedValuePath="ID"  FlowDirection="RightToLeft" Width="150" SelectedIndex="-1">
-                        <ComboBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"/>
-                            </ItemsPanelTemplate>
-                        </ComboBox.ItemsPanel>
-                    </ComboBox>
-                </DockPanel>
+        <!-- MAIN SETTINGS AREA -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="16">
+                <!-- Changed Background to White and BorderBrush to a safe Hex Color -->
+                <Border Background="White" CornerRadius="8" Margin="0,0,0,8" Padding="16"
+                        BorderBrush="#FFE0E0E0" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-            </TabPanel>
-            <TabPanel FlowDirection="RightToLeft" Margin="0,15,0,0">
-                <DockPanel>
-                    <Label Content="نوع انتخاب فاکتور ها :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-                    <RadioButton x:Name="RD_SELECTIVE" IsChecked="True" GroupName="CHS" Content="انتخاب سفارشی" Margin="5" Checked="RD_SELECTIVE_Checked"/>
-                    <RadioButton x:Name="RD_RANGENUMBER" GroupName="CHS" Content="شماره محدوده" Margin="5" Checked="RD_RANGENUMBER_Checked"/>
-                </DockPanel>
-                <DockPanel IsEnabled="{Binding ElementName=RD_RANGENUMBER,Path=IsChecked,UpdateSourceTrigger=PropertyChanged}">
-                    <Label Content="از شماره :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="5"/>
-                    <materialDesign:NumericUpDown x:Name="AZ_NUMBER" Width="60" Margin="5" Minimum="0" ValueChanged="AZ_NUMBER_ValueChanged"/>
-                    <Label Content="تا شماره :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="5"/>
-                    <materialDesign:NumericUpDown x:Name="TA_NUMBER" Width="60" Margin="5"  Minimum="1" ValueChanged="TA_NUMBER_ValueChanged"/>
-                </DockPanel>
-                <TabPanel FlowDirection="RightToLeft">
-                    <DockPanel>
-                        <CheckBox x:Name="CHK_CUSTOM_DATE" Content="استفاده از تاریخ سفارشی برای ارسال" IsChecked="False" Margin="5" VerticalContentAlignment="Center"/>
-                        <Label Content="تاریخ سفارشی :" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="5"/>
-                        <TextBox x:Name="TXT_CUSTOM_DATE" Width="120" Margin="5" Text=""
-                             IsEnabled="{Binding ElementName=CHK_CUSTOM_DATE,Path=IsChecked,UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="فرمت: 1404/08/24"/>
-                    </DockPanel>
+                        <!-- Group 1: Environment & Scope -->
+                        <DockPanel Grid.Row="0" Grid.Column="0" Margin="0,0,16,16">
+                            <TextBlock DockPanel.Dock="Top" Text="محیط ارسال سامانه" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,8" />
+                            <WrapPanel>
+                                <RadioButton x:Name="RD_SANDBOXAPI" GroupName="APITYPE" IsChecked="True" Width="135" Content="تستی (SandBox)" Margin="0,0,16,8" Style="{StaticResource MaterialDesignFilterChipSecondaryCheckBox}" />
+                                <RadioButton x:Name="RD_MAINAPI" GroupName="APITYPE" Content="سامانه اصلی" Width="135" Margin="0,0,0,8" Style="{StaticResource MaterialDesignFilterChipSecondaryCheckBox}" />
+                            </WrapPanel>
+                        </DockPanel>
 
-                </TabPanel>
-            </TabPanel>
-            <Expander Header="نکات قبل از ارسال" FlowDirection="RightToLeft" Margin="5">
-                <TabPanel FlowDirection="RightToLeft" >
-                    <StackPanel>
-                        <Label Content=" * درصورت خالی گذاشتن نوع صورت حساب یا روش تسویه , سیستم از اطلاعات ثبت شده در فاکتور , مقادیر را برمیدارد." VerticalContentAlignment="Center" Foreground="#FFD20000"/>
-                        <!--<Label Content=" * در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
-                        <Label Content=" * فقط میتوان فاکتور هایی را ارسال کرد که شماره صورت حساب مرجع آنها خالی باشد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
-                        <!--<Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>-->
-                        <Label Content=" * به طور پیش فرض در لیست زیر فقط فاکتور هایی را نمایش میدهد که در سامانه ثبت نشده"  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                        <DockPanel x:Name="DockPanel_SentType" Grid.Row="0" Grid.Column="1" Margin="16,0,0,16">
+                            <TextBlock DockPanel.Dock="Top" Text="فیلتر وضعیت نمایش" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,8" />
+                            <WrapPanel VerticalAlignment="Center">
+                                <RadioButton x:Name="RD_NOT_SENT_ONLY" GroupName="SENTTYPE" IsChecked="True" Content="فقط ارسال نشده‌ها" Margin="0,0,16,8" Checked="RD_SENT_TYPE_Changed" />
+                                <RadioButton x:Name="RD_INCLUDE_SENT" GroupName="SENTTYPE" Content="همه (شامل ارسال شده)" Margin="0,0,16,8" Checked="RD_SENT_TYPE_Changed" Foreground="{DynamicResource PrimaryHueMidBrush}" />
+                                <Button Content="دریافت مجدد داده‌ها" Style="{StaticResource MaterialDesignFlatButton}" Click="Button_Click_1" Height="28" Padding="12,0" Margin="0,0,0,8"/>
+                            </WrapPanel>
+                        </DockPanel>
 
-                        <Label Content=" * باتوجه به محدودیت و دسترسی کاربر وارد شده , به فاکتور فروش , میتواند فاکتور های زیر را ببیند."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                        <!-- Separator -->
+                        <Separator Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,16" Background="#FFE0E0E0" />
 
-                        <Label Content=" * در صورت استفاده از تاریخ سفارشی , مبنای تاریخ ارسال صورت حساب های انتخاب شده , تاریخ وارد شده می باشد و به تاریخ فاکتور کاری ندارد."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
-                        <Label Content=" * اگر تاریخ سفارشی را اعمال کنید , بعدا باید مسئله تاریخ را در نظر بگیرید که تاریخ صورت حساب های اصلاح/ابطالی/برگشتی باید بعد از تاریخ صورت حساب (اصلی فروش) مرجع باشد ."  VerticalContentAlignment="Center" Foreground="#FFD20000"/>
+                        <!-- Group 2: Invoice Metadata -->
+                        <DockPanel Grid.Row="2" Grid.Column="0" Margin="0,0,16,0">
+                            <TextBlock DockPanel.Dock="Top" Text="مشخصات صورت‌حساب" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,12" />
+                            <WrapPanel>
+                                <ComboBox x:Name="CMB_Inty" materialDesign:HintAssist.Hint="نوع صورت‌حساب" DisplayMemberPath="NAME" SelectedValuePath="ID" Width="180" Margin="0,0,16,16" Style="{StaticResource MaterialDesignFloatingHintComboBox}">
+                                    <ComboBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"/>
+                                        </ItemsPanelTemplate>
+                                    </ComboBox.ItemsPanel>
+                                </ComboBox>
 
-                        <Label x:Name="LBL_WARNING_RESEND" Content=" ⚠️⚠️⚠️ هشدار: ارسال مجدد فاکتورهای قبلاً ارسال شده ممکن است منجر به تکراری شدن صورتحساب در سامانه مودیان شود! این گزینه فقط در شرایط خاص استفاده شود."
-               VerticalContentAlignment="Center" Foreground="#FFFF0000" FontWeight="Bold" FontSize="12"
-               Visibility="Collapsed" Background="#33FF0000"/>
+                                <ComboBox x:Name="CMB_Setm" materialDesign:HintAssist.Hint="روش تسویه" DisplayMemberPath="NAME" SelectedValuePath="ID" Width="150" Margin="0,0,16,16" SelectedIndex="-1" Style="{StaticResource MaterialDesignFloatingHintComboBox}">
+                                    <ComboBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"/>
+                                        </ItemsPanelTemplate>
+                                    </ComboBox.ItemsPanel>
+                                </ComboBox>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,16,16" VerticalAlignment="Center">
+                                    <TextBlock Text="الگو:" Margin="0,0,4,0" Opacity="0.7" VerticalAlignment="Center"/>
+                                    <TextBlock Text="فروش" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryHueMidBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16" VerticalAlignment="Center">
+                                    <TextBlock Text="موضوع:" Margin="0,0,4,0" Opacity="0.7" VerticalAlignment="Center"/>
+                                    <TextBlock Text="اصلی" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryHueMidBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </WrapPanel>
+                        </DockPanel>
+
+                        <!-- Group 3: Selection Limits & Dates -->
+                        <DockPanel Grid.Row="2" Grid.Column="1" Margin="16,0,0,0">
+                            <TextBlock DockPanel.Dock="Top" Text="مدحدوه انتخاب و تاریخ‌گذاری" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,12" />
+                            <WrapPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,24,16">
+                                    <RadioButton x:Name="RD_SELECTIVE" IsChecked="True" GroupName="CHS" Content="انتخاب دستی" Margin="0,0,16,0" Checked="RD_SELECTIVE_Checked" VerticalAlignment="Center"/>
+                                    <RadioButton x:Name="RD_RANGENUMBER" GroupName="CHS" Content="محدوده فاکتور" Margin="0,0,16,0" Checked="RD_RANGENUMBER_Checked" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" IsEnabled="{Binding ElementName=RD_RANGENUMBER,Path=IsChecked,UpdateSourceTrigger=PropertyChanged}" Margin="0,0,24,16" VerticalAlignment="Bottom">
+                                    <TextBlock Text="از:" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.8"/>
+                                    <materialDesign:NumericUpDown x:Name="AZ_NUMBER" Width="60" Minimum="0" ValueChanged="AZ_NUMBER_ValueChanged" VerticalAlignment="Center" Style="{StaticResource MaterialDesignNumericUpDown}" />
+                                    <TextBlock Text="تا:" VerticalAlignment="Center" Margin="16,0,8,0" Opacity="0.8"/>
+                                    <materialDesign:NumericUpDown x:Name="TA_NUMBER" Width="60" Minimum="1" ValueChanged="TA_NUMBER_ValueChanged" VerticalAlignment="Center" Style="{StaticResource MaterialDesignNumericUpDown}"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16" VerticalAlignment="Bottom">
+                                    <CheckBox x:Name="CHK_CUSTOM_DATE" Content="تاریخ سفارشی:" IsChecked="False" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="TXT_CUSTOM_DATE" Width="100" materialDesign:HintAssist.Hint="مثال: 1404/08/24" 
+                                             IsEnabled="{Binding ElementName=CHK_CUSTOM_DATE,Path=IsChecked,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </WrapPanel>
+                        </DockPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Information & Warnings Expander -->
+                <Expander Header="نکات و راهنمای قبل از ارسال" Margin="0,8,0,0" Background="Transparent" BorderBrush="#FFE0E0E0" BorderThickness="1">
+                    <StackPanel Margin="16,8,16,16">
+                        <TextBlock Text="• اگر نوع صورت‌حساب یا روش تسویه را خالی بگذارید، مقادیر از خود فاکتور برداشته می‌شود." Margin="0,4" Opacity="0.8"/>
+                        <TextBlock Text="• فقط فاکتورهایی قابل ارسال هستند که شماره صورت‌حساب مرجع آن‌ها خالی باشد." Margin="0,4" Opacity="0.8"/>
+                        <TextBlock Text="• به‌طور پیش‌فرض تنها فاکتورهای ثبت نشده در سامانه، در لیست پایین نمایش داده می‌شود." Margin="0,4" Opacity="0.8"/>
+                        <TextBlock Text="• نمایش فاکتورهای فروش بر اساس محدودیت و دسترسی کاربر وارد شده انجام می‌پذیرد." Margin="0,4" Opacity="0.8"/>
+                        <TextBlock Text="• در صورت استفاده از تاریخ سفارشی، مبنای ارسال فاکتور تاریخ جدید است نه تاریخ اصلی آن." Margin="0,4" Opacity="0.8"/>
+                        <TextBlock Text="• هنگام استفاده از تاریخ سفارشی، به یاد داشته باشید تاریخ صورت‌حساب‌های ابطالی/برگشتی باید پس از تاریخ مرجع باشد." Margin="0,4" Opacity="0.8"/>
+
+                        <Label x:Name="LBL_WARNING_RESEND" 
+                               Content="⚠️ هشدار: ارسال مجدد فاکتورهای قبلاً ارسال شده ممکن است منجر به تکراری شدن صورتحساب شود! (فقط در شرایط خاص استفاده شود)"
+                               VerticalContentAlignment="Center" Foreground="#D32F2F" FontWeight="SemiBold" FontSize="13"
+                               Visibility="Collapsed" Background="#1AD32F2F" Padding="12,8" Margin="0,8,0,0"/>
                     </StackPanel>
-                </TabPanel>
-            </Expander>
+                </Expander>
 
-            <Button Click="Button_Click" Margin="10" Width="300" Content="اتخاب همه آیتم های موجود" HorizontalAlignment="Right" Style="{StaticResource MaterialDesignOutlinedButton}" />
+                <!-- Action Bar -->
+                <Grid Margin="0,16,0,0">
+                    <Button Click="Button_Click" Content="انتخاب همه آیتم‌های موجود" HorizontalAlignment="Right" Style="{StaticResource MaterialDesignOutlinedButton}" Height="40" Padding="24,0"/>
+                    <Button x:Name="BTN_SENDGRP" Click="BTN_SENDGRP_Click" HorizontalAlignment="Left" Width="280" Height="40"
+                            materialDesign:ButtonProgressAssist.Minimum="0"
+                            materialDesign:ButtonProgressAssist.Maximum="100"
+                            materialDesign:ButtonProgressAssist.IsIndicatorVisible="{Binding IsBusy}"
+                            materialDesign:ButtonProgressAssist.IsIndeterminate="{Binding IsIndeterminate}"
+                            materialDesign:ButtonProgressAssist.Value="{Binding Progress}"
+                            Content="ارسال گروهی فاکتورهای انتخاب شده"
+                            Style="{StaticResource MaterialDesignRaisedButton}" Foreground="#DDFFFFFF" />
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
 
-            <Button x:Name="BTN_SENDGRP"
-        Click="BTN_SENDGRP_Click"
-        materialDesign:ButtonProgressAssist.Minimum="0"
-        materialDesign:ButtonProgressAssist.Maximum="100"
-        materialDesign:ButtonProgressAssist.IsIndicatorVisible="{Binding IsBusy}"
-        materialDesign:ButtonProgressAssist.IsIndeterminate="{Binding IsIndeterminate}"
-        materialDesign:ButtonProgressAssist.Value="{Binding Progress}"
-        Content="ارسال گروهی فاکتورهای انتخاب شده"
-        Style="{StaticResource MaterialDesignOutlinedButton}" />
-
-        </StackPanel>
-
-        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="#FF1F1F1F"/>
-
-        <Grid Grid.Row="2" Margin="5">
-            <syncfusion:SfDataGrid x:Name="SYNCFUSION_DG" 
+        <!-- DATA GRID AREA -->
+        <Border Grid.Row="2" Margin="16,8,16,16" BorderBrush="#FFE0E0E0" BorderThickness="1" CornerRadius="8" Background="White">
+            <syncfusion:SfDataGrid x:Name="SYNCFUSION_DG" Margin="1"
                     ContextMenu="{StaticResource DataGridContextMenu}"
                     ItemsSource="{Binding FACTOR_DATA}" 
                     AutoGenerateColumns="False"
@@ -181,19 +218,18 @@
                     AllowFiltering="True"
                     AllowSorting="True"
                     SelectionMode="Extended"
-                    RowHeight="30"
+                    RowHeight="36"
                     FrozenColumnCount="0"
                     FlowDirection="RightToLeft"
                     d:ItemsSource="{d:SampleData ItemCount=5}"
                     Style="{StaticResource KDG}"
                     HeaderStyle="{StaticResource KDGHeader}"
-                      
                     CurrentCellActivated="SYNCFUSION_DG_CurrentCellActivated"
                     PreviewMouseRightButtonDown="SYNCFUSION_DG_PreviewMouseRightButtonDown"
-                    AllowRowHoverHighlighting="True" AllowSelectionOnPointerPressed="True" ScrollMode="Async" ShowRowHeader="True" ShowGroupDropArea="True" SelectionChanged="SYNCFUSION_DG_SelectionChanged" Margin="0,0,0,39">
+                    AllowRowHoverHighlighting="True" AllowSelectionOnPointerPressed="True" ScrollMode="Async" ShowRowHeader="True" ShowGroupDropArea="True" SelectionChanged="SYNCFUSION_DG_SelectionChanged">
                 <syncfusion:SfDataGrid.Resources>
                     <ResourceDictionary>
-                        <Style TargetType="TextBox">
+                        <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignTextBox}">
                             <Setter Property="AcceptsReturn" Value="True" />
                             <Setter Property="Height" Value="40" />
                         </Style>
@@ -274,11 +310,18 @@
                     <syncfusion:GridDateTimeColumn x:Name="CRT_COLUMN" HeaderText="تاریخ ایجاد فاکتور" MappingName="CRT" Pattern="FullDateTime" IsReadOnly="True" />
                 </syncfusion:SfDataGrid.Columns>
             </syncfusion:SfDataGrid>
-            <Label Content="تعداد رکورد ها:" Margin="0,0,16,7"  FlowDirection="RightToLeft" Width="84" HorizontalAlignment="Right" Height="27" VerticalAlignment="Bottom"/>
-            <TextBlock x:Name="ROWCOUNT_TEXTBLK" Text=""   Margin="0,0,100,9"  FlowDirection="RightToLeft" Width="230" HorizontalAlignment="Right" Height="23" VerticalAlignment="Bottom"/>
+        </Border>
 
-            <TextBlock Text="{Binding SelectedItemsCount, StringFormat='تعداد انتخاب شده: {0}'}" FlowDirection="RightToLeft" Margin="5,0,339,7" Height="27" VerticalAlignment="Bottom"/>
+        <!-- STATUS BAR -->
+        <materialDesign:ColorZone Grid.Row="3" Mode="Standard" Padding="16,8" materialDesign:ElevationAssist.Elevation="Dp4" Panel.ZIndex="1" BorderBrush="#FFE0E0E0" BorderThickness="0,1,0,0" Background="White">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <TextBlock Text="تعداد رکوردها:" VerticalAlignment="Center" Opacity="0.7" FontWeight="Medium"/>
+                    <TextBlock x:Name="ROWCOUNT_TEXTBLK" Text="" VerticalAlignment="Center" Margin="8,0,0,0" FontWeight="SemiBold"/>
+                </StackPanel>
+                <TextBlock Text="{Binding SelectedItemsCount, StringFormat='تعداد انتخاب شده: {0}'}" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="{DynamicResource PrimaryHueMidBrush}" FontWeight="SemiBold"/>
+            </DockPanel>
+        </materialDesign:ColorZone>
 
-        </Grid>
     </Grid>
 </Window>
