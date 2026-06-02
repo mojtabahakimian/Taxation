@@ -94,17 +94,19 @@ namespace Prg_Moadian.FUNCTIONS
                 item.Mu = decimal.Truncate(decimal.Parse(item.Mu, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
             }
 
-            var src_taxid = taxService.RequestTaxId(MemoryID, dt); //A114K804C0B000AB33C0A7
             var src_Indatim = TaxService.ConvertDateToLong(dt); //1681977600000
             var src_Indati2m = TaxService.ConvertDateToLong(dt); //1681977600000
 
             TaxModel.InvoiceModel.Header header = new TaxModel.InvoiceModel.Header();
-            header.Taxid = src_taxid; //شماره منحصر به فرد مالیاتی
             header.Indatim = src_Indatim; //تاریخ و زمان صدور صورتحساب (میلادی)
             header.Indati2m = src_Indati2m; //تاریخ و زمان ایجاد صورتحساب (میلادی)
 
             header.Inty = Convert.ToInt32(RS_ROW.First().Inty); //(انواع صورتحساب الکترونیکی 1و2و3) نوع صورتحساب
             header.Inno = RS_ROW.First().Inno; //سریال صورتحساب  //NUMBER	 HEAD_LST
+            // اگر Inno از فرمت قدیمی (هگز یا null) باشد، از serial رندوم استفاده می‌شود (فقط هشدار، نه رد)
+            long innoSerial = long.TryParse(header.Inno, out long parsed) ? parsed : Random.Shared.NextInt64(1, 999_999_999);
+            var src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, dt, innoSerial);
+            header.Taxid = src_taxid; //شماره منحصر به فرد مالیاتی
             header.Irtaxid = RS_ROW.First().Taxid; //شماره منحصر به فرد مالیاتی صورتحساب مرجع
             header.Inp = Convert.ToInt32(RS_ROW.First().Inp); //الگوی صورتحساب
             header.Ins = 4; //فقط برگشت فروش | موضوع صورتحساب

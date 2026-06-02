@@ -151,7 +151,7 @@ namespace Prg_Grpsend
         {
             Logation.AMALIYAT_USER(this.GetType().Name);
 
-            // چک کردن دسترسی
+            //// چک کردن دسترسی
             var Result = Saftey.SETSECURITY("HEAD_LST_FROOSH");
             if (!string.IsNullOrEmpty(Result))
             {
@@ -657,9 +657,24 @@ namespace Prg_Grpsend
             if (!CheckAndWarnForAlreadySentInvoices())
                 return;
 
-            // -- دیالوگ تأیید
-            if (!(new Msgwin(true, "آیا از ارسال گروهی آیتم‌های انتخاب‌شده مطمئن هستید؟")
-                    .ShowDialog() ?? false))
+            // -- جمع‌آوری اطلاعات برای نمایش به کاربر پیش از تأیید نهایی
+            string envName = (RD_MAINAPI.IsChecked ?? false) ? "سامانه اصلی (واقعی)" : "سامانه تستی (SandBox)";
+            string selectMode = (RD_RANGENUMBER.IsChecked ?? false) ? $"محدوده فاکتور (از {AZ_NUMBER.Value} تا {TA_NUMBER.Value})" : "انتخاب سفارشی (دستی)";
+            string dateStatus = (CHK_CUSTOM_DATE?.IsChecked ?? false) ? $"تاریخ جدید سفارشی ({TXT_CUSTOM_DATE.Text.Trim()})" : "بدون تغییر (همان تاریخ فاکتور)";
+            string invType = string.IsNullOrWhiteSpace(CMB_Inty.Text) ? "خواندن از اطلاعات خود فاکتور" : CMB_Inty.Text;
+            string setType = string.IsNullOrWhiteSpace(CMB_Setm.Text) ? "خواندن از اطلاعات خود فاکتور" : CMB_Setm.Text;
+
+            // -- ساخت پیام دیالوگ تأیید
+            string confirmMsg = $"لطفاً اطلاعات ارسال را پیش از تأیید نهایی به دقت بررسی کنید:\n\n" +
+                                $"🌐 محیط ارسال: {envName}\n" +
+                                $"📄 تعداد فاکتور انتخابی: {SelectedItemsCount} عدد\n" +
+                                $"🎯 نحوه انتخاب: {selectMode}\n" +
+                                $"📅 مبنای تاریخ: {dateStatus}\n" +
+                                $"🏷️ نوع صورت‌حساب: {invType}\n" +
+                                $"💳 روش تسویه: {setType}\n\n" +
+                                $"آیا از ارسال این فاکتورها به سامانه مودیان اطمینان کامل دارید؟";
+
+            if (!(new Msgwin(true, confirmMsg, YesBtnText: "تأیید و ارسال", NoBtnText: "انصراف").ShowDialog() ?? false))
                 return;
 
             // -- آدرس سرویس
@@ -713,9 +728,10 @@ namespace Prg_Grpsend
                 //-------------------------------------------------
                 //                     UI
                 //-------------------------------------------------
-                var summary = $"تعداد ارسال موفق: {result.Success}\n" + (result.Failures.Any()
-                                  ? $"تعداد ارسال ناموفق: {result.Failures.Count}"
-                                  : "همه فاکتورها ارسال و در صف قرار گرفتند");
+                var summary = $"✅ تعداد ارسال شده به صف سامانه: {result.Success}\n" +
+                              (result.Failures.Any() ? $"❌ تعداد خطای ارسال اولیه: {result.Failures.Count}\n\n" : "\n") +
+                              $"⚠️ توجه مهم: ارسال موفق به معنای قرارگیری فاکتورها در صف پردازش سامانه مودیان است و به منزله تأیید نهایی در کارپوشه مالیاتی نیست!\n" +
+                              $"جهت اطمینان از ثبت نهایی، حتماً بعداً وضعیت این فاکتورها را استعلام کنید.";
 
                 _ = new Msgwin(false, summary).ShowDialog();
 

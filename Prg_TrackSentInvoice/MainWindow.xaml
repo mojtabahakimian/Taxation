@@ -9,8 +9,60 @@
         mc:Ignorable="d"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         WindowStartupLocation="CenterScreen"
-        Title="استعلام صورت حساب ها" Height="700" Width="1250" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered">
-    <Grid x:Name="grid">
+        Title="استعلام صورت حساب ها" Height="800" Width="1250" 
+        Loaded="Window_Loaded" ContentRendered="Window_ContentRendered"
+        Background="#FFF4F6F8"
+        TextElement.Foreground="#FF1C1C1E">
+
+    <Window.Resources>
+        <!-- Style to make selected RadioButtons bolder and clearer -->
+        <Style x:Key="ClearRadioButtonStyle" TargetType="RadioButton" BasedOn="{StaticResource MaterialDesignRadioButton}">
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Clean WPF DataGrid Style to match previous SfDataGrid -->
+        <Style x:Key="CleanDataGridStyle" TargetType="DataGrid" BasedOn="{StaticResource MaterialDesignDataGrid}">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RowHeight" Value="42"/>
+            <!-- Slightly increased for badges to fit perfectly -->
+            <Setter Property="ColumnHeaderHeight" Value="48"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#FFF0F0F0"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
+            <Setter Property="Background" Value="#FFF0F2F5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="#FFE0E0E0"/>
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid FlowDirection="RightToLeft">
+        <!-- 
+            FIX: Property elements (like Grid.RowDefinitions) must be declared 
+            BEFORE any child elements (like tb:TaskbarIcon).
+        -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Header -->
+            <RowDefinition Height="Auto"/>
+            <!-- Cards Area -->
+            <RowDefinition Height="Auto"/>
+            <!-- Toolbar & Expander -->
+            <RowDefinition Height="*"/>
+            <!-- DataGrid -->
+            <RowDefinition Height="Auto"/>
+            <!-- Status Bar -->
+        </Grid.RowDefinitions>
 
         <tb:TaskbarIcon x:Name="NotifyIcon" ToolTipText="استعلام صورت حساب ها">
             <tb:TaskbarIcon.TrayToolTip>
@@ -18,244 +70,406 @@
             </tb:TaskbarIcon.TrayToolTip>
         </tb:TaskbarIcon>
 
-        <DataGrid x:Name="INVOCIE_DTGR" MouseRightButtonUp="DG_SUB_MouseRightButtonUp" IsReadOnly="True" AutoGenerateColumns="False" Margin="10,310,10,36" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Visible" PreviewMouseDoubleClick="INVOCIE_DTGR_PreviewMouseDoubleClick" SelectionMode="Extended" SelectionUnit="FullRow" SelectionChanged="INVOCIE_DTGR_SelectionChanged">
-            <DataGrid.ContextMenu>
-                <ContextMenu FlowDirection="LeftToRight" FontFamily="pack://application:,,,/Prg_Graphicy;component/UIY/FNT/#IRANYekanFN">
-                    <MenuItem Header="Copy Data" Click="CopyData_Click" Icon="{materialDesign:PackIcon Kind=ContentCopy}"/>
-                    <Separator/>
-                    <!--<MenuItem Header="Export to XML" Click="ExportToXml_Click" Icon="{materialDesign:PackIcon Kind=Xml}" />
-                    <MenuItem Header="Export to JSON" Click="ExportToJson_Click" Icon="{materialDesign:PackIcon Kind=CodeJson}" />-->
-                    <MenuItem Header="ابطالی/برگشتی/اصلاحی این صورت حساب" Click="MenuItem_Click" Icon="{materialDesign:PackIcon Kind=Invoice}"/>
+        <!-- HEADER APP BAR -->
+        <materialDesign:ColorZone FlowDirection="LeftToRight" Grid.Row="0" Mode="Standard" Padding="20,16" materialDesign:ElevationAssist.Elevation="Dp2" Background="White">
+            <DockPanel>
+                <!-- Environment Indication (Left) -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" FlowDirection="RightToLeft" VerticalAlignment="Center">
+                    <TextBlock Text="محیط متصل:" VerticalAlignment="Center" Margin="0,0,0,0" Opacity="0.6"/>
+                    <RadioButton IsChecked="True"  x:Name="RD_MAINTAX" GroupName="RD_TAXURL" Content="سامانه اصلی" Margin="16,0,0,0" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
+                    <RadioButton IsChecked="False" x:Name="RD_SANDBOX" GroupName="RD_TAXURL" Content="آزمایشی (Sandbox)" Margin="16,0,0,0" Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
+                </StackPanel>
 
-                </ContextMenu>
-            </DataGrid.ContextMenu>
-            <DataGrid.Columns>
+                <!-- Title (Right) -->
+                <TextBlock Text="استعلام و پیگیری صورت‌حساب‌ها" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Foreground="{DynamicResource PrimaryHueMidBrush}" FontWeight="Bold" HorizontalAlignment="Right" />
+            </DockPanel>
+        </materialDesign:ColorZone>
 
-                <DataGridTextColumn x:Name="rownumberColumn" Binding="{Binding ROWNUMBER}" Header="ردیف" Width="auto"/>
-                <DataGridTextColumn x:Name="taxidColumn" Binding="{Binding Taxid}" Header="شماره منحصر به فرد مالیاتی" Width="auto"/>
+        <!-- MAIN CARDS AREA -->
+        <Grid Grid.Row="1" Margin="16,16,16,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="6*"/>
+                <!-- Search & Filters -->
+                <ColumnDefinition Width="4*"/>
+                <!-- Invoice Actions -->
+            </Grid.ColumnDefinitions>
 
-                <DataGridTemplateColumn Header="نوع صورتحساب" Width="auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock>
-                                <TextBlock.Style>
-                                    <Style TargetType="{x:Type TextBlock}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Inty}" Value="1">
-                                                <Setter Property="Text" Value="نوع اول" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Inty}" Value="2">
-                                                <Setter Property="Text" Value="نوع دوم" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Inty}" Value="3">
-                                                <Setter Property="Text" Value="نوع سوم" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="الگوی صورتحساب" Width="auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock>
-                                <TextBlock.Style>
-                                    <Style TargetType="{x:Type TextBlock}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Inp}" Value="1">
-                                                <Setter Property="Text" Value="فروش" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Inp}" Value="2">
-                                                <Setter Property="Text" Value="فروش ارزی" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Inp}" Value="3">
-                                                <Setter Property="Text" Value="صورت حساب طلا , جواهر و پلاتین" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Inp}" Value="4">
-                                                <Setter Property="Text" Value="پیمانکاری" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Inp}" Value="5">
-                                                <Setter Property="Text" Value="قبوض خدماتی" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Inp}" Value="6">
-                                                <Setter Property="Text" Value="هواپیما" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Inp}" Value="7">
-                                                <Setter Property="Text" Value="صادرات" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="موضوع صورت حساب" Width="auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock>
-                                <TextBlock.Style>
-                                    <Style TargetType="{x:Type TextBlock}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Ins}" Value="1">
-                                                <Setter Property="Text" Value="اصلی (فروش)" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Ins}" Value="2">
-                                                <Setter Property="Text" Value="اصلاحی" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Ins}" Value="3">
-                                                <Setter Property="Text" Value="ابطالی" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Ins}" Value="4">
-                                                <Setter Property="Text" Value="برگشت فروش" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
+            <!-- CARD 1: Search & Filters -->
+            <Border Grid.Column="0" Background="White" CornerRadius="8" Margin="0,0,8,0" Padding="16" BorderBrush="#FFE0E0E0" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <DataGridTextColumn x:Name="iDDColumn" Binding="{Binding IDD}" Header="IDD" Visibility="Hidden" Width="auto"/>
-                <DataGridTextColumn x:Name="theStatusColumn" Binding="{Binding TheStatus}" Visibility="Hidden" Header="STATE" Width="auto"/>
-                <DataGridTemplateColumn Header="وضعیت" Width="auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock>
-                                <TextBlock.Style>
-                                    <Style TargetType="{x:Type TextBlock}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding TheStatus}" Value="FAILED">
-                                                <Setter Property="Text" Value="ناموفق" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding TheStatus}" Value="PENDING">
-                                                <Setter Property="Text" Value="در انتظار" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding TheStatus}" Value="SUCCESS">
-                                                <Setter Property="Text" Value="موفق" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding TheStatus}" Value="EXPIRED">
-                                                <Setter Property="Text" Value="منقضی شده" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTextColumn x:Name="innoColumn" Binding="{Binding Inno}" Header="شماره فاکتور (حواله) داخلی" Width="auto"/>
+                    <TextBlock Grid.Row="0" Text="جستجو و فیلتر اطلاعات" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,12" />
 
-                <DataGridTextColumn Binding = "{Binding CUST_NO}" Header="کد مشتری" Width="auto"/>
-                <DataGridTextColumn Binding = "{Binding MOLAH}" Header="ملاحظات" Width="auto"/>
-                <DataGridTextColumn Binding = "{Binding SHARAYET}" Header="متن پایین" Width="auto"/>
+                    <WrapPanel Grid.Row="1" VerticalAlignment="Center">
+                        <!-- Text Search -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,24,12">
+                            <TextBox x:Name="SEARCHBOX" materialDesign:HintAssist.Hint="متن جستجو در فاکتورها..." Width="220" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <Button x:Name="SEARCH_BUTTON" Content="جستجو" Style="{StaticResource MaterialDesignOutlinedButton}" Click="SEARCH_BUTTON_Click" Height="32" Padding="16,0"/>
+                        </StackPanel>
 
-                <DataGridTextColumn  Binding="{Binding DATE_N , StringFormat=####/##/##}" Header="تاریخ (داخلی) فاکتور " Width="auto"/>
-                <DataGridTextColumn  Binding="{Binding LineCount}" Header="تعداد سطر فاکتور" Width="auto"/>
+                        <!-- Economic Code Search -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,24,12">
+                            <TextBox x:Name="EGCODE" materialDesign:HintAssist.Hint="کد اقتصادی..." Width="150" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <Button x:Name="SEARCH_BUTTON1" Content="بررسی کد" Style="{StaticResource MaterialDesignOutlinedButton}" Click="SEARCH_BUTTON1_Click" Height="32" Padding="16,0"/>
+                        </StackPanel>
 
-                <DataGridTextColumn x:Name="CrtColumn" Binding="{Binding CRT}" Header="تاریخ ارسال میلادی" Width="auto"/>
-                <DataGridTextColumn x:Name="PersianCrtColumn" Binding="{Binding PersianCRT}" Header="تاریخ ارسال شمسی" Width="auto"/>
+                        <!-- Time Filter -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
+                            <TextBlock Text="بازه زمانی:" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.7"/>
+                            <RadioButton GroupName="ZAMAN" x:Name="RD_LAST30" Content="۳۰ روز گذشته" Margin="0,0,12,0" IsChecked="True" Click="RD_LAST30_Click" Style="{StaticResource ClearRadioButtonStyle}"/>
+                            <RadioButton GroupName="ZAMAN" x:Name="RD_ALL_TIME" Content="همه فاکتورها" Margin="0,0,0,0" IsChecked="False" Click="RD_ALL_TIME_Click" Style="{StaticResource ClearRadioButtonStyle}"/>
+                        </StackPanel>
+                    </WrapPanel>
+                </Grid>
+            </Border>
 
-                <DataGridTextColumn x:Name="SentTaxMemoryColumn" Binding="{Binding SentTaxMemory}" Header="حافظه مالیاتی ارسالی" Width="auto"/>
-                <DataGridTemplateColumn Header="ارسال شده به سامانه" Width="auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock>
-                                <TextBlock.Style>
-                                    <Style TargetType="{x:Type TextBlock}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ApiTypeSent}" Value="0">
-                                                <Setter Property="Text" Value="آزمایشی" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding ApiTypeSent}" Value="1">
-                                                <Setter Property="Text" Value="اصلی" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding ApiTypeSent}" Value="False">
-                                                <Setter Property="Text" Value="آزمایشی" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding ApiTypeSent}" Value="True">
-                                                <Setter Property="Text" Value="اصلی" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTextColumn x:Name="refrenceNumberColumn" Binding="{Binding RefrenceNumber}" Header="(Refrence Number) شناسه صورت حساب" Width="auto"/>
-                <DataGridTextColumn Binding="{Binding NUMBER}" Header="شماره (فاکتور) حواله" Width="auto"/>
-                <!--<DataGridTextColumn x:Name="theConfirmationReferenceIdColumn" Binding="{Binding TheConfirmationReferenceId}" Header="شناسه تاییدیه" Width="auto"/>-->
-                <DataGridTextColumn x:Name="theErrorColumn" Binding="{Binding TheError}" Header="پیغام های خطا" Width="auto"/>
-                <DataGridCheckBoxColumn x:Name="theSuccessColumn" Binding="{Binding TheSuccess}" Visibility="Hidden" Header="وضعیت موفقیت" Width="auto"/>
+            <!-- CARD 2: Selected Invoice Actions -->
+            <Border Grid.Column="1" Background="White" CornerRadius="8" Margin="8,0,0,0" Padding="16" BorderBrush="#FFE0E0E0" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
+                    <TextBlock Grid.Row="0" Text="عملیات صورت‌حساب انتخاب شده" Style="{StaticResource MaterialDesignSubtitle2TextBlock}" Opacity="0.7" Margin="0,0,0,12" />
 
-            </DataGrid.Columns>
-        </DataGrid>
-        <TextBox x:Name="UID_TXB" Margin="0,10,240,0" TextWrapping="Wrap"  Text="{Binding ElementName=INVOCIE_DTGR,Path=SelectedItem.RefrenceNumber,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" HorizontalAlignment="Right" Width="265" TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus"/>
-        <Label Content="(Refrence Number) شناسه صورت حساب :" ToolTip="اعتبارسنجی محاسباتی" HorizontalAlignment="Right" PreviewMouseDoubleClick="Label_PreviewMouseDoubleClick" Margin="0,17,13,0" VerticalAlignment="Top" FlowDirection="RightToLeft"/>
-        <Button x:Name="ESTELAM_BTN"  Style="{StaticResource MaterialDesignFlatButton}" Content="بررسی لحظه ای (استعلام)" Margin="0,15,510,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="ESTELAM_BTN_Click" HorizontalAlignment="Right" Width="167" FlowDirection="RightToLeft"/>
-        <Button x:Name="RESEND_BTN" IsEnabled="False" Style="{StaticResource MaterialDesignFlatButton}" Content="ارسال مجدد (تکراری) فاکتور های انتخاب شده" Margin="0,15,689,0" VerticalAlignment="Top" Height="33" FontSize="12" Click="RESEND_BTN_Click" HorizontalAlignment="Right" Width="261" FlowDirection="RightToLeft"/>
+                    <!-- Ref Number & Tax ID -->
+                    <Grid Grid.Row="1" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-        <RadioButton IsChecked="True" GroupName="RD_TAXURL" x:Name="RD_MAINTAX" Content="سامانه اصلی" HorizontalAlignment="Left" Margin="193,20,0,0" VerticalAlignment="Top" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" />
-        <RadioButton IsChecked="False" GroupName="RD_TAXURL" x:Name="RD_SANDBOX" Content="(Sandbox) سامانه آزمایشی" HorizontalAlignment="Left" Margin="19,20,0,0" VerticalAlignment="Top"   Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False"/>
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <!-- Label kept separate to preserve the DoubleClick Event -->
+                            <Label Content="شناسه صورت‌حساب (Refrence Number):" FontSize="11" Opacity="0.7" Padding="0,0,0,4" PreviewMouseDoubleClick="Label_PreviewMouseDoubleClick" ToolTip="دابل کلیک برای اعتبارسنجی محاسباتی"/>
+                            <TextBox x:Name="UID_TXB" Text="{Binding ElementName=INVOCIE_DTGR, Path=SelectedItem.RefrenceNumber, UpdateSourceTrigger=PropertyChanged}" 
+                                     TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus" Height="28"/>
+                        </StackPanel>
 
-        <StackPanel Orientation="Horizontal"  Height="40" Margin="93,85,19,0" FlowDirection="RightToLeft" VerticalAlignment="Top">
-            <Label Content="متن جستجو:" VerticalAlignment="Center" FlowDirection="RightToLeft" Margin="0,0,0,-4"/>
-            <TextBox x:Name="SEARCHBOX" TextWrapping="Wrap" Text="" Width="843" Margin="3,0,0,0" Height="33" Padding="0,6,0,4"/>
-            <Button x:Name="SEARCH_BUTTON" Content="جستجو" Style="{StaticResource MaterialDesignFlatButton}" Click="SEARCH_BUTTON_Click" FontSize="12" Padding="16,4,16,4" Margin="4,0,0,0" Width="110"/>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <Label Content="شماره مالیاتی (جهت کپی):" FontSize="11" Opacity="0.7" Padding="0,0,0,4"/>
+                            <TextBox x:Name="TAXId_TextBox" Text="{Binding ElementName=INVOCIE_DTGR, Path=SelectedItem.Taxid, UpdateSourceTrigger=PropertyChanged}" 
+                                     IsReadOnly="True" PreviewGotKeyboardFocus="TAXId_TextBox_PreviewGotKeyboardFocus" Height="28" Background="#FFF9F9F9"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Action Buttons -->
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="ESTELAM_BTN" Grid.Column="0" Content="بررسی لحظه‌ای (استعلام)" Style="{StaticResource MaterialDesignRaisedButton}" Click="ESTELAM_BTN_Click" Margin="0,0,4,0" Height="36" Foreground="#DDFFFFFF"/>
+                        <Button x:Name="RESEND_BTN" Grid.Column="1" IsEnabled="False" Content="ارسال مجدد فاکتور(ها)" Style="{StaticResource MaterialDesignOutlinedButton}" Click="RESEND_BTN_Click" Margin="4,0,0,0" Height="36" Foreground="#D32F2F" BorderBrush="#D32F2F"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- TOOLBAR & EXPANDER (Row 2) -->
+        <StackPanel Grid.Row="2" Margin="16,0,16,8">
+            <DockPanel Margin="0,0,0,8">
+                <!-- Excel Exports (Left side in RTL -> floats Right physically) -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <Button x:Name="ExportToExcelBtn" Click="ExportToExcelBtn_Click" Style="{StaticResource MaterialDesignFloatingActionMiniSecondaryButton}" ToolTip="خروجی اکسل" Margin="0,0,8,0" Width="36" Height="36" Background="White" BorderBrush="#FFE0E0E0" Foreground="#1D6F42" materialDesign:ElevationAssist.Elevation="Dp0">
+                        <materialDesign:PackIcon Kind="MicrosoftExcel" Width="20" Height="20"/>
+                    </Button>
+                    <Button x:Name="ExportToExcelBtnGroup" Visibility="Collapsed" Click="ExportToExcelBtnGroup_Click" Style="{StaticResource MaterialDesignFloatingActionMiniSecondaryButton}" ToolTip="خروجی اکسل گروهی" IsEnabled="False" Margin="0,0,8,0" Width="36" Height="36" Background="White" BorderBrush="#FFE0E0E0" Foreground="#1D6F42" materialDesign:ElevationAssist.Elevation="Dp0">
+                        <materialDesign:PackIcon Kind="FormatListGroup" Width="20" Height="20"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Status & Warning Labels -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Label x:Name="LBL_WARN" Content="" Foreground="#D32F2F" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+                    <Border Background="#1A1A1A" CornerRadius="4" Visibility="{Binding Visibility, ElementName=STATUS_LABEL}">
+                        <Label x:Name="STATUS_LABEL" Visibility="Hidden" Content="" Foreground="White" Padding="8,4" />
+                    </Border>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Help Texts -->
+            <Expander Header="راهنمای استعلام و تاخیر سامانه" Background="Transparent" BorderBrush="#FFE0E0E0" BorderThickness="1">
+                <StackPanel Margin="16,8,16,16">
+                    <!-- 1. نکته کلی و تفاوت رسید با تایید -->
+                    <TextBlock Text="• توجه: دریافت «شناسه صورت‌حساب» (Refrence Number) در لحظه ارسال، صرفاً به معنای رسیدن اطلاعات به سرور است و به منزله تایید نهایی (SUCCESS) فاکتور نیست. حتماً باید وضعیت آن را تا زمان موفقیت استعلام کنید." Margin="0,4" Opacity="0.9" TextWrapping="Wrap" Foreground="#1976D2" FontWeight="SemiBold"/>
+
+                    <!-- 2. تأخیر نمایش در کارپوشه (SUCCESS اما نامرئی) -->
+                    <TextBlock Text="• اگر صورت‌حسابی استعلام موفق (SUCCESS) گرفت ولی در کارپوشه دارایی دیده نمی‌شود، این یک روال عادی (در زمان شلوغی سرور) سمت سامانه مودیان است. لطفاً از ارسال مجدد خودداری کرده و بین ۲۴ الی ۷۲ ساعت منتظر بمانید." Margin="0,4" Opacity="0.8" TextWrapping="Wrap" Foreground="#D32F2F" FontWeight="SemiBold"/>
+
+                    <!-- 3. هشدار ارسال مجدد در حالت PENDING / IN_PROGRESS -->
+                    <TextBlock Text="• هشدار: اگر وضعیت صورت‌حساب «در انتظار» (PENDING) یا «در حال پردازش» (IN_PROGRESS) است، از ارسال مجدد آن اکیداً خودداری کنید. ارسال مجدد باعث ایجاد فاکتور تکراری خواهد شد." Margin="0,4" Opacity="0.9" TextWrapping="Wrap" Foreground="#F57C00" FontWeight="Bold"/>
+
+                    <!-- 4. خطای NOT_FOUND -->
+                    <TextBlock Text="• خطای NOT_FOUND: این خطا یعنی سامانه در حال حاضر این کد رهگیری را نمی‌شناسد. این مشکل ۲ دلیل دارد: ۱- ترافیک شدید و تأخیر سامانه در ثبت اولیه کد (چند ساعت صبر کنید). ۲- فاکتور در سرور دارایی گم شده است. اگر پس از ۲۴ ساعت همچنان این خطا پابرجا بود، باید فاکتور را مجدداً ارسال کنید." Margin="0,4" Opacity="0.8" TextWrapping="Wrap"/>
+
+                    <!-- 5. خطای FAILED و نحوه برخورد -->
+                    <TextBlock Text="• فاکتورهای رد شده (FAILED): صورت‌حساب‌های ناموفق هیچ‌گونه اعتبار مالیاتی ندارند و در کارپوشه ثبت نمی‌شوند. نیازی به «ابطال» آن‌ها نیست؛ کافیست دلیل خطا را بررسی، در سیستم اصلاح و مجدداً ارسال کنید." Margin="0,4" Opacity="0.8" TextWrapping="Wrap"/>
+
+                    <!-- 6. قوانین ابطال و اصلاح -->
+                    <TextBlock Text="• فاکتورهای ابطالی و اصلاحی: برای ارسال فاکتور ابطالی یا اصلاحی، حتماً باید وضعیت فاکتور اصلی (مرجع) در حالت SUCCESS (موفق) باشد. امکان ابطال فاکتورهای در انتظار یا ناموفق وجود ندارد." Margin="0,4" Opacity="0.8" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Expander>
+
+            <!-- Hidden Legacy Controls (Kept for Code-Behind logic) -->
+            <StackPanel Visibility="Collapsed">
+                <Label x:Name="LBL_MOADINA_SCNUM" Content="شماره فاکتور (حواله) داخلی Inno شروع از عدد :" PreviewMouseDoubleClick="LBL_MOADINA_SCNUM_PreviewMouseDoubleClick"/>
+                <TextBox x:Name="MOADINA_SCNUM" IsReadOnly="True" TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus"/>
+                <Button x:Name="BTN_SAVE_MOADINA_SCNUM" Click="BTN_SAVE_MOADINA_SCNUM_Click"/>
+            </StackPanel>
         </StackPanel>
-        <Label x:Name="STATUS_LABEL" HorizontalContentAlignment="Center" Visibility="Hidden" VerticalContentAlignment="Center" Background="#FF1A1A1A" Foreground="#DDFFFFFF" Opacity="0.90" Margin="0,209,0,0"/>
-        <Border x:Name="MyBoderStatus" BorderThickness="1" Margin="0,60,0,0" RenderTransformOrigin="0.5,0.5" Height="4" VerticalAlignment="Top">
-            <Border.Background>
-                <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
-                    <GradientStop Color="#FF00B3FF"/>
-                    <GradientStop Color="#FF00A7FF" Offset="1"/>
-                </LinearGradientBrush>
-            </Border.Background>
-            <Border.RenderTransform>
-                <TransformGroup>
-                    <ScaleTransform ScaleY="-1"/>
-                    <SkewTransform/>
-                    <RotateTransform/>
-                    <TranslateTransform/>
-                </TransformGroup>
-            </Border.RenderTransform>
+
+        <!-- DATAGRID AREA (Row 3) -->
+        <Border Grid.Row="3" Margin="16,0,16,16" BorderBrush="#FFE0E0E0" BorderThickness="1" CornerRadius="8" Background="White" ClipToBounds="True">
+            <Grid>
+                <DataGrid x:Name="INVOCIE_DTGR" Style="{StaticResource CleanDataGridStyle}" MouseRightButtonUp="DG_SUB_MouseRightButtonUp" IsReadOnly="True" AutoGenerateColumns="False" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Auto" PreviewMouseDoubleClick="INVOCIE_DTGR_PreviewMouseDoubleClick" SelectionMode="Extended" SelectionUnit="FullRow" SelectionChanged="INVOCIE_DTGR_SelectionChanged" BorderThickness="0">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu FlowDirection="LeftToRight" FontFamily="pack://application:,,,/Prg_Graphicy;component/UIY/FNT/#IRANYekanFN">
+                            <MenuItem Header="Copy Data" Click="CopyData_Click" Icon="{materialDesign:PackIcon Kind=ContentCopy}"/>
+                            <Separator/>
+                            <MenuItem Header="ابطالی/برگشتی/اصلاحی این صورت حساب" Click="MenuItem_Click" Icon="{materialDesign:PackIcon Kind=Invoice}"/>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn x:Name="rownumberColumn" Binding="{Binding ROWNUMBER}" Header="ردیف" Width="SizeToCells" MinWidth="60"/>
+                        <DataGridTextColumn x:Name="taxidColumn" Binding="{Binding Taxid}" Header="شماره منحصر به فرد مالیاتی" Width="Auto"/>
+
+                        <DataGridTemplateColumn Header="نوع صورتحساب" Width="Auto">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock VerticalAlignment="Center" Margin="8,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="{x:Type TextBlock}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Inty}" Value="1">
+                                                        <Setter Property="Text" Value="نوع اول" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Inty}" Value="2">
+                                                        <Setter Property="Text" Value="نوع دوم" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Inty}" Value="3">
+                                                        <Setter Property="Text" Value="نوع سوم" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="الگوی صورتحساب" Width="Auto">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock VerticalAlignment="Center" Margin="8,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="{x:Type TextBlock}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Inp}" Value="1">
+                                                        <Setter Property="Text" Value="فروش" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Inp}" Value="2">
+                                                        <Setter Property="Text" Value="فروش ارزی" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Inp}" Value="3">
+                                                        <Setter Property="Text" Value="صورت حساب طلا , جواهر و پلاتین" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Inp}" Value="4">
+                                                        <Setter Property="Text" Value="پیمانکاری" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Inp}" Value="5">
+                                                        <Setter Property="Text" Value="قبوض خدماتی" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Inp}" Value="6">
+                                                        <Setter Property="Text" Value="هواپیما" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Inp}" Value="7">
+                                                        <Setter Property="Text" Value="صادرات" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="موضوع صورت‌حساب" Width="Auto">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock VerticalAlignment="Center" Margin="8,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="{x:Type TextBlock}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Ins}" Value="1">
+                                                        <Setter Property="Text" Value="اصلی (فروش)" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Ins}" Value="2">
+                                                        <Setter Property="Text" Value="اصلاحی" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Ins}" Value="3">
+                                                        <Setter Property="Text" Value="ابطالی" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Ins}" Value="4">
+                                                        <Setter Property="Text" Value="برگشت فروش" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn x:Name="iDDColumn" Binding="{Binding IDD}" Header="IDD" Visibility="Hidden"/>
+                        <DataGridTextColumn x:Name="theStatusColumn" Binding="{Binding TheStatus}" Visibility="Hidden" Header="STATE"/>
+
+                        <DataGridTemplateColumn Header="وضعیت" Width="100">
+                            <!-- Defined Width to ensure room for the badge -->
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <!-- BADGE REDESIGN -->
+                                    <Border CornerRadius="12" MinWidth="75" Padding="12,4" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="4,0">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <!-- Fallback Default -->
+                                                <Setter Property="Background" Value="#FFF5F5F5"/>
+                                                <Setter Property="BorderBrush" Value="#FFE0E0E0"/>
+                                                <Setter Property="BorderThickness" Value="1"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding TheStatus}" Value="FAILED">
+                                                        <Setter Property="Background" Value="#FFEBEE"/>
+                                                        <Setter Property="BorderBrush" Value="#FFEF9A9A"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding TheStatus}" Value="PENDING">
+                                                        <Setter Property="Background" Value="#FFFFF8E1"/>
+                                                        <Setter Property="BorderBrush" Value="#FFFFE082"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding TheStatus}" Value="SUCCESS">
+                                                        <Setter Property="Background" Value="#FFE8F5E9"/>
+                                                        <Setter Property="BorderBrush" Value="#FFA5D6A7"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding TheStatus}" Value="EXPIRED">
+                                                        <Setter Property="Background" Value="#FFF5F5F5"/>
+                                                        <Setter Property="BorderBrush" Value="#FFEEEEEE"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+
+                                        <TextBlock FontSize="12" FontWeight="SemiBold" TextAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="{x:Type TextBlock}">
+                                                    <!-- Fallback Default (Will show raw state if it doesn't match below) -->
+                                                    <Setter Property="Text" Value="{Binding TheStatus}" />
+                                                    <Setter Property="Foreground" Value="#FF757575"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding TheStatus}" Value="FAILED">
+                                                            <Setter Property="Text" Value="ناموفق" />
+                                                            <Setter Property="Foreground" Value="#FFC62828"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding TheStatus}" Value="PENDING">
+                                                            <Setter Property="Text" Value="در انتظار" />
+                                                            <Setter Property="Foreground" Value="#FFEF6C00"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding TheStatus}" Value="SUCCESS">
+                                                            <Setter Property="Text" Value="موفق" />
+                                                            <Setter Property="Foreground" Value="#FF2E7D32"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding TheStatus}" Value="EXPIRED">
+                                                            <Setter Property="Text" Value="منقضی شده" />
+                                                            <Setter Property="Foreground" Value="#FF616161"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn x:Name="innoColumn" Binding="{Binding Inno}" Header="شماره فاکتور (حواله) داخلی" Width="Auto"/>
+                        <DataGridTextColumn Binding="{Binding CUST_NO}" Header="کد مشتری" Width="Auto"/>
+                        <DataGridTextColumn Binding="{Binding MOLAH}" Header="ملاحظات" Width="Auto"/>
+                        <DataGridTextColumn Binding="{Binding SHARAYET}" Header="متن پایین" Width="Auto"/>
+                        <DataGridTextColumn Binding="{Binding DATE_N, StringFormat=####/##/##}" Header="تاریخ فاکتور داخلی" Width="Auto"/>
+                        <DataGridTextColumn Binding="{Binding LineCount}" Header="تعداد سطر" Width="Auto"/>
+                        <DataGridTextColumn x:Name="CrtColumn" Binding="{Binding CRT}" Header="تاریخ ارسال میلادی" Width="Auto"/>
+                        <DataGridTextColumn x:Name="PersianCrtColumn" Binding="{Binding PersianCRT}" Header="تاریخ ارسال شمسی" Width="Auto"/>
+                        <DataGridTextColumn x:Name="SentTaxMemoryColumn" Binding="{Binding SentTaxMemory}" Header="حافظه مالیاتی ارسالی" Width="Auto"/>
+
+                        <DataGridTemplateColumn Header="ارسال شده به سامانه" Width="Auto">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock VerticalAlignment="Center" Margin="8,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="{x:Type TextBlock}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ApiTypeSent}" Value="0">
+                                                        <Setter Property="Text" Value="آزمایشی" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ApiTypeSent}" Value="1">
+                                                        <Setter Property="Text" Value="اصلی" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ApiTypeSent}" Value="False">
+                                                        <Setter Property="Text" Value="آزمایشی" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ApiTypeSent}" Value="True">
+                                                        <Setter Property="Text" Value="اصلی" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn x:Name="refrenceNumberColumn" Binding="{Binding RefrenceNumber}" Header="شناسه صورت‌حساب" Width="Auto"/>
+                        <DataGridTextColumn Binding="{Binding NUMBER}" Header="شماره (فاکتور) حواله" Width="Auto"/>
+                        <DataGridTextColumn x:Name="theErrorColumn" Binding="{Binding TheError}" Header="پیغام‌های خطا" Width="250">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextWrapping" Value="Wrap"/>
+                                    <Setter Property="Foreground" Value="#D32F2F"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridCheckBoxColumn x:Name="theSuccessColumn" Binding="{Binding TheSuccess}" Visibility="Hidden" Header="وضعیت موفقیت"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Loading/Status Top Gradient Border (Moved inside DataGrid border to act as a sleek top line) -->
+                <Border x:Name="MyBoderStatus" Height="3" VerticalAlignment="Top" BorderThickness="0">
+                    <Border.Background>
+                        <LinearGradientBrush EndPoint="1,0" StartPoint="0,0">
+                            <GradientStop Color="#FF03A9F4" Offset="0"/>
+                            <GradientStop Color="#FF0288D1" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Grid>
         </Border>
-        <Button x:Name="ExportToExcelBtn" Click="ExportToExcelBtn_Click" Style="{StaticResource MaterialDesignFlatButton}" Margin="15,83,0,0" VerticalAlignment="Top" Height="43" HorizontalAlignment="Left" Width="70">
-            <Button.Content>
-                <Viewbox>
-                    <materialDesign:PackIcon Kind="MicrosoftExcel"/>
-                </Viewbox>
-            </Button.Content>
-        </Button>
-        <Button x:Name="ExportToExcelBtnGroup" Visibility="Collapsed" Click="ExportToExcelBtnGroup_Click" Style="{StaticResource MaterialDesignFlatButton}" Margin="15,180,0,0" VerticalAlignment="Top" Height="43" HorizontalAlignment="Left" Width="70" IsEnabled="False">
-            <Button.Content>
-                <Viewbox>
-                    <materialDesign:PackIcon Kind="FormatListGroup"/>
-                </Viewbox>
-            </Button.Content>
-        </Button>
-        <TextBox x:Name="TAXId_TextBox" Margin="0,146,228,0" TextWrapping="Wrap" Text="{Binding ElementName=INVOCIE_DTGR,Path=SelectedItem.Taxid,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" HorizontalAlignment="Right" Width="202" IsReadOnly="True" PreviewGotKeyboardFocus="TAXId_TextBox_PreviewGotKeyboardFocus"/>
-        <Label Content="شماره منحصر به فرد مالیاتی (جهت کپی) :" FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,152,9,0" VerticalAlignment="Top"/>
-        <TextBlock FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Justify" VerticalAlignment="Top" Margin="110,147,457,0" Height="83" Opacity="0.7"><Run Text="نکته : گاهی اوقات سامانه به دلیل بروز رسانی یا ترافیک شدید تا مدتی نتیجه صورت حساب ارسالی را مشخص نمی کند , بنا بر این صبر کنید تا وضعیت نهایی آن مشخص شود و یا از طریق شماره مالیاتی , مستقیما آنرا در کارپوشه خود جستجو کنید."/><LineBreak/><Run Text="اگر صورت حساب ارسال شده موفق (SUCCESS) شده ولی توی کارپوشه نیست , باید 48-72 ساعت صبر کنید , این تاخیر در پردازش صورت حساب توسط سامانه است."/></TextBlock>
-        <RadioButton GroupName="ZAMAN" x:Name="RD_ALL_TIME" IsChecked="False" Content="همه صورت حساب ها" HorizontalAlignment="Left" Margin="20,277,0,0" VerticalAlignment="Top" Padding="4,-1,0,0" Click="RD_ALL_TIME_Click"/>
-        <RadioButton GroupName="ZAMAN" x:Name="RD_LAST30" Content="صورت حساب های 30 روز گذشته" HorizontalAlignment="Left" Margin="176,277,0,0" VerticalAlignment="Top" Padding="4,-1,0,0" IsChecked="True" Click="RD_LAST30_Click"/>
-        <TextBlock FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Justify" VerticalAlignment="Top" Margin="868,276,9,0" Height="21" Opacity="0.7"><Run FlowDirection="RightToLeft" Text="صورت حساب های ارسالی به سامانه مودیان به تفکیک فاکتور"/><Run FlowDirection="RightToLeft" Language="fa-ir" Text=":"/></TextBlock>
-        <TextBlock FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Justify" VerticalAlignment="Bottom" Margin="1108,0,11,9" Height="21" Opacity="0.7"><Run FlowDirection="RightToLeft" Language="fa-ir" Text="تعداد ردیف ها:"/></TextBlock>
-        <TextBlock x:Name="LabelRowCounter" Text="{Binding ElementName=INVOCIE_DTGR,Path=Items.Count,UpdateSourceTrigger=PropertyChanged}" FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Justify" VerticalAlignment="Bottom" Margin="852,0,97,9" Height="21" Opacity="0.7"/>
-        <TextBox x:Name="MOADINA_SCNUM" IsReadOnly="True" Margin="0,62,267,0" TextWrapping="Wrap"  Text="" VerticalAlignment="Top" HorizontalAlignment="Right" Width="245" TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus" Visibility="Collapsed"/>
-        <Label x:Name="LBL_MOADINA_SCNUM" Content="شماره فاکتور (حواله) داخلی Inno شروع از عدد :"  HorizontalAlignment="Right" Margin="0,69,19,0" VerticalAlignment="Top" FlowDirection="RightToLeft" PreviewMouseDoubleClick="LBL_MOADINA_SCNUM_PreviewMouseDoubleClick" Visibility="Collapsed"/>
-        <Button x:Name="BTN_SAVE_MOADINA_SCNUM"  Style="{StaticResource MaterialDesignFlatButton}" Content="ذخیره →" Margin="526,67,0,0" VerticalAlignment="Top" Height="33" FontSize="12" HorizontalAlignment="Left" Width="158" Click="BTN_SAVE_MOADINA_SCNUM_Click" Visibility="Collapsed"/>
-        <Label x:Name="LBL_WARN" Content="" FlowDirection="RightToLeft" Margin="1,62,-1,0" VerticalAlignment="Top" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-        <StackPanel Orientation="Horizontal"  Height="40" Margin="93,202,19,0" FlowDirection="RightToLeft" VerticalAlignment="Top">
-            <Label Content="استعلام کد اقتصادی:" VerticalAlignment="Center" FlowDirection="RightToLeft" Margin="0,0,0,-4"/>
-            <TextBox x:Name="EGCODE" TextWrapping="Wrap" Text="" Width="200" TextAlignment="Left" Margin="3,0,0,0" Height="33" Padding="0,6,0,4"/>
-            <Button x:Name="SEARCH_BUTTON1" Content="بررسی" Style="{StaticResource MaterialDesignFlatButton}" Click="SEARCH_BUTTON1_Click" FontSize="12" Padding="16,4,16,4" Margin="4,0,0,0" Width="110"/>
-        </StackPanel>
+
+        <!-- STATUS BAR (Row 4) -->
+        <materialDesign:ColorZone Grid.Row="4" Mode="Standard" Padding="16,8" materialDesign:ElevationAssist.Elevation="Dp4" Panel.ZIndex="1" BorderBrush="#FFE0E0E0" BorderThickness="0,1,0,0" Background="White">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <TextBlock Text="تعداد فاکتورهای نمایش داده شده:" VerticalAlignment="Center" Opacity="0.7" FontWeight="Medium"/>
+                    <!-- Bound to the code-behind element, kept x:Name -->
+                    <TextBlock x:Name="LabelRowCounter" Text="{Binding ElementName=INVOCIE_DTGR, Path=Items.Count, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="8,0,0,0" FontWeight="SemiBold"/>
+                </StackPanel>
+            </DockPanel>
+        </materialDesign:ColorZone>
+
     </Grid>
 </Window>
- 

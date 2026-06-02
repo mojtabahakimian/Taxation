@@ -181,20 +181,6 @@ namespace Prg_Moadian.Bulk
             var headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
             if (headExt == null)
             {
-                //if (Inty_Value != null || Setm_Value != null) //نوع صورت حساب
-                //{
-
-                //    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                //                VALUES({number}, {tag}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
-
-                //    headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
-
-                //}
-                //else
-                //{
-                //    throw new NullyExceptiony($"HEAD_LST_EXTENDED not found for invoice {number} tag {tag}");
-                //}
-
                 // ✅ ساخت خودکار رکورد پیش‌فرض برای سربرگ مودیان
                 // اگر نوع صورت حساب یا روش تسویه از UI ارسال شده، از اونها استفاده می‌کنیم
                 // در غیر این صورت از مقادیر پیش‌فرض استفاده می‌شود
@@ -203,10 +189,18 @@ namespace Prg_Moadian.Bulk
 
                 try
                 {
-                    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                            VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
+                    _db.DoExecuteSQL($@"
+                        INSERT INTO dbo.HEAD_LST_EXTENDED (NUMBER, TGU, inty, inp, ins, setm, todam, cut)
+                        VALUES ({number}, {tag}, {defaultInty}, 1, 1, {defaultSetm}, 0, '2');");
                 }
-                catch { }
+                catch (Exception insertEx)
+                {
+                    // PK violation = race condition (همزمان دو بار برای همین فاکتور) — رکورد قبلاً ساخته شده، مشکلی نیست
+                    // بقیه خطاها = مشکل واقعی که باید لاگ شود
+                    bool isPkViolation = insertEx.Message.Contains("PRIMARY KEY") || insertEx.Message.Contains("duplicate key") || insertEx.Message.Contains("UNIQUE");
+                    if (!isPkViolation)
+                        Generaly.CL_Generaly.DoGetwriteAppenLog($"HEAD_LST_EXTENDED INSERT failed for invoice {number} tag {tag}: {insertEx.Message}");
+                }
 
                 headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
 
@@ -399,18 +393,17 @@ namespace Prg_Moadian.Bulk
                 dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
             }
 
-            //var taxId = _taxService.RequestTaxId(_memoryId, dt);
-            //var ts = TaxService.ConvertDateToLong(dt);
-            // اعمال اختلاف زمانی سرور
-            var dtAdjusted = dt.Add(TokenLifeTime.ServerClockSkew); //جلوگیری از خطای تاریخ
-            var taxId = _taxService.RequestTaxId(_memoryId, dtAdjusted);
-            var ts = TaxService.ConvertDateToLong(dtAdjusted);
+            // تاریخ فاکتور تاریخچه‌ای است و نباید اختلاف ساعت سرور به آن اعمال شود
+            // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
+            var ts = TaxService.ConvertDateToLong(dt);
 
             // 1. دریافت شماره فاکتور (مثلاً 10391)
             long invoiceNum = long.Parse(number.ToString());
-            // 2. تولید سریال ۱۰ رقمی استاندارد
-            // فرض: _sazman.YEA "1404" است
+            // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
+            // 3. serial TaxId = همان عدد Inno → رفع هشدار 1300501 (عدم تطابق serial)
+            // سریال‌های قدیمی رندوم ≤ 999,999,999 بودند؛ serial جدید ≥ 1,404,000,000 → بدون تداخل
+            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto
