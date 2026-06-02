@@ -204,14 +204,18 @@ namespace Prg_Moadian.Bulk
 
                 try
                 {
-                    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                            VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
+                    // IF NOT EXISTS برای جلوگیری از PK violation در ارسال موازی
+                    _db.DoExecuteSQL(@$"IF NOT EXISTS (SELECT 1 FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag})
+                        INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
+                        VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
                 }
-                catch { }
+                catch (Exception insertEx)
+                {
+                    Generaly.CL_Generaly.DoGetwriteAppenLog($"HEAD_LST_EXTENDED INSERT failed for invoice {number} tag {tag}: {insertEx.Message}");
+                }
 
                 headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
 
-                // اگر بعد از INSERT هم نتونستیم بخونیم، خطا بده (این نباید اتفاق بیفته)
                 if (headExt == null)
                 {
                     throw new NullyExceptiony($"Failed to create HEAD_LST_EXTENDED for invoice {number} tag {tag}");
