@@ -1339,38 +1339,33 @@ namespace Prg_TrackSentInvoice
                 return;
             }
 
+            // capture کردن username قبل از Task.Run تا در REMARKS هم قابل استفاده باشد
+            string windowsUser = Environment.UserName;
+            string ipAddress = "UnknownIP";
+            try
+            {
+                ipAddress = Dns.GetHostEntry(Dns.GetHostName())
+                    .AddressList
+                    .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a))
+                    ?.ToString() ?? "UnknownIP";
+            }
+            catch { }
+            string resendUser = $"{windowsUser} | {ipAddress}";
+
             #region LOG
             try
             {
                 using (var db = new SqlConnection(CL_CCNNMANAGER.CONNECTION_STR))
                 {
                     db.Open();
-
-                    var windowsUser = Environment.UserName; // Windows username
-
-                    // Get local IPv4 address (skip loopback)
-                    string ipAddress = Dns.GetHostEntry(Dns.GetHostName())
-                        .AddressList
-                        .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a))
-                        ?.ToString() ?? "UnknownIP";
-
-                    // Combine into username field
-                    string username = $"{windowsUser} | {ipAddress}";
-
-                    string _FRM_ = this.GetType().Name;
-
-                    var sql = @"
-                            INSERT INTO AMALIAT
-                                (USERID, USERNAME, ADATE, AMALID)
-                            VALUES
-                                (@UserId, @Username, GETDATE(), @AmalId)";
-                    var parameters = new
+                    var sql = @"INSERT INTO AMALIAT (USERID, USERNAME, ADATE, AMALID)
+                                VALUES (@UserId, @Username, GETDATE(), @AmalId)";
+                    db.Execute(sql, new
                     {
                         UserId = 0,
-                        Username = TruncateString(username, 49),
-                        AmalId = TruncateString(_FRM_, 49)
-                    };
-                    db.Execute(sql, parameters);
+                        Username = TruncateString(resendUser, 49),
+                        AmalId = TruncateString($"ResendDuplicate:{uniqueTaxids.Count}inv", 49)
+                    });
                 }
             }
             catch { }
@@ -1424,7 +1419,7 @@ namespace Prg_TrackSentInvoice
                                                 SELECT TOP (1) Uid
                                                 FROM dbo.TAXDTL
                                                 WHERE Taxid = @taxid AND ApiTypeSent = @api
-                                                  AND ISNULL(REMARKS,'') <> 'ResendDuplicate'
+                                                  AND ISNULL(REMARKS,'') NOT LIKE 'ResendDuplicate%'
                                                 ORDER BY CRT ASC
                                             ", new { taxid, api = Convert.ToInt32(isMainApi) }).FirstOrDefault();
 
@@ -1558,7 +1553,7 @@ namespace Prg_TrackSentInvoice
                             newLogRow.TheError = null;
                             newLogRow.TheConfirmationReferenceId = null;
                             newLogRow.TheSuccess = false;
-                            newLogRow.REMARKS = "ResendDuplicate";
+                            newLogRow.REMARKS = $"ResendDuplicate | {resendUser} | {DateTime.Now:yyyy/MM/dd HH:mm:ss}";
 
                             InsertNewTaxDtlRecord(newLogRow);
                         }
