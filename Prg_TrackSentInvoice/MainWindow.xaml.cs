@@ -1300,17 +1300,20 @@ namespace Prg_TrackSentInvoice
 
             if (selectedItems.Count > 0)
             {
-                bool allPendingOrInProgress = selectedItems.All(item =>
-                    item.TheStatus?.ToUpper() == "PENDING" || item.TheStatus?.ToUpper() == "IN_PROGRESS");
+                bool allResendable = selectedItems.All(item =>
+                {
+                    var s = item.TheStatus?.ToUpper();
+                    return s == "PENDING" || s == "IN_PROGRESS" || s == "FAILED";
+                });
 
-                RESEND_BTN.IsEnabled = allPendingOrInProgress;
+                RESEND_BTN.IsEnabled = allResendable;
             }
             else
             {
                 RESEND_BTN.IsEnabled = false;
             }
         }
-        private void RESEND_BTN_Click(object sender, RoutedEventArgs e)
+        private async void RESEND_BTN_Click(object sender, RoutedEventArgs e)
         {
             if (!RESEND_BTN.IsEnabled) return;
 
@@ -1323,10 +1326,10 @@ namespace Prg_TrackSentInvoice
 
             var uniqueTaxids = selectedItems.Select(i => i.Taxid).Distinct().ToList();
             Msgwin msgwin = new Msgwin(true,
-                $"⚠️ توجه: تاریخ فاکتورهای ارسالی مجدد، تاریخ امروز در نظر گرفته خواهد شد.\n\n" +
                 $"✅ تعداد {uniqueTaxids.Count} فاکتور برای ارسال مجدد انتخاب شده است.\n\n" +
-                $"ℹ️ نکته مهم: اگر وضعیت صورتحساب‌های شما همچنان «در انتظار» یا «در حال انجام» است، " +
-                $"پیشنهاد می‌شود قبل از ادامه، کارپوشه خود را بررسی کنید و از عدم وجود آن صورتحساب‌ها مطمئن شوید.\n\n" +
+                $"ℹ️ این فاکتورها عیناً با همان شماره مالیاتی (TaxId) و تاریخ اصلی ارسال می‌شوند.\n" +
+                $"سامانه ممکن است آن‌ها را تکراری تشخیص دهد یا در صف بررسی قرار دهد — این رفتار طبیعی است.\n\n" +
+                $"⚠️ پیشنهاد می‌شود قبل از ادامه، کارپوشه خود را بررسی کنید.\n\n" +
                 $"آیا از ارسال مجدد اطمینان دارید؟");
             msgwin.Height = msgwin.Height + 50;
             msgwin.ShowDialog();
@@ -1375,6 +1378,7 @@ namespace Prg_TrackSentInvoice
 
             STATUS_LABEL.Content = "در حال آماده سازی برای ارسال مجدد...";
             STATUS_LABEL.Visibility = Visibility.Visible;
+            RESEND_BTN.IsEnabled = false;
             IsOtherProccessingNow = true;
             int successCount = 0;
             int failCount = 0;
@@ -1402,8 +1406,12 @@ namespace Prg_TrackSentInvoice
                     isMainApi = false;
                 }
 
+                // اجرا روی background thread تا UI فریز نکند
+                (successCount, failCount) = await Task.Run(() =>
+                {
                 var taxService = new TaxService(memoryId, privateKey, TaxURL);
                 taxService.RequestToken();
+                int ok = 0, fail = 0;
 
                 foreach (var taxid in uniqueTaxids)
                 {
@@ -1451,125 +1459,18 @@ namespace Prg_TrackSentInvoice
                         var bodies = CreateBodyListFromFullTaxDtl((List<FULL_TAXDTL>)originalInvoiceRows);
                         var payments = new List<InvoiceModel.Payment>();
 
-                        #region Cleaning_RestoreValiding
+                        // تمیزکاری header — body قبلاً در CreateBodyListFromFullTaxDtl پاک‌سازی شده
                         if (header is InvoiceModel.Header TheHead)
                         {
-                            //Matter {
-                            if (TheHead?.Bpn != null) //شماره گذرنامه خریدار
-                            {
-                                if (string.IsNullOrWhiteSpace(TheHead?.Bpn) || TheHead?.Bpn == "0")
-                                {
-                                    TheHead.Bpn = null;
-                                }
-                            }
-                            if (TheHead?.Scc != null) //کد گمرک محل اظهار فروشنده
-                            {
-                                if (string.IsNullOrWhiteSpace(TheHead?.Scc) || TheHead?.Scc == "0")
-                                {
-                                    TheHead.Scc = null;
-                                }
-                            }
-                            //Matter }
-
-                            if (string.IsNullOrEmpty(TheHead?.Crn) || TheHead?.Crn == "0")
-                            {
-                                if (TheHead?.Crn != null)
-                                {
-                                    TheHead.Crn = null; //شناسه یکتای ثبت قرار داد فروشنده
-                                }
-                            }
-                            if (TheHead?.Irtaxid != null) //جلوگیری از مقدار خالی یا Space
-                            {
-                                if (string.IsNullOrWhiteSpace(TheHead?.Irtaxid))
-                                {
-                                    if (TheHead?.Inp != 7) //الگوی صورتحساب => صادرات نیست
-                                    {
-                                        TheHead.Irtaxid = null;
-                                    }
-                                }
-                            }
+                            if (string.IsNullOrWhiteSpace(TheHead.Bpn) || TheHead.Bpn == "0")
+                                TheHead.Bpn = null;
+                            if (string.IsNullOrWhiteSpace(TheHead.Scc) || TheHead.Scc == "0")
+                                TheHead.Scc = null;
+                            if (string.IsNullOrEmpty(TheHead.Crn) || TheHead.Crn == "0")
+                                TheHead.Crn = null;
+                            if (string.IsNullOrWhiteSpace(TheHead.Irtaxid) && TheHead.Inp != 7)
+                                TheHead.Irtaxid = null;
                         }
-                        foreach (var item in bodies)
-                        {
-                            if (item?.Cut != null) //نوع ارز
-                            {
-                                if (string.IsNullOrWhiteSpace(item?.Cut))
-                                {
-                                    item.Cut = null;
-                                }
-                            }
-                            if (item?.Cfee == null)
-                            {
-                                item.Cfee = 0; //میزان ارز
-                            }
-                            if (string.IsNullOrWhiteSpace(item?.Odt))
-                            {
-                                item.Odt = "0"; //موضوع سایر مالیات و عوارض
-                            }
-                            if (item?.Odr == null)
-                            {
-                                item.Odr = 0; //نرخ سایر مالیات و عوارض
-                            }
-                            if (item?.Odam == null)
-                            {
-                                item.Odam = 0; //مبلغ سایر مالیات و عوارض
-                            }
-                            // --- سایر وجوه قانونی ---
-                            if (string.IsNullOrWhiteSpace(item?.Olt))
-                            {
-                                item.Olt = "0";  //موضوع سایر وجوه قانونی
-                            }
-                            if (item?.Olr == null)
-                            {
-                                item.Olr = 0; //نرخ سایر وجوه قانونی
-                            }
-                            if (item?.Olam == null)
-                            {
-                                item.Olam = 0; //مبلغ سایر وجوه قانونی
-                            }
-                            // --- هزینه‌ها و سود ---
-                            if (item?.Consfee == null)
-                            {
-                                item.Consfee = 0; //اجرت ساخت
-                            }
-                            if (item?.Spro == null)
-                            {
-                                item.Spro = 0; ////سود فروشنده
-                            }
-                            if (item?.Bros == null)
-                            {
-                                item.Bros = 0; //حق العمل
-                            }
-                            if (item?.Tcpbs == null)
-                            {
-                                item.Tcpbs = 0; //جمع کل اجرت , حق العمل و سود
-                            }
-                            if (item?.Cop == null)
-                            {
-                                item.Cop = 0; //سهم نقدی از پرداخت
-                            }
-                            if (item?.Vop == null) //سهم ارزش افزوده از پرداخت
-                            {
-                                item.Vop = 0;
-                            }
-                            if (string.IsNullOrWhiteSpace(item?.Bsrn))
-                            {
-                                item.Bsrn = null; //شناسه یکتای ثبت قرارداد حق العملکاری
-                            }
-                            if (item?.Nw == null || item.Nw == 0)
-                            {
-                                item.Nw = 0; //وزن خالص
-                            }
-                            if (item?.Ssrv == null || item.Ssrv == 0)
-                            {
-                                item.Ssrv = 0;  //ارزش ریالی کالا
-                            }
-                            if (item?.Sscv == null || item.Sscv == 0)
-                            {
-                                item.Sscv = 0; //ارزش ارزی کالا
-                            }
-                        }
-                        #endregion
 
                         #region JSON_LOG
                         try
@@ -1590,7 +1491,7 @@ namespace Prg_TrackSentInvoice
                             // Serialize the custom JSON object to JSON
                             string jsonData = System.Text.Json.JsonSerializer.Serialize(jsonObject);
                             // Define the file path for the combined JSON file
-                            string combinedFilePath = Path.Combine(directoryPath, $"{DateTime.Now.ToString("yyyy-mm-dd-ss-fff")}-Combined.json");
+                            string combinedFilePath = Path.Combine(directoryPath, $"{DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss-fff")}-Combined.json");
 
                             File.WriteAllText(combinedFilePath, jsonData);
                         }
@@ -1618,14 +1519,16 @@ namespace Prg_TrackSentInvoice
 
                             InsertNewTaxDtlRecord(newLogRow);
                         }
-                        successCount++;
+                        ok++;
                     }
                     catch (Exception ex)
                     {
-                        failCount++;
+                        fail++;
                         CL_Generaly.DoWritePRGLOG($"Failed to resend invoice with TaxID {taxid}", ex);
                     }
                 }
+                return (ok, fail);
+                }); // end Task.Run
             }
             catch (Exception ex)
             {
@@ -1635,6 +1538,7 @@ namespace Prg_TrackSentInvoice
             finally
             {
                 STATUS_LABEL.Visibility = Visibility.Hidden;
+                RESEND_BTN.IsEnabled = true;
                 IsOtherProccessingNow = false;
                 RefGetData();
                 new Msgwin(false, $"عملیات ارسال مجدد تکمیل شد.\nموفق: {successCount}\nناموفق: {failCount}").ShowDialog();
