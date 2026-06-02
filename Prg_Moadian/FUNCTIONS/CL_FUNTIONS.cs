@@ -218,15 +218,23 @@ namespace Prg_Moadian.FUNCTIONS
         {
             const int FixedLength = 10;
             int serialLen = FixedLength - year.Length; // معمولاً 6
-            long maxInvoice = (long)Math.Pow(10, serialLen) - 1; // 999,999
+            long maxDecimal = (long)Math.Pow(10, serialLen) - 1; // 999,999
 
-            if (invoiceNumber < 1 || invoiceNumber > maxInvoice)
-                throw new InvalidOperationException(
-                    $"شماره فاکتور {invoiceNumber} باید بین 1 و {maxInvoice} باشد " +
-                    $"(سریال {serialLen} رقمی با سال {year}).");
+            string inno;
+            if (invoiceNumber >= 1 && invoiceNumber <= maxDecimal)
+            {
+                inno = year + invoiceNumber.ToString().PadLeft(serialLen, '0');
+            }
+            else
+            {
+                string hexPart = invoiceNumber.ToString("X");
+                if (invoiceNumber < 1 || hexPart.Length > serialLen)
+                    throw new InvalidOperationException(
+                        $"شماره فاکتور {invoiceNumber} بیش از حد مجاز است (hex: {hexPart}, حداکثر {serialLen} کاراکتر).");
+                inno = year + hexPart.PadLeft(serialLen, '0');
+            }
 
-            string inno = year + invoiceNumber.ToString().PadLeft(serialLen, '0');
-            return (inno, long.Parse(inno));
+            return (inno, invoiceNumber); // Serial همیشه عدد خام است، نه parse از Inno
         }
         public static string CODEUN(string cody)
         {
