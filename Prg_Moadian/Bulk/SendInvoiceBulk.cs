@@ -181,20 +181,6 @@ namespace Prg_Moadian.Bulk
             var headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
             if (headExt == null)
             {
-                //if (Inty_Value != null || Setm_Value != null) //نوع صورت حساب
-                //{
-
-                //    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                //                VALUES({number}, {tag}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
-
-                //    headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
-
-                //}
-                //else
-                //{
-                //    throw new NullyExceptiony($"HEAD_LST_EXTENDED not found for invoice {number} tag {tag}");
-                //}
-
                 // ✅ ساخت خودکار رکورد پیش‌فرض برای سربرگ مودیان
                 // اگر نوع صورت حساب یا روش تسویه از UI ارسال شده، از اونها استفاده می‌کنیم
                 // در غیر این صورت از مقادیر پیش‌فرض استفاده می‌شود
@@ -203,10 +189,18 @@ namespace Prg_Moadian.Bulk
 
                 try
                 {
-                    _db.DoExecuteSQL(@$"INSERT INTO dbo.HEAD_LST_EXTENDED(NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                            VALUES({number}, {tag}, {defaultInty}, 1, 1, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, 0, DEFAULT, DEFAULT, DEFAULT, {defaultSetm}, DEFAULT, DEFAULT, DEFAULT, DEFAULT, '2', DEFAULT);");
+                    _db.DoExecuteSQL($@"
+                        INSERT INTO dbo.HEAD_LST_EXTENDED (NUMBER, TGU, inty, inp, ins, setm, todam, cut)
+                        VALUES ({number}, {tag}, {defaultInty}, 1, 1, {defaultSetm}, 0, '2');");
                 }
-                catch { }
+                catch (Exception insertEx)
+                {
+                    // PK violation = race condition (همزمان دو بار برای همین فاکتور) — رکورد قبلاً ساخته شده، مشکلی نیست
+                    // بقیه خطاها = مشکل واقعی که باید لاگ شود
+                    bool isPkViolation = insertEx.Message.Contains("PRIMARY KEY") || insertEx.Message.Contains("duplicate key") || insertEx.Message.Contains("UNIQUE");
+                    if (!isPkViolation)
+                        Generaly.CL_Generaly.DoGetwriteAppenLog($"HEAD_LST_EXTENDED INSERT failed for invoice {number} tag {tag}: {insertEx.Message}");
+                }
 
                 headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
 

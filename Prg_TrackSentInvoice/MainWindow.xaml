@@ -71,13 +71,13 @@
         </tb:TaskbarIcon>
 
         <!-- HEADER APP BAR -->
-        <materialDesign:ColorZone Grid.Row="0" Mode="Standard" Padding="20,16" materialDesign:ElevationAssist.Elevation="Dp2" Background="White">
+        <materialDesign:ColorZone FlowDirection="LeftToRight" Grid.Row="0" Mode="Standard" Padding="20,16" materialDesign:ElevationAssist.Elevation="Dp2" Background="White">
             <DockPanel>
                 <!-- Environment Indication (Left) -->
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" FlowDirection="RightToLeft" VerticalAlignment="Center">
                     <TextBlock Text="محیط متصل:" VerticalAlignment="Center" Margin="0,0,0,0" Opacity="0.6"/>
-                    <RadioButton x:Name="RD_SANDBOX" GroupName="RD_TAXURL" Content="آزمایشی (Sandbox)" Margin="16,0,0,0" Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
-                    <RadioButton x:Name="RD_MAINTAX" GroupName="RD_TAXURL" IsChecked="True" Content="سامانه اصلی" Margin="16,0,0,0" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
+                    <RadioButton IsChecked="False"  x:Name="RD_MAINTAX" GroupName="RD_TAXURL" Content="سامانه اصلی" Margin="16,0,0,0" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
+                    <RadioButton IsChecked="True" x:Name="RD_SANDBOX" GroupName="RD_TAXURL" Content="آزمایشی (Sandbox)" Margin="16,0,0,0" Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
                 </StackPanel>
 
                 <!-- Title (Right) -->
@@ -165,7 +165,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Button x:Name="ESTELAM_BTN" Grid.Column="0" Content="بررسی لحظه‌ای (استعلام)" Style="{StaticResource MaterialDesignRaisedButton}" Click="ESTELAM_BTN_Click" Margin="0,0,4,0" Height="36"/>
+                        <Button x:Name="ESTELAM_BTN" Grid.Column="0" Content="بررسی لحظه‌ای (استعلام)" Style="{StaticResource MaterialDesignRaisedButton}" Click="ESTELAM_BTN_Click" Margin="0,0,4,0" Height="36" Foreground="#DDFFFFFF"/>
                         <Button x:Name="RESEND_BTN" Grid.Column="1" IsEnabled="False" Content="ارسال مجدد فاکتور(ها)" Style="{StaticResource MaterialDesignOutlinedButton}" Click="RESEND_BTN_Click" Margin="4,0,0,0" Height="36" Foreground="#D32F2F" BorderBrush="#D32F2F"/>
                     </Grid>
                 </Grid>
