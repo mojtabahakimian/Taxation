@@ -1553,7 +1553,7 @@ namespace Prg_TrackSentInvoice
                             newLogRow.TheError = null;
                             newLogRow.TheConfirmationReferenceId = null;
                             newLogRow.TheSuccess = false;
-                            newLogRow.REMARKS = $"ResendDuplicate | {resendUser} | {DateTime.Now:yyyy/MM/dd HH:mm:ss}";
+                            newLogRow.REMARKS = TruncateString($"ResendDuplicate|{windowsUser}|{DateTime.Now:yy/MM/dd HH:mm}", 49);
 
                             InsertNewTaxDtlRecord(newLogRow);
                         }
