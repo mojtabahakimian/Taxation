@@ -248,7 +248,7 @@ namespace Prg_TrackSentInvoice
                 var _YEA_ = dbms.DoGetDataSQL<string>("SELECT TOP 1 YEA FROM dbo.SAZMAN").FirstOrDefault();
                 var _NAME_ = dbms.DoGetDataSQL<string>("SELECT TOP 1 NAME FROM dbo.SAZMAN").FirstOrDefault();
 
-                this.Title = $"استعلام صورت حساب برای {_NAME_} سال مالی {_YEA_} ";
+                this.Title = $"{_NAME_} سال مالی {_YEA_} ";
             }
             catch (Exception)
             {
@@ -320,8 +320,8 @@ namespace Prg_TrackSentInvoice
             }
             catch (Exception er)
             {
-                MyBoderStatus.Height = 30;
-                MyBoderStatus.Background = new SolidColorBrush(Color.FromArgb(255, 178, 34, 34)); // Firebrick
+                //MyBoderStatus.Height = 30;
+                //MyBoderStatus.Background = new SolidColorBrush(Color.FromArgb(255, 178, 34, 34)); // Firebrick
 
                 var _msger = CER.ExpecMsgEr(er);
 
