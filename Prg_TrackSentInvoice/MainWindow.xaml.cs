@@ -1401,21 +1401,25 @@ namespace Prg_TrackSentInvoice
                     isMainApi = false;
                 }
 
-                // اجرا روی background thread تا UI فریز نکند
-                (successCount, failCount) = await Task.Run(() =>
+                // capture روی UI thread قبل از Task.Run (TaxURL به RadioButton دسترسی دارد)
+                string taxUrl = TaxURL;
+
+                // فقط اتصال اولیه (HTTP) در background — بقیه روی UI thread
+                var taxService = await Task.Run(() =>
                 {
-                    var taxService = new TaxService(memoryId, privateKey, TaxURL);
-                    taxService.RequestToken();
-                    int ok = 0, fail = 0;
+                    var svc = new TaxService(memoryId, privateKey, taxUrl);
+                    svc.RequestToken();
+                    return svc;
+                });
 
-                    foreach (var taxid in uniqueTaxids)
+                foreach (var taxid in uniqueTaxids)
+                {
+                    try
                     {
-                        try
-                        {
-                            Dispatcher.Invoke(() => STATUS_LABEL.Content = $"در حال پردازش فاکتور با شماره مالیاتی: {taxid}");
+                        STATUS_LABEL.Content = $"در حال پردازش فاکتور با شماره مالیاتی: {taxid}";
 
-                            // ۱) UID نسخهٔ پایه (اولین ارسالِ غیر ResendDuplicate) را بگیر
-                            var baseUid = dbms.DoGetDataSQL<string>(@"
+                        // ۱) UID نسخهٔ پایه (اولین ارسالِ غیر ResendDuplicate) را بگیر
+                        var baseUid = dbms.DoGetDataSQL<string>(@"
                                                 SELECT TOP (1) Uid
                                                 FROM dbo.TAXDTL
                                                 WHERE Taxid = @taxid AND ApiTypeSent = @api
@@ -1423,150 +1427,128 @@ namespace Prg_TrackSentInvoice
                                                 ORDER BY CRT ASC
                                             ", new { taxid, api = Convert.ToInt32(isMainApi) }).FirstOrDefault();
 
-                            // اگر به هر دلیل چیزی برنگشت، بیفت روی اولین UID موجود (fallback بی‌خطر)
-                            if (string.IsNullOrEmpty(baseUid))
-                            {
-                                baseUid = dbms.DoGetDataSQL<string>(@"
+                        if (string.IsNullOrEmpty(baseUid))
+                        {
+                            baseUid = dbms.DoGetDataSQL<string>(@"
                                                     SELECT TOP (1) Uid
                                                     FROM dbo.TAXDTL
                                                     WHERE Taxid = @taxid AND ApiTypeSent = @api
                                                     ORDER BY CRT ASC
                                                 ", new { taxid, api = Convert.ToInt32(isMainApi) }).FirstOrDefault();
-                            }
+                        }
 
-                            // ۲) کل ردیف‌های همان گروه را بگیر (و ترتیب ثابت بده)
-                            var originalInvoiceRows = dbms.DoGetDataSQL<FULL_TAXDTL>(@"
+                        var originalInvoiceRows = dbms.DoGetDataSQL<FULL_TAXDTL>(@"
                                                 SELECT *
                                                 FROM dbo.TAXDTL
                                                 WHERE Taxid = @taxid AND ApiTypeSent = @api AND Uid = @baseUid
                                                 ORDER BY CRT, IDD
                                             ", new { taxid, api = Convert.ToInt32(isMainApi), baseUid });
 
-
-                            if (!originalInvoiceRows.Any())
-                            {
-                                CL_Generaly.DoWritePRGLOG($"Skipping TaxID {taxid} as no records were found in TAXDTL.", null);
-                                fail++;
-                                continue;
-                            }
-
-                            var header = CreateHeaderFromFullTaxDtl(originalInvoiceRows.First());
-                            var bodies = CreateBodyListFromFullTaxDtl(originalInvoiceRows.ToList());
-                            var payments = new List<InvoiceModel.Payment>();
-
-                            #region Cleaning_RestoreValiding
-                            if (header is InvoiceModel.Header TheHead)
-                            {
-                                //Matter {
-                                if (TheHead?.Bpn != null) //شماره گذرنامه خریدار
-                                {
-                                    if (string.IsNullOrWhiteSpace(TheHead?.Bpn) || TheHead?.Bpn == "0")
-                                        TheHead.Bpn = null;
-                                }
-                                if (TheHead?.Scc != null) //کد گمرک محل اظهار فروشنده
-                                {
-                                    if (string.IsNullOrWhiteSpace(TheHead?.Scc) || TheHead?.Scc == "0")
-                                        TheHead.Scc = null;
-                                }
-                                //Matter }
-                                if (string.IsNullOrEmpty(TheHead?.Crn) || TheHead?.Crn == "0")
-                                {
-                                    if (TheHead?.Crn != null)
-                                        TheHead.Crn = null; //شناسه یکتای ثبت قرار داد فروشنده
-                                }
-                                if (TheHead?.Irtaxid != null) //جلوگیری از مقدار خالی یا Space
-                                {
-                                    if (string.IsNullOrWhiteSpace(TheHead?.Irtaxid))
-                                    {
-                                        if (TheHead?.Inp != 7) //الگوی صورتحساب => صادرات نیست
-                                            TheHead.Irtaxid = null;
-                                    }
-                                }
-                            }
-                            foreach (var item in bodies)
-                            {
-                                if (item?.Cut != null) //نوع ارز — از DB می‌آید، ممکن است whitespace باشد
-                                {
-                                    if (string.IsNullOrWhiteSpace(item?.Cut))
-                                        item.Cut = null;
-                                }
-                                if (item?.Cfee == null) item.Cfee = 0;
-                                if (string.IsNullOrWhiteSpace(item?.Odt)) item.Odt = "0";
-                                if (item?.Odr == null) item.Odr = 0;
-                                if (item?.Odam == null) item.Odam = 0;
-                                if (string.IsNullOrWhiteSpace(item?.Olt)) item.Olt = "0";
-                                if (item?.Olr == null) item.Olr = 0;
-                                if (item?.Olam == null) item.Olam = 0;
-                                if (item?.Consfee == null) item.Consfee = 0;
-                                if (item?.Spro == null) item.Spro = 0;
-                                if (item?.Bros == null) item.Bros = 0;
-                                if (item?.Tcpbs == null) item.Tcpbs = 0;
-                                if (item?.Cop == null) item.Cop = 0;
-                                if (item?.Vop == null) item.Vop = 0;
-                                if (string.IsNullOrWhiteSpace(item?.Bsrn)) item.Bsrn = null;
-                                if (item?.Nw == null || item.Nw == 0) item.Nw = 0;
-                                if (item?.Ssrv == null || item.Ssrv == 0) item.Ssrv = 0;
-                                if (item?.Sscv == null || item.Sscv == 0) item.Sscv = 0;
-                            }
-                            #endregion
-
-                            #region JSON_LOG
-                            try
-                            {
-                                string directoryPath = @"C:\CORRECT\SENTS";
-                                if (!Directory.Exists(directoryPath))
-                                {
-                                    Directory.CreateDirectory(directoryPath);
-                                }
-                                // Create a custom JSON object to hold header, bodies, and payments
-                                var jsonObject = new
-                                {
-                                    Header = header,
-                                    Bodies = bodies,
-                                    Payments = payments
-                                };
-
-                                // Serialize the custom JSON object to JSON
-                                string jsonData = System.Text.Json.JsonSerializer.Serialize(jsonObject);
-                                // Define the file path for the combined JSON file
-                                string combinedFilePath = Path.Combine(directoryPath, $"{DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss-fff")}-Combined.json");
-
-                                File.WriteAllText(combinedFilePath, jsonData);
-                            }
-                            catch (Exception ex)
-                            {
-                                CL_Generaly.DoWritePRGLOG($"JSON log failed for TaxID {taxid}", ex);
-                            }
-                            #endregion
-
-                            var sendResult = taxService.SendInvoices(header, bodies, payments);
-
-                            foreach (var originalRow in originalInvoiceRows)
-                            {
-                                var newLogRow = (FULL_TAXDTL)originalRow.Clone();
-                                newLogRow.IDD = Functions.GetNewIDD();
-                                newLogRow.RefrenceNumber = sendResult.ReferenceNumber;
-                                newLogRow.UID = sendResult.Uid;
-                                newLogRow.CRT = DateTime.Now;
-                                newLogRow.TheStatus = "PENDING";
-                                newLogRow.ApiTypeSent = isMainApi;
-                                newLogRow.TheError = null;
-                                newLogRow.TheConfirmationReferenceId = null;
-                                newLogRow.TheSuccess = false;
-                                newLogRow.REMARKS = TruncateString($"ResendDuplicate|{windowsUser}|{DateTime.Now:yy/MM/dd HH:mm}", 49);
-
-                                InsertNewTaxDtlRecord(newLogRow);
-                            }
-                            ok++;
-                        }
-                        catch (Exception ex)
+                        if (!originalInvoiceRows.Any())
                         {
-                            fail++;
-                            CL_Generaly.DoWritePRGLOG($"Failed to resend invoice with TaxID {taxid}", ex);
+                            CL_Generaly.DoWritePRGLOG($"Skipping TaxID {taxid} as no records were found in TAXDTL.", null);
+                            failCount++;
+                            continue;
                         }
+
+                        var header = CreateHeaderFromFullTaxDtl(originalInvoiceRows.First());
+                        var bodies = CreateBodyListFromFullTaxDtl(originalInvoiceRows.ToList());
+                        var payments = new List<InvoiceModel.Payment>();
+
+                        #region Cleaning_RestoreValiding
+                        if (header is InvoiceModel.Header TheHead)
+                        {
+                            //Matter {
+                            if (TheHead?.Bpn != null) //شماره گذرنامه خریدار
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Bpn) || TheHead?.Bpn == "0")
+                                    TheHead.Bpn = null;
+                            }
+                            if (TheHead?.Scc != null) //کد گمرک محل اظهار فروشنده
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Scc) || TheHead?.Scc == "0")
+                                    TheHead.Scc = null;
+                            }
+                            //Matter }
+                            if (string.IsNullOrEmpty(TheHead?.Crn) || TheHead?.Crn == "0")
+                            {
+                                if (TheHead?.Crn != null)
+                                    TheHead.Crn = null;
+                            }
+                            if (TheHead?.Irtaxid != null)
+                            {
+                                if (string.IsNullOrWhiteSpace(TheHead?.Irtaxid))
+                                {
+                                    if (TheHead?.Inp != 7)
+                                        TheHead.Irtaxid = null;
+                                }
+                            }
+                        }
+                        foreach (var item in bodies)
+                        {
+                            if (item?.Cut != null)
+                            {
+                                if (string.IsNullOrWhiteSpace(item?.Cut))
+                                    item.Cut = null;
+                            }
+                            if (item?.Cfee == null) item.Cfee = 0;
+                            if (string.IsNullOrWhiteSpace(item?.Odt)) item.Odt = "0";
+                            if (item?.Odr == null) item.Odr = 0;
+                            if (item?.Odam == null) item.Odam = 0;
+                            if (string.IsNullOrWhiteSpace(item?.Olt)) item.Olt = "0";
+                            if (item?.Olr == null) item.Olr = 0;
+                            if (item?.Olam == null) item.Olam = 0;
+                            if (item?.Consfee == null) item.Consfee = 0;
+                            if (item?.Spro == null) item.Spro = 0;
+                            if (item?.Bros == null) item.Bros = 0;
+                            if (item?.Tcpbs == null) item.Tcpbs = 0;
+                            if (item?.Cop == null) item.Cop = 0;
+                            if (item?.Vop == null) item.Vop = 0;
+                            if (string.IsNullOrWhiteSpace(item?.Bsrn)) item.Bsrn = null;
+                            if (item?.Nw == null || item.Nw == 0) item.Nw = 0;
+                            if (item?.Ssrv == null || item.Ssrv == 0) item.Ssrv = 0;
+                            if (item?.Sscv == null || item.Sscv == 0) item.Sscv = 0;
+                        }
+                        #endregion
+
+                        #region JSON_LOG
+                        try
+                        {
+                            string directoryPath = @"C:\CORRECT\SENTS";
+                            if (!Directory.Exists(directoryPath))
+                                Directory.CreateDirectory(directoryPath);
+                            string jsonData = System.Text.Json.JsonSerializer.Serialize(new { Header = header, Bodies = bodies, Payments = payments });
+                            File.WriteAllText(Path.Combine(directoryPath, $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff}-Combined.json"), jsonData);
+                        }
+                        catch (Exception ex) { CL_Generaly.DoWritePRGLOG($"JSON log failed for TaxID {taxid}", ex); }
+                        #endregion
+
+                        // فقط HTTP call در background
+                        var sendResult = await Task.Run(() => taxService.SendInvoices(header, bodies, payments));
+
+                        foreach (var originalRow in originalInvoiceRows)
+                        {
+                            var newLogRow = (FULL_TAXDTL)originalRow.Clone();
+                            newLogRow.IDD = Functions.GetNewIDD();
+                            newLogRow.RefrenceNumber = sendResult.ReferenceNumber;
+                            newLogRow.UID = sendResult.Uid;
+                            newLogRow.CRT = DateTime.Now;
+                            newLogRow.TheStatus = "PENDING";
+                            newLogRow.ApiTypeSent = isMainApi;
+                            newLogRow.TheError = null;
+                            newLogRow.TheConfirmationReferenceId = null;
+                            newLogRow.TheSuccess = false;
+                            newLogRow.REMARKS = TruncateString($"ResendDuplicate|{windowsUser}|{DateTime.Now:yy/MM/dd HH:mm}", 49);
+                            InsertNewTaxDtlRecord(newLogRow);
+                        }
+                        successCount++;
                     }
-                    return (ok, fail);
-                }); // end Task.Run
+                    catch (Exception ex)
+                    {
+                        failCount++;
+                        CL_Generaly.DoWritePRGLOG($"Failed to resend invoice with TaxID {taxid}", ex);
+                    }
+                }
             }
             catch (Exception ex)
             {

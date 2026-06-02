@@ -76,8 +76,8 @@
                 <!-- Environment Indication (Left) -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" FlowDirection="RightToLeft" VerticalAlignment="Center">
                     <TextBlock Text="محیط متصل:" VerticalAlignment="Center" Margin="0,0,0,0" Opacity="0.6"/>
-                    <RadioButton IsChecked="False"  x:Name="RD_MAINTAX" GroupName="RD_TAXURL" Content="سامانه اصلی" Margin="16,0,0,0" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
-                    <RadioButton IsChecked="True" x:Name="RD_SANDBOX" GroupName="RD_TAXURL" Content="آزمایشی (Sandbox)" Margin="16,0,0,0" Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
+                    <RadioButton IsChecked="True"  x:Name="RD_MAINTAX" GroupName="RD_TAXURL" Content="سامانه اصلی" Margin="16,0,0,0" Checked="RD_MAINTAX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
+                    <RadioButton IsChecked="False" x:Name="RD_SANDBOX" GroupName="RD_TAXURL" Content="آزمایشی (Sandbox)" Margin="16,0,0,0" Checked="RD_SANDBOX_Checked" Focusable="False" IsHitTestVisible="False" IsTabStop="False" Style="{StaticResource ClearRadioButtonStyle}"/>
                 </StackPanel>
 
                 <!-- Title (Right) -->
