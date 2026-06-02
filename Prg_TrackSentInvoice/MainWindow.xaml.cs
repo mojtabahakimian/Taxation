@@ -1401,10 +1401,13 @@ namespace Prg_TrackSentInvoice
                     isMainApi = false;
                 }
 
+                // capture روی UI thread قبل از Task.Run (TaxURL به RadioButton دسترسی دارد)
+                string taxUrl = TaxURL;
+
                 // فقط اتصال اولیه (HTTP) در background — بقیه روی UI thread
                 var taxService = await Task.Run(() =>
                 {
-                    var svc = new TaxService(memoryId, privateKey, TaxURL);
+                    var svc = new TaxService(memoryId, privateKey, taxUrl);
                     svc.RequestToken();
                     return svc;
                 });
