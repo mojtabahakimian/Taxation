@@ -204,19 +204,17 @@ namespace Prg_Moadian.Bulk
 
                 try
                 {
-                    // MERGE WITH (HOLDLOCK) = اتمیک است — race condition بین چند thread رو رفع می‌کند
-                    // NULL صریح به‌جای DEFAULT تا به DEFAULT constraint در DB وابسته نباشیم
-                    _db.DoExecuteSQL(@$"
-                        MERGE dbo.HEAD_LST_EXTENDED WITH (HOLDLOCK) AS T
-                        USING (SELECT {number} AS N, {tag} AS G) AS S
-                            ON T.NUMBER = S.N AND T.TGU = S.G
-                        WHEN NOT MATCHED THEN
-                            INSERT (NUMBER, tgu, inty, inp, ins, sbc, Bbc, ft, bpn, scln, scc, cdcn, cdcd, crn, billid, todam, tonw, torv, tocv, setm, cap, insp, tvop, tax17, cut, irtaxid)
-                            VALUES ({number}, {tag}, {defaultInty}, 1, 1, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, {defaultSetm}, NULL, NULL, NULL, NULL, '2', NULL);");
+                    _db.DoExecuteSQL($@"
+                        INSERT INTO dbo.HEAD_LST_EXTENDED (NUMBER, TGU, inty, inp, ins, setm, todam, cut)
+                        VALUES ({number}, {tag}, {defaultInty}, 1, 1, {defaultSetm}, 0, '2');");
                 }
                 catch (Exception insertEx)
                 {
-                    Generaly.CL_Generaly.DoGetwriteAppenLog($"HEAD_LST_EXTENDED MERGE failed for invoice {number} tag {tag}: {insertEx.Message}");
+                    // PK violation = race condition (همزمان دو بار برای همین فاکتور) — رکورد قبلاً ساخته شده، مشکلی نیست
+                    // بقیه خطاها = مشکل واقعی که باید لاگ شود
+                    bool isPkViolation = insertEx.Message.Contains("PRIMARY KEY") || insertEx.Message.Contains("duplicate key") || insertEx.Message.Contains("UNIQUE");
+                    if (!isPkViolation)
+                        Generaly.CL_Generaly.DoGetwriteAppenLog($"HEAD_LST_EXTENDED INSERT failed for invoice {number} tag {tag}: {insertEx.Message}");
                 }
 
                 headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
