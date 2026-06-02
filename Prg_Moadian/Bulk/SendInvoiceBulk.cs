@@ -399,12 +399,10 @@ namespace Prg_Moadian.Bulk
                 dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
             }
 
-            //var taxId = _taxService.RequestTaxId(_memoryId, dt);
-            //var ts = TaxService.ConvertDateToLong(dt);
-            // اعمال اختلاف زمانی سرور
-            var dtAdjusted = dt.Add(TokenLifeTime.ServerClockSkew); //جلوگیری از خطای تاریخ
-            var taxId = _taxService.RequestTaxId(_memoryId, dtAdjusted);
-            var ts = TaxService.ConvertDateToLong(dtAdjusted);
+            // تاریخ فاکتور تاریخچه‌ای است و نباید اختلاف ساعت سرور به آن اعمال شود
+            // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
+            var taxId = _taxService.RequestTaxId(_memoryId, dt);
+            var ts = TaxService.ConvertDateToLong(dt);
 
             // 1. دریافت شماره فاکتور (مثلاً 10391)
             long invoiceNum = long.Parse(number.ToString());

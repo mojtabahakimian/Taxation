@@ -31,14 +31,15 @@ namespace Prg_Moadian.Service
                 ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
 
                 var serverTimeMs = serverInformation.ServerTime;
-                var localTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                // اگر SDK زمان قدیمی کش‌شده برگرداند (اختلاف > ۵ ساعت)، از ساعت محلی استفاده می‌کنیم
-                if (Math.Abs(serverTimeMs - localTimeMs) > (long)TimeSpan.FromHours(5).TotalMilliseconds)
-                    serverTimeMs = localTimeMs;
 
-                TimeSync.SyncWithServer(serverTimeMs);
-                TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
-                TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
+                if (serverTimeMs > 0)
+                {
+                    TimeSync.SyncWithServer(serverTimeMs);
+
+                    TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds((long)serverTimeMs).UtcDateTime;
+                    TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
+                }
+
             }
         }
 
