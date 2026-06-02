@@ -1,9 +1,4 @@
 ﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaxCollectData.Library.Business;
 using TaxCollectData.Library.Dto.Config;
 using TaxCollectData.Library.Dto.Content;
@@ -12,10 +7,7 @@ using TaxCollectData.Library.Dto.Transfer;
 using TaxCollectData.Library.Dto;
 using TaxCollectData.Library.Enums;
 using Prg_Moadian.CNNMANAGER;
-using Prg_Moadian.Generaly;
 using static Prg_Moadian.Generaly.CL_Generaly;
-using Newtonsoft.Json.Linq;
-using Prg_Moadian.FUNCTIONS;
 
 namespace Prg_Moadian.Service
 {
@@ -31,15 +23,21 @@ namespace Prg_Moadian.Service
                 ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
 
                 var serverTimeMs = serverInformation.ServerTime;
-
+                // SDK هیچ caching‌ای ندارد — هر بار HTTP call می‌زند، پس ServerTime همیشه معتبر است.
+                // این زمان برای جبران ساعت اشتباه سیستم‌های مشتری استفاده می‌شود (فقط برای عملیات
+                // real-time مثل اصلاحی/ابطالی — نه برای تاریخ تاریخچه‌ای فاکتور که از DATE_N می‌آید).
                 if (serverTimeMs > 0)
                 {
-                    TimeSync.SyncWithServer(serverTimeMs);
-
-                    TokenLifeTime.ServerUtcTime = DateTimeOffset.FromUnixTimeMilliseconds((long)serverTimeMs).UtcDateTime;
-                    TokenLifeTime.ServerClockSkew = TokenLifeTime.ServerUtcTime - DateTime.UtcNow;
+                    var serverUtc = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime; //ساعت مودیان
+                    var skew = serverUtc - DateTime.UtcNow; //ساعت داخلی خود کاربر
+                    // اگر اختلاف بیشتر از 12 ساعت بود، پاسخ سرور ناهنجار است — sync انجام نمی‌شود
+                    if (Math.Abs(skew.TotalHours) < 12)
+                    {
+                        TimeSync.SyncWithServer(serverTimeMs);
+                        TokenLifeTime.ServerUtcTime = serverUtc;
+                        TokenLifeTime.ServerClockSkew = skew;
+                    }
                 }
-
             }
         }
 

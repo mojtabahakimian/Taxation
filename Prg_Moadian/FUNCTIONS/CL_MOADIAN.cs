@@ -318,7 +318,7 @@ namespace Prg_Moadian.FUNCTIONS
                     var rDate = dbms.DoGetDataSQL<string>($"SELECT DATE_N FROM dbo.HEAD_LST_FBK WHERE NUMBER1 = {NUMBER}").FirstOrDefault();
                     DtNowBase = TheFunctions.GetGregorianDateTime(rDate);
 
-                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase); //1. //تولید شماره منحصربه فرد مالیاتی طبق تاریخ الان
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase); //2.
                     break;
 
@@ -329,14 +329,14 @@ namespace Prg_Moadian.FUNCTIONS
                     var serverUtcNow = DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
                     DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
 
-                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase); //تولید شماره منحصربه فرد مالیاتی طبق تاریخ الان
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 default:
                     DtNowBase = TheFunctions.GetGregorianDateTime(L_DRV_TBL_US.First().DATE_N.ToString());
 
-                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase); //تولید شماره منحصربه فرد مالیاتی طبق تاریخ الان
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
             }

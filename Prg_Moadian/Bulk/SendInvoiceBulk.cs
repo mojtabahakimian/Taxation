@@ -401,14 +401,15 @@ namespace Prg_Moadian.Bulk
 
             // تاریخ فاکتور تاریخچه‌ای است و نباید اختلاف ساعت سرور به آن اعمال شود
             // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
-            var taxId = _taxService.RequestTaxId(_memoryId, dt);
             var ts = TaxService.ConvertDateToLong(dt);
 
             // 1. دریافت شماره فاکتور (مثلاً 10391)
             long invoiceNum = long.Parse(number.ToString());
-            // 2. تولید سریال ۱۰ رقمی استاندارد
-            // فرض: _sazman.YEA "1404" است
+            // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
+            // 3. serial TaxId = همان عدد Inno → رفع هشدار 1300501 (عدم تطابق serial)
+            // سریال‌های قدیمی رندوم ≤ 999,999,999 بودند؛ serial جدید ≥ 1,404,000,000 → بدون تداخل
+            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto
