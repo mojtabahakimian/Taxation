@@ -68,38 +68,56 @@ namespace Prg_Grpsend
         private void Command3_Click(object sender, RoutedEventArgs e)
         {
             dbms.DoExecuteSQL("UPDATE dbo.SAZMAN SET SERVERNAM = '" + this.SERVERNAM.Text + "'");
+
             var RST = dbms.DoGetDataSQL<int?>("SELECT COUNT(N_S) AS CN_S FROM DEED_HED").FirstOrDefault();
-            //var RST = dbms.DoGetDataSQL<long?>("SELECT COUNT(N_S) AS CN_S FROM DEED_HED WITH (INDEX ([N_SI]))").FirstOrDefault(); ////this is faster
+
             if (RST > 31)
             {
-                AxTINYLib.AxTiny axTiny1 = new AxTINYLib.AxTiny();
-                axTiny1.CreateControl();
-                axTiny1.ServerIP = SERVERNAM.Text;
-                axTiny1.Enabled = true;
-                axTiny1.Initialize = true;
+                // چک اتصال اولیه — بدون Initialize
+                TINYLib.Tiny initTiny = new TINYLib.Tiny();
+                initTiny.ServerIP = SERVERNAM.Text;
+                initTiny.NetWorkINIT = true;
+                // ← بدون Initialize
 
-                if (axTiny1.TinyErrCode != 0)
+                if ((int)initTiny.TinyErrCode != 0)
                 {
-                    Msgwin msgwin = new Msgwin(false, Lockwatch.LockReasonError(axTiny1.TinyErrCode.ToString())); msgwin.ShowDialog();
+                    new Msgwin(false, Lockwatch.LockReasonError(((int)initTiny.TinyErrCode).ToString())).ShowDialog();
                     Close();
+                    return;
                 }
-                else
+
+                // تطبیق کلید — هر بار instance جدید، UserPassWord قبل از ShowTinyInfo
+                bool matched = false;
+                foreach (var password in Lockwatch.TheKeys)
                 {
-                    foreach (var password in Lockwatch.TheKeys)
-                    {
-                        if (Lockwatch.TryMatchValidLock(axTiny1, password))
-                            break;
-                    }
+                    TINYLib.Tiny tiny = new TINYLib.Tiny();
+                    tiny.ServerIP = SERVERNAM.Text;
+                    tiny.NetWorkINIT = true;
+                    tiny.UserPassWord = password;
+                    tiny.ShowTinyInfo = true;
+                    // ← بدون Initialize
 
-                    if (axTiny1.TinyErrCode != 0)
-                    {
-                        Msgwin msgwin = new Msgwin(false, Lockwatch.LockReasonError(axTiny1.TinyErrCode.ToString())); msgwin.ShowDialog();
-                        Close();
-                        Application.Current.Shutdown();
-                    }
+                    int err = (int)tiny.TinyErrCode;
+                    string data = tiny.DataPartition as string ?? "";
+                    bool dataValid = !string.IsNullOrEmpty(data)
+                                     && data.Replace("0", "").Trim().Length > 0;
 
+                    if (err == 0 && dataValid)
+                    {
+                        Baseknow.tindata = data;
+                        matched = true;
+                        break;
+                    }
+                }
+
+                if (!matched)
+                {
+                    new Msgwin(false, Lockwatch.LockReasonError("2")).ShowDialog();
+                    Close();
+                    return;
                 }
             }
+
             this.Close();
             Application.Current.Shutdown();
         }
