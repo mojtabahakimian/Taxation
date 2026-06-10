@@ -663,6 +663,8 @@ namespace Prg_Grpsend
             string dateStatus = (CHK_CUSTOM_DATE?.IsChecked ?? false) ? $"تاریخ جدید سفارشی ({TXT_CUSTOM_DATE.Text.Trim()})" : "بدون تغییر (همان تاریخ فاکتور)";
             string invType = string.IsNullOrWhiteSpace(CMB_Inty.Text) ? "خواندن از اطلاعات خود فاکتور" : CMB_Inty.Text;
             string setType = string.IsNullOrWhiteSpace(CMB_Setm.Text) ? "خواندن از اطلاعات خود فاکتور" : CMB_Setm.Text;
+            bool sendOptionalItemName = CHK_SEND_OPTIONAL_ITEM_NAME.IsChecked ?? true;
+            string optionalItemNameStatus = sendOptionalItemName ? "ارسال شود" : "ارسال نشود";
 
             // -- ساخت پیام دیالوگ تأیید
             string confirmMsg = $"لطفاً اطلاعات ارسال را پیش از تأیید نهایی به دقت بررسی کنید:\n\n" +
@@ -671,7 +673,8 @@ namespace Prg_Grpsend
                                 $"🎯 نحوه انتخاب: {selectMode}\n" +
                                 $"📅 مبنای تاریخ: {dateStatus}\n" +
                                 $"🏷️ نوع صورت‌حساب: {invType}\n" +
-                                $"💳 روش تسویه: {setType}\n\n" +
+                                $"💳 روش تسویه: {setType}\n" +
+                                $"🏷️ نام اختیاری کالا/خدمت: {optionalItemNameStatus}\n\n" +
                                 $"آیا از ارسال این فاکتورها به سامانه مودیان اطمینان کامل دارید؟";
 
             if (!(new Msgwin(true, confirmMsg, YesBtnText: "تأیید و ارسال", NoBtnText: "انصراف").ShowDialog() ?? false))
@@ -722,7 +725,7 @@ namespace Prg_Grpsend
                                  selected, 2,
                                  inty,
                                  setm,
-                                 pr, IsCustomDate, CustomDateValue);
+                                 pr, IsCustomDate, CustomDateValue, sendOptionalItemName);
                 });
 
                 //-------------------------------------------------
