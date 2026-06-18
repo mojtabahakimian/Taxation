@@ -371,7 +371,7 @@ namespace Prg_Moadian.FUNCTIONS
             int persianDay = int.Parse(persianDate.Substring(6, 2));
 
             PersianCalendar? persianCalendar = new PersianCalendar();
-            DateTime dateTime = persianCalendar.ToDateTime(persianYear, persianMonth, persianDay, 0, 0, 0, 0);
+            DateTime dateTime = persianCalendar.ToDateTime(persianYear, persianMonth, persianDay, 12, 0, 0, 0);
             //var now = new DateTimeOffset(TheFunctions.GetGregorianDateTime("14020224")).ToUnixTimeMilliseconds();
             return dateTime;
         }
@@ -382,7 +382,7 @@ namespace Prg_Moadian.FUNCTIONS
             var day = int.Parse(persianDate.Substring(6, 2));
 
             var persianCalendar = new PersianCalendar();
-            var gregorianDate = persianCalendar.ToDateTime(year, month, day, 0, 0, 0, 0);
+            var gregorianDate = persianCalendar.ToDateTime(year, month, day, 12, 0, 0, 0);
 
             return new DateTimeOffset(gregorianDate, TimeSpan.Zero);
         }
