@@ -793,7 +793,9 @@ VALUES
                 var nowUtcOffset = DateTimeOffset.UtcNow.Add(TimeSync.TimeOffset);
                 var now = TimeZoneInfo.ConvertTimeFromUtc(nowUtcOffset.UtcDateTime, iranTZ);
 
-                var taxidNew = taxService.RequestTaxId(_memoryId, now);
+                // سریال Taxid باید دقیقاً برابر long.Parse(Inno) باشد وگرنه مودیان خطای 0300101 می‌دهد
+                var innoSerial = long.Parse(TAXDTL_DATA.First().Inno);
+                var taxidNew = taxService.RequestTaxIdWithSpecificSerial(_memoryId, now, innoSerial);
 
                 long indatim = nowUtcOffset.ToUnixTimeMilliseconds();
                 long indatim2 = indatim;
