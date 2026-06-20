@@ -61,12 +61,9 @@ namespace Prg_Moadian.Service
 
         public static long ConvertDateToLong(DateTime dateTime)
         {
-            ////شاید بعدا , صرفا اینجا باشه
-            ////// حذف ثانیه و میلی‌ثانیه 
-            ////dateTime = dateTime.AddTicks(-(dateTime.Ticks % TimeSpan.TicksPerMinute));
-            ////return new DateTimeOffset(dateTime).ToUnixTimeMilliseconds();
-
-            return new DateTimeOffset(dateTime).ToUnixTimeMilliseconds();
+            // تمام callerها یک DateTime با Kind=Unspecified به‌معنای ساعت ایران پاس می‌دهند.
+            // offset را صریحاً +03:30 می‌گذاریم تا روی سرورهای غیر ایران (مثل Docker/UTC) هم درست کار کند.
+            return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified), new TimeSpan(3, 30, 0)).ToUnixTimeMilliseconds();
         }
 
         public TaxModel.SendInvoicesModel SendInvoices(TaxModel.InvoiceModel.Header header, List<TaxModel.InvoiceModel.Body> body, List<TaxModel.InvoiceModel.Payment> payment)
