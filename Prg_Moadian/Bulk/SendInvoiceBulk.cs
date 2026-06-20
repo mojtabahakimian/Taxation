@@ -402,9 +402,14 @@ namespace Prg_Moadian.Bulk
             long invoiceNum = long.Parse(number.ToString());
             // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
-            // 3. serial TaxId = همان عدد Inno → رفع هشدار 1300501 (عدم تطابق serial)
-            // سریال‌های قدیمی رندوم ≤ 999,999,999 بودند؛ serial جدید ≥ 1,404,000,000 → بدون تداخل
-            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
+            // 3. تولید TaxId
+            // سامانه/SDK شناسه مالیاتی را با سریال داخلی حداکثر ۹ رقمی می‌سازد.
+            // Inno ده‌رقمی مثل 1405002736 اگر به عنوان serial به TaxIdGenerator داده شود،
+            // TaxId نامعتبر تولید می‌شود و سامانه خطای 0300101
+            // «شماره مالیاتی صورتحساب با اطلاعات سامانه منطبق نیست» برمی‌گرداند.
+            // بنابراین مثل نسخه‌های موفق قبلی TaxId را با serial داخلی مجاز تولید می‌کنیم
+            // و Inno استاندارد ده‌رقمی را جداگانه در هدر می‌فرستیم.
+            var taxId = _taxService.RequestTaxId(_memoryId, dt);
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto
