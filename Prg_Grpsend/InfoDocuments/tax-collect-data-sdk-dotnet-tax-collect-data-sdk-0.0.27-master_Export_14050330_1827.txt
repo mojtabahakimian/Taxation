@@ -1,0 +1,3462 @@
+﻿# Project Export — AI Context
+# Files    : 89
+# Size     : 90.2 KB
+# Generated: 1405-03-30 18:27:38
+# Mode     : Normal
+
+## Project Overview
+
+- **TaxCollectData.Library** `TaxCollectData.Library/TaxCollectData.Library.csproj`
+  - SDK: `Microsoft.NET.Sdk`  |  Target: `netstandard2.0`
+- **TaxCollectData.Sample** `TaxCollectData.Sample/TaxCollectData.Sample.csproj`
+  - SDK: `Microsoft.NET.Sdk`  |  Target: `net7.0`
+- **TaxCollectData.Test** `TaxCollectData.Test/TaxCollectData.Test.csproj`
+  - SDK: `Microsoft.NET.Sdk`  |  Target: `net6.0`
+
+## Project Structure
+
+```
+Tax-Collect-Data-SDK-master/
+├── Tax Collect Data SDK.sln
+├── TaxCollectData.Library/
+│   ├── Abstraction/
+│   │   ├── Clients/
+│   │   │   ├── IClient.cs
+│   │   │   ├── ILowLevelTaxApi.cs
+│   │   │   ├── ITaxApi.cs
+│   │   │   └── ITaxPublicApi.cs
+│   │   ├── Cryptography/
+│   │   │   ├── IEncryptor.cs
+│   │   │   └── ISignatory.cs
+│   │   ├── Providers/
+│   │   │   ├── ICurrentDateProvider.cs
+│   │   │   ├── IErrorDetectionAlgorithm.cs
+│   │   │   ├── IPacketProvider.cs
+│   │   │   ├── IRequestProvider.cs
+│   │   │   ├── ISerializer.cs
+│   │   │   └── ITaxIdProvider.cs
+│   │   └── Repositories/
+│   │       └── IEncryptionKeyRepository.cs
+│   ├── Algorithms/
+│   │   └── VerhoeffAlgorithm.cs
+│   ├── Clients/
+│   │   ├── LowLevelTaxApi.cs
+│   │   ├── RestSharpHttpClient.cs
+│   │   ├── TaxApi.cs
+│   │   └── TaxPublicApi.cs
+│   ├── Configs/
+│   │   ├── IsExternalInit.cs
+│   │   └── JsonSerializerConfig.cs
+│   ├── Constants/
+│   │   └── PacketTypeConstants.cs
+│   ├── Cryptography/
+│   │   ├── EmptySignatory.cs
+│   │   ├── JweEncryptor.cs
+│   │   ├── JwsHardwareTokenSignatory.cs
+│   │   └── JwsSignatory.cs
+│   ├── Dto/
+│   │   ├── BodyItemDto.cs
+│   │   ├── ExtensionItemDto.cs
+│   │   ├── HeaderDto.cs
+│   │   ├── InquiryByReferenceNumberDto.cs
+│   │   ├── InquiryByTimeRangeDto.cs
+│   │   ├── InquiryByUidDto.cs
+│   │   ├── InvoiceDto.cs
+│   │   ├── PacketDto.cs
+│   │   ├── PacketHeaderDto.cs
+│   │   ├── Pageable.cs
+│   │   └── PaymentItemDto.cs
+│   ├── Enums/
+│   │   └── RequestStatus.cs
+│   ├── Exceptions/
+│   │   ├── NotInitializedException.cs
+│   │   ├── PacketTypeNotFoundException.cs
+│   │   └── TaxApiException.cs
+│   ├── Factories/
+│   │   ├── EncryptorFactory.cs
+│   │   ├── PacketProviderFactory.cs
+│   │   ├── Pkcs11SignatoryFactory.cs
+│   │   ├── Pkcs8SignatoryFactory.cs
+│   │   ├── PrivateKeyFactory.cs
+│   │   ├── SignatoryFactory.cs
+│   │   ├── TaxApiFactory.cs
+│   │   ├── TaxIdProviderFactory.cs
+│   │   └── X509CertificateFactory.cs
+│   ├── Middlewares/
+│   │   ├── EmptyMiddleware.cs
+│   │   ├── EncryptionMiddleware.cs
+│   │   ├── Middleware.cs
+│   │   └── SignatoryMiddleware.cs
+│   ├── Models/
+│   │   ├── BatchResponseModel.cs
+│   │   ├── FiscalFullInformationModel.cs
+│   │   ├── InquiryResultModel.cs
+│   │   ├── InvoiceErrorModel.cs
+│   │   ├── InvoicePacket.cs
+│   │   ├── InvoiceResponseModel.cs
+│   │   ├── InvoiceValidationResponseModel.cs
+│   │   ├── KeyModel.cs
+│   │   ├── NonceEntity.cs
+│   │   ├── ResponseModel.cs
+│   │   ├── ResponsePacketModel.cs
+│   │   ├── ServerInformationModel.cs
+│   │   ├── TaxpayerModel.cs
+│   │   └── TokenModel.cs
+│   ├── Providers/
+│   │   ├── AbstractPacketProvider.cs
+│   │   ├── CurrentDateProvider.cs
+│   │   ├── PacketProvider.cs
+│   │   ├── RequestProvider.cs
+│   │   ├── Serializer.cs
+│   │   └── TaxIdProvider.cs
+│   ├── Repositories/
+│   │   └── EncryptionKeyRepository.cs
+│   └── TaxCollectData.Library.csproj
+├── TaxCollectData.Sample/
+│   ├── DocumentSample.cs
+│   ├── Program.cs
+│   ├── SampleExportInvoiceCreator.cs
+│   ├── SampleInvoiceCreator.cs
+│   ├── SampleTest.cs
+│   ├── SampleTestWithArbitraryUid.cs
+│   ├── TaxApiWithPkcs11SignatureSample.cs
+│   ├── TaxApiWithPkcs8SignatureSample.cs
+│   ├── TaxClient.cs
+│   └── TaxCollectData.Sample.csproj
+└── TaxCollectData.Test/
+    ├── JweEncryptionTests.cs
+    ├── TaxCollectData.Test.csproj
+    └── VerhoffProviderTests.cs
+```
+
+## File Types
+
+| Extension | Count |
+|-----------|-------|
+| `.cs` | 85 |
+| `.csproj` | 3 |
+| `.sln` | 1 |
+
+## File Dependencies
+
+### `TaxCollectData.Library/Algorithms/VerhoeffAlgorithm.cs`
+- **Inherits**: `IErrorDetectionAlgorithm`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+
+### `TaxCollectData.Library/Clients/LowLevelTaxApi.cs`
+- **Inherits**: `ILowLevelTaxApi`
+- Uses: `TaxCollectData.Library.Abstraction.Clients`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Dto`
+- Uses: `TaxCollectData.Library.Models`
+
+### `TaxCollectData.Library/Clients/RestSharpHttpClient.cs`
+- **Inherits**: `IClient`
+- Uses: `TaxCollectData.Library.Abstraction.Clients`
+- Uses: `TaxCollectData.Library.Abstraction.Cryptography`
+- Uses: `TaxCollectData.Library.Abstraction.Properties`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Configs`
+- Uses: `TaxCollectData.Library.Models`
+- Uses: `TaxCollectData.Library.Properties`
+
+### `TaxCollectData.Library/Clients/TaxApi.cs`
+- **Inherits**: `ITaxApi`
+- Uses: `TaxCollectData.Library.Abstraction.Clients`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Dto`
+- Uses: `TaxCollectData.Library.Models`
+
+### `TaxCollectData.Library/Clients/TaxPublicApi.cs`
+- **Inherits**: `ITaxPublicApi`
+- Uses: `TaxCollectData.Library.Abstraction.Clients`
+- Uses: `TaxCollectData.Library.Models`
+
+### `TaxCollectData.Library/Cryptography/EmptySignatory.cs`
+- **Inherits**: `ISignatory`
+- Uses: `TaxCollectData.Library.Abstraction.Cryptography`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+
+### `TaxCollectData.Library/Cryptography/JweEncryptor.cs`
+- **Inherits**: `IEncryptor`
+- Uses: `Jose`
+- Uses: `TaxCollectData.Library.Abstraction.Cryptography`
+- Uses: `TaxCollectData.Library.Abstraction.Repositories`
+
+### `TaxCollectData.Library/Cryptography/JwsHardwareTokenSignatory.cs`
+- **Inherits**: `ISignatory`
+- **Inherits**: `IPinProvider`
+- Uses: `JWT.Algorithms`
+- Uses: `JWT.Builder`
+- Uses: `Net.Pkcs11Interop.X509Store`
+- Uses: `TaxCollectData.Library.Abstraction.Cryptography`
+- Uses: `TaxCollectData.Library.Providers`
+
+### `TaxCollectData.Library/Cryptography/JwsSignatory.cs`
+- **Inherits**: `ISignatory`
+- **Inherits**: `IJsonSerializer`
+- Uses: `JWT`
+- Uses: `JWT.Algorithms`
+- Uses: `JWT.Builder`
+- Uses: `Org.BouncyCastle.Crypto.Parameters`
+- Uses: `Org.BouncyCastle.Security`
+- Uses: `TaxCollectData.Library.Abstraction.Cryptography`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Configs`
+
+### `TaxCollectData.Library/Exceptions/NotInitializedException.cs`
+- **Inherits**: `Exception`
+
+### `TaxCollectData.Library/Exceptions/PacketTypeNotFoundException.cs`
+- **Inherits**: `Exception`
+
+### `TaxCollectData.Library/Exceptions/TaxApiException.cs`
+- **Inherits**: `Exception`
+
+### `TaxCollectData.Library/Middlewares/EmptyMiddleware.cs`
+- **Inherits**: `Middleware`
+
+### `TaxCollectData.Library/Middlewares/EncryptionMiddleware.cs`
+- **Inherits**: `Middleware`
+- Uses: `TaxCollectData.Library.Abstraction.Cryptography`
+- Uses: `TaxCollectData.Library.Cryptography`
+
+### `TaxCollectData.Library/Middlewares/SignatoryMiddleware.cs`
+- **Inherits**: `Middleware`
+- Uses: `TaxCollectData.Library.Abstraction.Cryptography`
+
+### `TaxCollectData.Library/Providers/CurrentDateProvider.cs`
+- **Inherits**: `ICurrentDateProvider`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+
+### `TaxCollectData.Library/Providers/PacketProvider.cs`
+- **Inherits**: `AbstractPacketProvider`
+- **Inherits**: `IPacketProvider`
+- Uses: `TaxCollectData.Library.Abstraction.Cryptography`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Dto`
+- Uses: `TaxCollectData.Library.Middlewares`
+- Uses: `TaxCollectData.Library.Properties`
+
+### `TaxCollectData.Library/Providers/RequestProvider.cs`
+- **Inherits**: `IRequestProvider`
+- Uses: `TaxCollectData.Library.Abstraction.Properties`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Constants`
+- Uses: `TaxCollectData.Library.Dto`
+
+### `TaxCollectData.Library/Providers/Serializer.cs`
+- **Inherits**: `ISerializer`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Configs`
+
+### `TaxCollectData.Library/Providers/TaxIdProvider.cs`
+- **Inherits**: `ITaxIdProvider`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Algorithms`
+
+### `TaxCollectData.Library/Repositories/EncryptionKeyRepository.cs`
+- **Inherits**: `IEncryptionKeyRepository`
+- Uses: `Org.BouncyCastle.Crypto.Parameters`
+- Uses: `Org.BouncyCastle.Security`
+- Uses: `Org.BouncyCastle.Utilities.Encoders`
+- Uses: `TaxCollectData.Library.Abstraction.Providers`
+- Uses: `TaxCollectData.Library.Abstraction.Repositories`
+- Uses: `TaxCollectData.Library.Models`
+
+## File Contents
+
+### File: `Tax Collect Data SDK.sln`
+```text
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32014.148
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxCollectData.Library", "TaxCollectData.Library\TaxCollectData.Library.csproj", "{0ECC049F-7517-4CCF-B2FB-BC92511FA4A2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxCollectData.Sample", "TaxCollectData.Sample\TaxCollectData.Sample.csproj", "{FB1CD192-5B48-4ACE-A892-AA3544D054BD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxCollectData.Test", "TaxCollectData.Test\TaxCollectData.Test.csproj", "{5F334568-8C1D-4376-88F3-727B13B81BDF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0ECC049F-7517-4CCF-B2FB-BC92511FA4A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0ECC049F-7517-4CCF-B2FB-BC92511FA4A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0ECC049F-7517-4CCF-B2FB-BC92511FA4A2}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+		{0ECC049F-7517-4CCF-B2FB-BC92511FA4A2}.Debug|Any CPU.Build.0 = Release|Any CPU
+		{FB1CD192-5B48-4ACE-A892-AA3544D054BD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB1CD192-5B48-4ACE-A892-AA3544D054BD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB1CD192-5B48-4ACE-A892-AA3544D054BD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB1CD192-5B48-4ACE-A892-AA3544D054BD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F334568-8C1D-4376-88F3-727B13B81BDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F334568-8C1D-4376-88F3-727B13B81BDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F334568-8C1D-4376-88F3-727B13B81BDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F334568-8C1D-4376-88F3-727B13B81BDF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1E1ADAD4-CA48-430C-8F60-C94AC3904BDC}
+	EndGlobalSection
+EndGlobal
+```
+
+### File: `TaxCollectData.Library/Abstraction/Clients/IClient.cs`
+```csharp
+namespace TaxCollectData.Library.Abstraction.Clients;
+
+public interface IClient
+{
+    Task<T> SendRequestAsync<T>(HttpRequestMessage request, HttpRequestMessage nonceRequest);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Clients/ILowLevelTaxApi.cs`
+```csharp
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Models;
+
+namespace TaxCollectData.Library.Abstraction.Clients;
+
+public interface ILowLevelTaxApi
+{
+    ServerInformationModel GetServerInformation();
+    Task<ServerInformationModel> GetServerInformationAsync();
+    BatchResponseModel SendInvoices(List<PacketDto> packets);
+    Task<BatchResponseModel> SendInvoicesAsync(List<PacketDto> packets);
+    FiscalFullInformationModel GetFiscalInformation(string memoryId);
+    Task<FiscalFullInformationModel> GetFiscalInformationAsync(string memoryId);
+    TaxpayerModel GetTaxpayer(string economicCode);
+    Task<TaxpayerModel> GetTaxpayerAsync(string economicCode);
+    List<InquiryResultModel> InquiryByTime(InquiryByTimeRangeDto dto);
+    Task<List<InquiryResultModel>> InquiryByTimeAsync(InquiryByTimeRangeDto dto);
+    List<InquiryResultModel> InquiryByUid(InquiryByUidDto dto);
+    Task<List<InquiryResultModel>> InquiryByUidAsync(InquiryByUidDto dto);
+    List<InquiryResultModel> InquiryByReferenceId(InquiryByReferenceNumberDto dto);
+    Task<List<InquiryResultModel>> InquiryByReferenceIdAsync(InquiryByReferenceNumberDto dto);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Clients/ITaxApi.cs`
+```csharp
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Models;
+
+namespace TaxCollectData.Library.Abstraction.Clients;
+
+public interface ITaxApi
+{
+    FiscalFullInformationModel GetFiscalInformation(string memoryId);
+    Task<FiscalFullInformationModel> GetFiscalInformationAsync(string memoryId);
+    TaxpayerModel GetTaxpayer(string economicCode);
+    Task<TaxpayerModel> GetTaxpayerAsync(string economicCode);
+    List<InvoiceResponseModel> SendInvoices(List<InvoiceDto> invoices);
+    Task<List<InvoiceResponseModel>> SendInvoicesAsync(List<InvoiceDto> invoices);
+    List<InquiryResultModel> InquiryByTime(InquiryByTimeRangeDto dto);
+    Task<List<InquiryResultModel>> InquiryByTimeAsync(InquiryByTimeRangeDto dto);
+    List<InquiryResultModel> InquiryByUid(InquiryByUidDto dto);
+    Task<List<InquiryResultModel>> InquiryByUidAsync(InquiryByUidDto dto);
+    List<InquiryResultModel> InquiryByReferenceId(InquiryByReferenceNumberDto dto);
+    Task<List<InquiryResultModel>> InquiryByReferenceIdAsync(InquiryByReferenceNumberDto dto);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Clients/ITaxPublicApi.cs`
+```csharp
+using TaxCollectData.Library.Models;
+
+namespace TaxCollectData.Library.Abstraction.Clients;
+
+public interface ITaxPublicApi
+{
+    ServerInformationModel GetServerInformation();
+    Task<ServerInformationModel> GetServerInformationAsync();
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Cryptography/IEncryptor.cs`
+```csharp
+namespace TaxCollectData.Library.Abstraction.Cryptography;
+
+public interface IEncryptor
+{
+    string Encrypt(string text);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Cryptography/ISignatory.cs`
+```csharp
+namespace TaxCollectData.Library.Abstraction.Cryptography;
+
+public interface ISignatory
+{
+    string Sign(string text);
+    string Sign(object data);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Providers/ICurrentDateProvider.cs`
+```csharp
+namespace TaxCollectData.Library.Abstraction.Providers;
+
+public interface ICurrentDateProvider
+{
+    long ToEpochMilli();
+
+    string ToDateFormat();
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Providers/IErrorDetectionAlgorithm.cs`
+```csharp
+namespace TaxCollectData.Library.Abstraction.Providers;
+
+public interface IErrorDetectionAlgorithm
+{
+    string GenerateCheckDigit(string num);
+
+    bool ValidateCheckDigit(string num);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Providers/IPacketProvider.cs`
+```csharp
+using TaxCollectData.Library.Dto;
+
+namespace TaxCollectData.Library.Abstraction.Providers;
+
+public interface IPacketProvider
+{
+    PacketDto CreateInvoicePacket(InvoiceDto invoice);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Providers/IRequestProvider.cs`
+```csharp
+using TaxCollectData.Library.Dto;
+
+namespace TaxCollectData.Library.Abstraction.Providers;
+
+public interface IRequestProvider
+{
+    HttpRequestMessage GetNonceRequest();
+
+    HttpRequestMessage GetServerInformation();
+
+    HttpRequestMessage GetInquiryByTimeRequest(InquiryByTimeRangeDto dto);
+
+    HttpRequestMessage GetInquiryByUidRequest(InquiryByUidDto dto);
+
+    HttpRequestMessage GetInquiryByReferenceIdRequest(InquiryByReferenceNumberDto dto);
+
+    HttpRequestMessage GetInvoicesRequest(List<PacketDto> data);
+
+    HttpRequestMessage GetTaxpayerRequest(string economicCode);
+
+    HttpRequestMessage GetFiscalInformationRequest(string memoryId);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Providers/ISerializer.cs`
+```csharp
+namespace TaxCollectData.Library.Abstraction.Providers;
+
+public interface ISerializer
+{
+    string Serialize(object dto);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Providers/ITaxIdProvider.cs`
+```csharp
+namespace TaxCollectData.Library.Abstraction.Providers;
+
+public interface ITaxIdProvider
+{
+    string GenerateTaxId(string memoryId, long serial, DateTime createDate);
+}
+```
+
+### File: `TaxCollectData.Library/Abstraction/Repositories/IEncryptionKeyRepository.cs`
+```csharp
+using System.Security.Cryptography;
+
+namespace TaxCollectData.Library.Abstraction.Repositories;
+
+public interface IEncryptionKeyRepository
+{
+    RSA GetKey();
+    string GetKeyId();
+}
+```
+
+### File: `TaxCollectData.Library/Algorithms/VerhoeffAlgorithm.cs`
+```csharp
+
+using TaxCollectData.Library.Abstraction.Providers;
+
+namespace TaxCollectData.Library.Algorithms;
+
+public class VerhoeffAlgorithm : IErrorDetectionAlgorithm {
+    
+    private readonly int[,] _multiplicationTable = {
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+        {1, 2, 3, 4, 0, 6, 7, 8, 9, 5},
+        {2, 3, 4, 0, 1, 7, 8, 9, 5, 6},
+        {3, 4, 0, 1, 2, 8, 9, 5, 6, 7},
+        {4, 0, 1, 2, 3, 9, 5, 6, 7, 8},
+        {5, 9, 8, 7, 6, 0, 4, 3, 2, 1},
+        {6, 5, 9, 8, 7, 1, 0, 4, 3, 2},
+        {7, 6, 5, 9, 8, 2, 1, 0, 4, 3},
+        {8, 7, 6, 5, 9, 3, 2, 1, 0, 4},
+        {9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
+    };
+
+    // The permutation table
+    private readonly int[,] _permutationTable = {
+        {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+        {1, 5, 7, 6, 2, 8, 3, 0, 9, 4},
+        {5, 8, 0, 3, 7, 9, 6, 1, 4, 2},
+        {8, 9, 1, 6, 0, 4, 3, 5, 2, 7},
+        {9, 4, 5, 3, 1, 2, 6, 8, 7, 0},
+        {4, 2, 8, 6, 5, 7, 3, 9, 0, 1},
+        {2, 7, 9, 3, 8, 0, 6, 4, 1, 5},
+        {7, 0, 4, 6, 9, 1, 3, 2, 5, 8}
+    };
+
+    // The inverse table
+    private readonly int[] _inverseTable = { 0, 4, 3, 2, 1, 5, 6, 7, 8, 9 };
+
+    public string GenerateCheckDigit(string num) {
+        var c = 0;
+        var myArray = StringToReversedIntArray(num);
+
+        for (var i = 0; i < myArray.Length; i++) {
+            c = _multiplicationTable[c, _permutationTable[((i + 1) % 8), myArray[i]]];
+        }
+
+        return _inverseTable[c].ToString();
+    }
+
+    public bool ValidateCheckDigit(string num) {
+        var c = 0;
+        var myArray = StringToReversedIntArray(num);
+
+        for (var i = 0; i < myArray.Length; i++) {
+            c = _multiplicationTable[c, _permutationTable[(i % 8), myArray[i]]];
+        }
+
+        return (c == 0);
+    }
+
+    private static int[] StringToReversedIntArray(string num)
+    {
+        var myArray = new int[num.Length];
+
+        for (var i = 0; i < num.Length; i++)
+        {
+            myArray[i] = int.Parse(num.Substring(i, 1));
+        }
+
+        Array.Reverse(myArray);
+
+        return myArray;
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Clients/LowLevelTaxApi.cs`
+```csharp
+using Microsoft.VisualStudio.Threading;
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Models;
+using TaxCollectData.Library.Abstraction.Providers;
+
+namespace TaxCollectData.Library.Clients;
+
+public class LowLevelTaxApi : ILowLevelTaxApi
+{
+    private readonly IClient _client;
+    private readonly IRequestProvider _requestProvider;
+
+    public LowLevelTaxApi(IClient client, IRequestProvider requestProvider)
+    {
+        _client = client;
+        _requestProvider = requestProvider;
+    }
+
+    public ServerInformationModel GetServerInformation()
+    {
+        using var taskContext = new JoinableTaskContext();
+        var taskFactory = new JoinableTaskFactory(taskContext);
+        return taskFactory.Run(async () => await GetServerInformationAsync().ConfigureAwait(true));
+    }
+
+    public async Task<ServerInformationModel> GetServerInformationAsync()
+    {
+        var request = _requestProvider.GetServerInformation();
+        return await SendRequestAsync<ServerInformationModel>(request).ConfigureAwait(false);
+    }
+
+
+    public FiscalFullInformationModel GetFiscalInformation(string memoryId)
+    {
+        using var taskContext = new JoinableTaskContext();
+        var taskFactory = new JoinableTaskFactory(taskContext);
+        return taskFactory.Run(async () => await GetFiscalInformationAsync(memoryId).ConfigureAwait(true));
+    }
+
+    public async Task<FiscalFullInformationModel> GetFiscalInformationAsync(string memoryId)
+    {
+        var request = _requestProvider.GetFiscalInformationRequest(memoryId);
+        return await SendRequestAsync<FiscalFullInformationModel>(request).ConfigureAwait(false);
+    }
+
+    public TaxpayerModel GetTaxpayer(string economicCode)
+    {
+        using var taskContext = new JoinableTaskContext();
+        var taskFactory = new JoinableTaskFactory(taskContext);
+        return taskFactory.Run(async () => await GetTaxpayerAsync(economicCode).ConfigureAwait(true));
+    }
+
+    public async Task<TaxpayerModel> GetTaxpayerAsync(string economicCode)
+    {
+        var request = _requestProvider.GetTaxpayerRequest(economicCode);
+        return await SendRequestAsync<TaxpayerModel>(request).ConfigureAwait(false);
+    }
+
+
+    public BatchResponseModel SendInvoices(List<PacketDto> packets)
+    {
+        using var taskContext = new JoinableTaskContext();
+        var taskFactory = new JoinableTaskFactory(taskContext);
+        return taskFactory.Run(async () => await SendInvoicesAsync(packets).ConfigureAwait(true));
+    }
+
+    public async Task<BatchResponseModel> SendInvoicesAsync(List<PacketDto> packets)
+    {
+        var request = _requestProvider.GetInvoicesRequest(packets);
+        return await SendRequestAsync<BatchResponseModel>(request).ConfigureAwait(false);
+    }
+
+
+    public List<InquiryResultModel> InquiryByTime(InquiryByTimeRangeDto dto)
+    {
+        using var taskContext = new JoinableTaskContext();
+        var taskFactory = new JoinableTaskFactory(taskContext);
+        return taskFactory.Run(async () => await InquiryByTimeAsync(dto).ConfigureAwait(true));
+    }
+
+    public async Task<List<InquiryResultModel>> InquiryByTimeAsync(InquiryByTimeRangeDto dto)
+    {
+        var request = _requestProvider.GetInquiryByTimeRequest(dto);
+        return await SendRequestAsync<List<InquiryResultModel>>(request).ConfigureAwait(false);
+    }
+
+
+    public List<InquiryResultModel> InquiryByUid(InquiryByUidDto dto)
+    {
+        using var taskContext = new JoinableTaskContext();
+        var taskFactory = new JoinableTaskFactory(taskContext);
+        return taskFactory.Run(async () => await InquiryByUidAsync(dto).ConfigureAwait(true));
+    }
+
+    public async Task<List<InquiryResultModel>> InquiryByUidAsync(InquiryByUidDto dto)
+    {
+        var request = _requestProvider.GetInquiryByUidRequest(dto);
+        return await SendRequestAsync<List<InquiryResultModel>>(request).ConfigureAwait(false);
+    }
+
+
+    public List<InquiryResultModel> InquiryByReferenceId(InquiryByReferenceNumberDto dto)
+    {
+        using var taskContext = new JoinableTaskContext();
+        var taskFactory = new JoinableTaskFactory(taskContext);
+        return taskFactory.Run(async () => await InquiryByReferenceIdAsync(dto).ConfigureAwait(true));
+    }
+
+    public async Task<List<InquiryResultModel>> InquiryByReferenceIdAsync(InquiryByReferenceNumberDto dto)
+    {
+        var request = _requestProvider.GetInquiryByReferenceIdRequest(dto);
+        return await SendRequestAsync<List<InquiryResultModel>>(request).ConfigureAwait(false);
+    }
+
+    private async Task<T> SendRequestAsync<T>(HttpRequestMessage request)
+    {
+        var nonceRequest = _requestProvider.GetNonceRequest();
+        return await _client.SendRequestAsync<T>(request, nonceRequest).ConfigureAwait(false);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Clients/RestSharpHttpClient.cs`
+```csharp
+using System.Diagnostics;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using Microsoft.Extensions.Logging;
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Abstraction.Properties;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Configs;
+using TaxCollectData.Library.Models;
+using TaxCollectData.Library.Properties;
+
+namespace TaxCollectData.Library.Clients;
+
+public class RestSharpHttpClient : IClient
+{
+    private const string Bearer = "Bearer ";
+    private const string MediaType = "application/json";
+    private const string Charset = "utf-8";
+    private readonly HttpClient _httpClient;
+    private readonly ISignatory _signatory;
+    private readonly TaxProperties _taxProperties;
+    private readonly IHttpHeadersProperties _httpHeadersProperties;
+    private readonly ISerializer _serializer;
+    private readonly ILogger? _logger;
+
+    public RestSharpHttpClient(HttpClient httpClient,
+        TaxProperties taxProperties,
+        ISignatory signatory,
+        IHttpHeadersProperties httpHeadersProperties,
+        ISerializer serializer,
+        ILogger? logger = null)
+    {
+        _httpClient = httpClient;
+        _taxProperties = taxProperties;
+        _signatory = signatory;
+        _httpHeadersProperties = httpHeadersProperties;
+        _serializer = serializer;
+        _logger = logger;
+    }
+    
+    public async Task<T> SendRequestAsync<T>(HttpRequestMessage request, HttpRequestMessage nonceRequest)
+    {
+        var authenticatedRequest = await GetAuthenticatedRequestAsync(request, nonceRequest).ConfigureAwait(false);
+        return await SendRequestAsync<T>(authenticatedRequest).ConfigureAwait(false);
+    }
+
+    private async Task<T> SendRequestAsync<T>(HttpRequestMessage request)
+    {
+        var stopWatch = Stopwatch.StartNew();
+        foreach (var customHeader in _httpHeadersProperties.CustomHeaders)
+        {
+            request.Headers.Add(customHeader.Key, customHeader.Value);
+        }
+        using var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+
+        try
+        {
+            _logger?.LogDebug("call {}", request.RequestUri.ToString());
+            return await response.Content.ReadFromJsonAsync<T>(JsonSerializerConfig.JsonSerializerOptions).ConfigureAwait(false);
+        }
+        finally
+        {
+            stopWatch.Stop();
+            _logger?.LogDebug("send and receive in {} ms", stopWatch.ElapsedMilliseconds);
+        }
+    }
+
+    private async Task<HttpRequestMessage> GetAuthenticatedRequestAsync(HttpRequestMessage request, HttpRequestMessage nonceRequest)
+    {
+        var signedNonce = await GetSignedNonceAsync(nonceRequest).ConfigureAwait(false);
+        request.Headers.Add(_httpHeadersProperties.AuthorizationHeaderName, signedNonce);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(MediaType));
+        request.Headers.AcceptCharset.Add(new StringWithQualityHeaderValue(Charset));
+        return request;
+    }
+
+    private async Task<string> GetSignedNonceAsync(HttpRequestMessage request)
+    {
+        var nonce = await SendRequestAsync<NonceEntity>(request).ConfigureAwait(false);
+        var tokenModel = new TokenModel(nonce.Nonce, _taxProperties.MemoryId);
+        return $"{Bearer} {_signatory.Sign(_serializer.Serialize(tokenModel))}";
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Clients/TaxApi.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Models;
+
+namespace TaxCollectData.Library.Clients;
+
+public class TaxApi : ITaxApi
+{
+    private readonly ILowLevelTaxApi _sender;
+    private readonly IPacketProvider _packetFactory;
+
+    public TaxApi(ILowLevelTaxApi sender, IPacketProvider packetFactory)
+    {
+        _sender = sender;
+        _packetFactory = packetFactory;
+    }
+
+    public List<InquiryResultModel> InquiryByTime(InquiryByTimeRangeDto dto)
+    {
+        return _sender.InquiryByTime(dto);
+    }
+
+    public async Task<List<InquiryResultModel>> InquiryByTimeAsync(InquiryByTimeRangeDto dto)
+    {
+        return await _sender.InquiryByTimeAsync(dto).ConfigureAwait(false);
+    }
+
+    public List<InquiryResultModel> InquiryByUid(InquiryByUidDto dto)
+    {
+        return _sender.InquiryByUid(dto);
+    }
+
+    public async Task<List<InquiryResultModel>> InquiryByUidAsync(InquiryByUidDto dto)
+    {
+        return await _sender.InquiryByUidAsync(dto).ConfigureAwait(false);
+    }
+
+
+    public List<InquiryResultModel> InquiryByReferenceId(InquiryByReferenceNumberDto dto)
+    {
+        return _sender.InquiryByReferenceId(dto);
+    }
+
+    public async Task<List<InquiryResultModel>> InquiryByReferenceIdAsync(InquiryByReferenceNumberDto dto)
+    {
+        return await _sender.InquiryByReferenceIdAsync(dto).ConfigureAwait(false);
+    }
+
+
+    public FiscalFullInformationModel GetFiscalInformation(string memoryId)
+    {
+        return _sender.GetFiscalInformation(memoryId);
+    }
+
+    public async Task<FiscalFullInformationModel> GetFiscalInformationAsync(string memoryId)
+    {
+        return await _sender.GetFiscalInformationAsync(memoryId).ConfigureAwait(false);
+    }
+
+    public TaxpayerModel GetTaxpayer(string economicCode)
+    {
+        return _sender.GetTaxpayer(economicCode);
+    }
+
+    public async Task<TaxpayerModel> GetTaxpayerAsync(string economicCode)
+    {
+        return await _sender.GetTaxpayerAsync(economicCode).ConfigureAwait(false);
+    }
+
+    public List<InvoiceResponseModel> SendInvoices(List<InvoiceDto> invoices)
+    {
+        var invoicePackets = invoices.Select(GetInvoicePacket).ToList();
+        var packets = invoicePackets.Select(i => i.PacketDto).ToList();
+        var response = _sender.SendInvoices(packets).Result;
+        var map = invoicePackets.ToDictionary(i => i.PacketDto.Header.RequestTraceId,
+            i => i.TaxId);
+        return response.Select(r => GetInvoiceResponseModel(map, r)).ToList();
+    }
+
+    public async Task<List<InvoiceResponseModel>> SendInvoicesAsync(List<InvoiceDto> invoices)
+    {
+        var invoicePackets = invoices.Select(GetInvoicePacket).ToList();
+        var packets = invoicePackets.Select(i => i.PacketDto).ToList();
+        var response = await _sender.SendInvoicesAsync(packets).ConfigureAwait(false);
+        var map = invoicePackets.ToDictionary(i => i.PacketDto.Header.RequestTraceId,
+            i => i.TaxId);
+        return response.Result.Select(r => GetInvoiceResponseModel(map, r)).ToList();
+    }
+
+    private static InvoiceResponseModel GetInvoiceResponseModel(Dictionary<string, string> map, ResponsePacketModel x)
+    {
+        return new InvoiceResponseModel(x.Data, x.Uid, x.ReferenceNumber, map[x.Uid]);
+    }
+
+    private InvoicePacket GetInvoicePacket(InvoiceDto x)
+    {
+        return new InvoicePacket(x.Header.taxid, _packetFactory.CreateInvoicePacket(x));
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Clients/TaxPublicApi.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Models;
+
+
+namespace TaxCollectData.Library.Clients;
+
+public class TaxPublicApi : ITaxPublicApi
+{
+    private readonly ILowLevelTaxApi _sender;
+
+    public TaxPublicApi(ILowLevelTaxApi sender)
+    {
+        _sender = sender;
+    }
+
+    public ServerInformationModel GetServerInformation()
+    {
+        return _sender.GetServerInformation();
+    }
+
+    public async Task<ServerInformationModel> GetServerInformationAsync()
+    {
+        return await _sender.GetServerInformationAsync().ConfigureAwait(false);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Configs/IsExternalInit.cs`
+```csharp
+using System.ComponentModel;
+
+namespace System.Runtime.CompilerServices;
+
+[EditorBrowsable(EditorBrowsableState.Never)]
+internal class IsExternalInit
+{
+}
+```
+
+### File: `TaxCollectData.Library/Configs/JsonSerializerConfig.cs`
+```csharp
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace TaxCollectData.Library.Configs;
+
+public static class JsonSerializerConfig
+{
+    public static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() },
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+}
+```
+
+### File: `TaxCollectData.Library/Constants/PacketTypeConstants.cs`
+```csharp
+namespace TaxCollectData.Library.Constants;
+
+internal static class PacketTypeConstants
+{
+    public const string GET_SERVER_INFORMATION = "server-information";
+    public const string INQUIRY_BY_TIME_RANGE = "inquiry";
+    public const string INQUIRY_BY_UID = "inquiry-by-uid";
+    public const string INQUIRY_BY_REFERENCE_ID = "inquiry-by-reference-id";
+    public const string PACKET_TYPE_GET_SERVICE_STUFF_LIST = "GET_SERVICE_STUFF_LIST";
+    public const string GET_FISCAL_INFORMATION = "fiscal-information";
+    public const string GET_TAXPAYER = "taxpayer";
+    public const string INVOICE = "invoice";
+    public const string PACKET_TYPE_RECEIVE_INVOICE_CONFIRM = "RECEIVE_INVOICE_CONFIRM";
+    public const string NONCE = "nonce";
+}
+```
+
+### File: `TaxCollectData.Library/Cryptography/EmptySignatory.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Abstraction.Providers;
+
+namespace TaxCollectData.Library.Cryptography;
+
+public class EmptySignatory : ISignatory
+{
+    private readonly ISerializer _serializer;
+
+    public EmptySignatory(ISerializer serializer)
+    {
+        _serializer = serializer;
+    }
+
+    public string Sign(string text)
+    {
+        return text;
+    }
+
+    public string Sign(object data)
+    {
+        return _serializer.Serialize(data);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Cryptography/JweEncryptor.cs`
+```csharp
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Abstraction.Repositories;
+using Jose;
+
+namespace TaxCollectData.Library.Cryptography;
+
+public class JweEncryptor : IEncryptor
+{
+    private readonly IEncryptionKeyRepository _repository;
+    private readonly ILogger? _logger;
+
+    public JweEncryptor(IEncryptionKeyRepository repository, ILogger? logger = null)
+    {
+        _repository = repository;
+        _logger = logger;
+    }
+
+
+    public string Encrypt(string text)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var header = new Dictionary<string, object>
+            {
+                {
+                    "kid", _repository.GetKeyId()
+                }
+            };
+            var recipient = new JweRecipient(JweAlgorithm.RSA_OAEP_256, _repository.GetKey(), header);
+            return JWE.Encrypt(text, new[] { recipient }, JweEncryption.A256GCM, mode:SerializationMode.Compact);
+        }
+        finally
+        {
+            _logger?.LogDebug("encrypt in {} ms", stopwatch.ElapsedMilliseconds);
+        }
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Cryptography/JwsHardwareTokenSignatory.cs`
+```csharp
+using System.Diagnostics;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using TaxCollectData.Library.Abstraction.Cryptography;
+using Microsoft.Extensions.Logging;
+using TaxCollectData.Library.Providers;
+using JWT.Builder;
+using JWT.Algorithms;
+using Net.Pkcs11Interop.X509Store;
+
+namespace TaxCollectData.Library.Cryptography;
+
+public class JwsHardwareTokenSignatory : ISignatory
+{
+    private readonly X509Certificate2 _parsedCertificate;
+    private readonly RS512Algorithm _algorithm;
+    private readonly ILogger? _logger;
+    private const string Jose = "jose";
+    private const string SigT = "sigT";
+    private const string Typ = "typ";
+    private const string Crit = "crit";
+    private const string Cty = "cty";
+    private const string ContentTypeHeaderValue = "text/plain";
+
+
+    public JwsHardwareTokenSignatory(string certificateAlias,
+        string pkcs11LibraryPath,
+        string pin,
+        ILogger? logger = null)
+    {
+        var pkcs11X509Certificate = GetCertificateFromStore(certificateAlias, pkcs11LibraryPath, pin);
+        _parsedCertificate = pkcs11X509Certificate.Info.ParsedCertificate;
+        _algorithm = new RS512Algorithm(pkcs11X509Certificate.GetRSAPublicKey(), pkcs11X509Certificate.GetRSAPrivateKey());
+        _logger = logger;
+    }
+    
+    public JwsHardwareTokenSignatory(RS512Algorithm algorithm,
+        X509Certificate2 certificate,
+        ILogger? logger = null)
+    {
+        _parsedCertificate = certificate;
+        _algorithm = algorithm;
+        _logger = logger;
+    }
+
+    private Pkcs11X509Certificate GetCertificateFromStore(string certificateAlias, string pkcs11LibraryPath, string pin)
+    {
+        var store = new Pkcs11X509Store(pkcs11LibraryPath, new ETokenPinProvider(pin));
+        return store.Slots[0]
+            .Token
+            .Certificates
+            .First(c => c.Info.Label.Equals(certificateAlias, StringComparison.InvariantCultureIgnoreCase));
+    }
+
+    public string Sign(string text)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        var token = JwtBuilder.Create()
+            .DoNotVerifySignature()
+            .WithAlgorithm(_algorithm)
+            .AddHeader(HeaderName.X5c, new[] {Convert.ToBase64String(_parsedCertificate.GetRawCertData())})
+            .AddHeader(SigT, new CurrentDateProvider().ToDateFormat())
+            .AddHeader(Typ, Jose)
+            .AddHeader(Crit, new[] {SigT})
+            .AddHeader(Cty, ContentTypeHeaderValue)
+            .Encode(JsonSerializer.Deserialize<JsonNode>(text));
+        
+        _logger?.LogDebug("sign in {} ms", stopwatch.ElapsedMilliseconds);
+
+        return token;
+    }
+
+    public string Sign(object data)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        var token = JwtBuilder.Create()
+            .DoNotVerifySignature()
+            .WithAlgorithm(_algorithm)
+            .AddHeader(HeaderName.X5c, new[] {Convert.ToBase64String(_parsedCertificate.GetRawCertData())})
+            .AddHeader(SigT, new CurrentDateProvider().ToDateFormat())
+            .AddHeader(Typ, Jose)
+            .AddHeader(Crit, new[] {SigT})
+            .AddHeader(Cty, ContentTypeHeaderValue)
+            .Encode(data);
+        
+        _logger?.LogDebug("sign in {} ms", stopwatch.ElapsedMilliseconds);
+
+        return token;
+    }
+
+
+    private class ETokenPinProvider : IPinProvider
+    {
+        private readonly string _pin;
+
+        public ETokenPinProvider(string pin)
+        {
+            _pin = pin;
+        }
+
+        private GetPinResult GetPin()
+        {
+            return new GetPinResult(false, _pin.Select((ch) => (byte) ch).ToArray()); //Convert to bytes
+        }
+
+        public GetPinResult GetKeyPin(
+            Pkcs11X509StoreInfo storeInfo,
+            Pkcs11SlotInfo slotInfo,
+            Pkcs11TokenInfo tokenInfo,
+            Pkcs11X509CertificateInfo certificateInfo
+        )
+        {
+            return GetPin();
+        }
+
+        public GetPinResult GetTokenPin(
+            Pkcs11X509StoreInfo storeInfo,
+            Pkcs11SlotInfo slotInfo,
+            Pkcs11TokenInfo tokenInfo
+        )
+        {
+            return GetPin();
+        }
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Cryptography/JwsSignatory.cs`
+```csharp
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using JWT;
+using JWT.Algorithms;
+using JWT.Builder;
+using Microsoft.Extensions.Logging;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Security;
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Configs;
+
+namespace TaxCollectData.Library.Cryptography;
+
+public class JwsSignatory : ISignatory
+{
+    private const string Jose = "jose";
+    private const string SigT = "sigT";
+    private const string Typ = "typ";
+    private const string Crit = "crit";
+    private const string Cty = "cty";
+    private const string ContentTypeHeaderValue = "text/plain";
+
+    private readonly X509Certificate _certificate;
+    private readonly RSA _privateKey;
+    private readonly ICurrentDateProvider _currentDateProvider;
+    private readonly ILogger? _logger;
+
+    public JwsSignatory(X509Certificate certificate,
+        RSA privateKey,
+        ICurrentDateProvider currentDateProvider,
+        ILogger? logger = null)
+    {
+        _certificate = certificate;
+        _privateKey = privateKey;
+        _currentDateProvider = currentDateProvider;
+        _logger = logger;
+    }
+
+    public string Sign(string text)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var publicKey = DotNetUtilities.ToRSA((RsaKeyParameters) DotNetUtilities.FromX509Certificate(_certificate).GetPublicKey());
+            return JwtBuilder.Create()
+                .WithJsonSerializer(new CustomSerializer())
+                .WithAlgorithm(new RS256Algorithm(publicKey, _privateKey))
+                .AddHeader(HeaderName.X5c, new[] {Convert.ToBase64String(_certificate.GetRawCertData())})
+                .AddHeader(SigT, _currentDateProvider.ToDateFormat())
+                .AddHeader(Typ, Jose)
+                .AddHeader(Crit, new[] {SigT})
+                .AddHeader(Cty, ContentTypeHeaderValue)
+                .Encode(JsonSerializer.Deserialize<JsonNode>(text));
+        }
+        finally
+        {
+            _logger?.LogDebug("sign in {} ms", stopwatch.ElapsedMilliseconds);
+        }
+    }
+    
+    public string Sign(object data)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var publicKey = DotNetUtilities.ToRSA((RsaKeyParameters) DotNetUtilities.FromX509Certificate(_certificate).GetPublicKey());
+            return JwtBuilder.Create()
+                .WithJsonSerializer(new CustomSerializer())
+                .WithAlgorithm(new RS256Algorithm(publicKey, _privateKey))
+                .AddHeader(HeaderName.X5c, new[] {Convert.ToBase64String(_certificate.GetRawCertData())})
+                .AddHeader(SigT, _currentDateProvider.ToDateFormat())
+                .AddHeader(Typ, Jose)
+                .AddHeader(Crit, new[] {SigT})
+                .AddHeader(Cty, ContentTypeHeaderValue)
+                .Encode(data);
+        }
+        finally
+        {
+            _logger?.LogDebug("sign in {} ms", stopwatch.ElapsedMilliseconds);
+        }
+    }
+    
+    private class CustomSerializer : IJsonSerializer
+    {
+        public string Serialize(object obj)
+        {
+            return Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(obj, JsonSerializerConfig.JsonSerializerOptions));
+        }
+
+        public object? Deserialize(Type type, string json)
+        {
+            return JsonSerializer.Deserialize(json, type);
+        }
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/BodyItemDto.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class BodyItemDto
+{
+    public string sstid { get; set; }
+    public string sstt { get; set; }
+    public string mu { get; set; }
+    public decimal? am { get; set; }
+    public decimal? fee { get; set; }
+    public decimal? cfee { get; set; }
+    public string cut { get; set; }
+    public long? exr { get; set; }
+    public long? prdis { get; set; }
+    public long? dis { get; set; }
+    public long? adis { get; set; }
+    public decimal? vra { get; set; }
+    public long? vam { get; set; }
+    public string odt { get; set; }
+    public decimal? odr { get; set; }
+    public long? odam { get; set; }
+    public string olt { get; set; }
+    public decimal? olr { get; set; }
+    public long? olam { get; set; }
+    public long? consfee { get; set; }
+    public long? spro { get; set; }
+    public long? bros { get; set; }
+    public long? tcpbs { get; set; }
+    public long? cop { get; set; }
+    public string bsrn { get; set; }
+    public long? vop { get; set; }
+    public long? tsstam { get; set; }
+    public decimal? nw { get; set; }
+    public long? ssrv { get; set; }
+    public long? sscv { get; set; }
+    public decimal? pspd { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/ExtensionItemDto.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class ExtensionItemDto
+{
+}
+```
+
+### File: `TaxCollectData.Library/Dto/HeaderDto.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class HeaderDto
+{
+    public long? indati2m { get; set; }
+    public long? indatim { get; set; }
+    public int? inty { get; set; }
+    public int? ft { get; set; }
+    public string inno { get; set; }
+    public string irtaxid { get; set; }
+    public string scln { get; set; }
+    public int? setm { get; set; }
+    public string tins { get; set; }
+    public long? cap { get; set; }
+    public string bid { get; set; }
+    public long? insp { get; set; }
+    public long? tvop { get; set; }
+    public string bpc { get; set; }
+    public long? tax17 { get; set; }
+    public string taxid { get; set; }
+    public int? inp { get; set; }
+    public string scc { get; set; }
+    public int? ins { get; set; }
+    public string billid { get; set; }
+    public long? tprdis { get; set; }
+    public long? tdis { get; set; }
+    public long? tadis { get; set; }
+    public long? tvam { get; set; }
+    public long? todam { get; set; }
+    public long? tbill { get; set; }
+    public int? tob { get; set; }
+    public string tinb { get; set; }
+    public string sbc { get; set; }
+    public string bbc { get; set; }
+    public string bpn { get; set; }
+    public string crn { get; set; }
+    public string cdcn { get; set; }
+    public int? cdcd { get; set; }
+    public decimal? tonw { get; set; }
+    public long? torv { get; set; }
+    public decimal? tocv { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/InquiryByReferenceNumberDto.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class InquiryByReferenceNumberDto
+{
+    public InquiryByReferenceNumberDto(List<string> referenceNumbers, DateTime? start = null, DateTime? end = null)
+    {
+        ReferenceNumbers = referenceNumbers;
+        Start = start;
+        End = end;
+    }
+
+    public List<string> ReferenceNumbers { get; }
+    public DateTime? Start { get; }
+    public DateTime? End { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/InquiryByTimeRangeDto.cs`
+```csharp
+using TaxCollectData.Library.Enums;
+
+namespace TaxCollectData.Library.Dto;
+
+public class InquiryByTimeRangeDto
+{
+    public InquiryByTimeRangeDto(DateTime start, DateTime? end = null, Pageable? pageable = null, RequestStatus? status = null)
+    {
+        Start = start;
+        End = end;
+        Pageable = pageable;
+        Status = status;
+    }
+
+    public DateTime Start { get; }
+    public DateTime? End { get; }
+    public Pageable? Pageable { get; }
+    public RequestStatus? Status { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/InquiryByUidDto.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class InquiryByUidDto
+{
+    public InquiryByUidDto(List<string> uidList, string fiscalId, DateTime? start = null, DateTime? end = null)
+    {
+        UidList = uidList;
+        FiscalId = fiscalId;
+        Start = start;
+        End = end;
+    }
+
+    public List<string> UidList { get; }
+    public string FiscalId { get; }
+    public DateTime? Start { get; }
+    public DateTime? End { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/InvoiceDto.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class InvoiceDto
+{
+    public HeaderDto Header { get; set; }
+    public List<BodyItemDto> Body { get; set; }
+    public List<PaymentItemDto> Payments { get; set; }
+    public List<ExtensionItemDto> Extension { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/PacketDto.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class PacketDto
+{
+    public string Payload { get; set; }
+    public PacketHeaderDto Header { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/PacketHeaderDto.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class PacketHeaderDto
+{
+    public string RequestTraceId { get; set; }
+    public string FiscalId { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/Pageable.cs`
+```csharp
+namespace TaxCollectData.Library.Dto;
+
+public class Pageable
+{
+    public Pageable(int pageNumber = 0, int pageSize = 10)
+    {
+        PageNumber = pageNumber;
+        PageSize = pageSize;
+    }
+
+    public int PageNumber { get; }
+    public int PageSize { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Dto/PaymentItemDto.cs`
+```csharp
+
+namespace TaxCollectData.Library.Dto;
+
+public class PaymentItemDto {
+    public string iinn { get; set; }
+    public string acn { get; set; }
+    public string trmn { get; set; }
+    public string trn { get; set; }
+    public string pcn { get; set; }
+    public string pid { get; set; }
+    public long? pdt { get; set; }
+    public int? pmt { get; set; }
+    public long? pv { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Enums/RequestStatus.cs`
+```csharp
+namespace TaxCollectData.Library.Enums;
+
+public enum RequestStatus
+{
+    SUCCESS, FAILED, PENDING, TIMEOUT 
+}
+```
+
+### File: `TaxCollectData.Library/Exceptions/NotInitializedException.cs`
+```csharp
+namespace TaxCollectData.Library.Exceptions;
+
+public class NotInitializedException : Exception
+{
+    public NotInitializedException()
+    {
+    }
+
+    public NotInitializedException(Exception cause) : base(cause.Message, cause)
+    {
+    }
+
+    public NotInitializedException(string paramName) : base(GetMessage(paramName))
+    {
+    }
+
+    public NotInitializedException(string message, Exception cause) : base(message, cause)
+    {
+    }
+
+    private static string GetMessage(string paramName)
+    {
+        return $"Parameter {paramName} is not initialized.";
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Exceptions/PacketTypeNotFoundException.cs`
+```csharp
+namespace TaxCollectData.Library.Exceptions;
+
+public class PacketTypeNotFoundException : Exception
+{
+    public PacketTypeNotFoundException()
+    {
+    }
+
+    public PacketTypeNotFoundException(Exception cause) : base(cause.Message, cause)
+    {
+    }
+
+    public PacketTypeNotFoundException(string paramName) : base(paramName)
+    {
+    }
+
+    public PacketTypeNotFoundException(string message, Exception cause) : base(message, cause)
+    {
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Exceptions/TaxApiException.cs`
+```csharp
+namespace TaxCollectData.Library.Exceptions
+{
+    internal class TaxApiException : Exception
+    {
+        public TaxApiException()
+        {
+        }
+
+        public TaxApiException(Exception cause) : base(cause.Message, cause)
+        {
+        }
+
+        public TaxApiException(string message) : base(message)
+        {
+        }
+
+        public TaxApiException(string message, Exception cause) : base(message, cause)
+        {
+        }
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/EncryptorFactory.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Cryptography;
+using TaxCollectData.Library.Models;
+using TaxCollectData.Library.Repositories;
+
+namespace TaxCollectData.Library.Factories;
+
+public class EncryptorFactory
+{
+    public IEncryptor Create(ITaxPublicApi publicApi)
+    {
+        return Create(() => publicApi.GetServerInformation().PublicKeys);
+    }
+
+    public IEncryptor Create(Func<List<KeyModel>> getPublicKeys)
+    {
+        var encryptionKeyRepository = new EncryptionKeyRepository(getPublicKeys);
+        return new JweEncryptor(encryptionKeyRepository);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/PacketProviderFactory.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Properties;
+using TaxCollectData.Library.Providers;
+
+namespace TaxCollectData.Library.Factories;
+
+public class PacketProviderFactory
+{
+    private readonly TaxProperties _packetProperties;
+
+    public PacketProviderFactory(TaxProperties packetProperties)
+    {
+        _packetProperties = packetProperties;
+    }
+
+    public IPacketProvider CreatePacketProvider(ISignatory signatory, IEncryptor encryptor)
+    {
+        return new PacketProvider(_packetProperties, signatory, encryptor, new Serializer());
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/Pkcs11SignatoryFactory.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Providers;
+
+namespace TaxCollectData.Library.Factories;
+
+public class Pkcs11SignatoryFactory
+{
+    private readonly SignatoryFactory _signatoryFactory;
+
+    public Pkcs11SignatoryFactory()
+    {
+        var currentDateProvider = new CurrentDateProvider();
+        _signatoryFactory = new SignatoryFactory(currentDateProvider);
+    }
+
+    public ISignatory Create(string certificateAlias, string pkcs11LibraryPath, string pin)
+    {
+        return _signatoryFactory.Create(certificateAlias, pkcs11LibraryPath, pin);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/Pkcs8SignatoryFactory.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Providers;
+
+namespace TaxCollectData.Library.Factories;
+
+public class Pkcs8SignatoryFactory
+{
+    private readonly SignatoryFactory _signatoryFactory;
+    private readonly X509CertificateFactory _x509CertificateFactory;
+    private readonly PrivateKeyFactory _privateKeyFactory;
+
+    public Pkcs8SignatoryFactory()
+    {
+        var currentDateProvider = new CurrentDateProvider();
+        _signatoryFactory = new SignatoryFactory(currentDateProvider);
+        _x509CertificateFactory = new X509CertificateFactory();
+        _privateKeyFactory = new PrivateKeyFactory();
+    }
+
+    public ISignatory Create(string privateKeyPath, string certificatePath)
+    {
+        var privateKey = _privateKeyFactory.ReadPrivateKeyFromFile(privateKeyPath);
+        var x509Certificate = _x509CertificateFactory.ReadCertificateFromFile(certificatePath);
+        return _signatoryFactory.Create(privateKey, x509Certificate);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/PrivateKeyFactory.cs`
+```csharp
+using System.Security.Cryptography;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.OpenSsl;
+using Org.BouncyCastle.Security;
+
+namespace TaxCollectData.Library.Factories;
+
+public class PrivateKeyFactory
+{
+    public RSA ReadPrivateKeyFromFile(string privateKeyPath)
+    {
+        var privateKeyPemReader = new PemReader(File.OpenText(privateKeyPath));
+        return DotNetUtilities.ToRSA((RsaPrivateCrtKeyParameters)privateKeyPemReader.ReadObject());
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/SignatoryFactory.cs`
+```csharp
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Cryptography;
+
+namespace TaxCollectData.Library.Factories;
+
+public class SignatoryFactory
+{
+    private readonly ICurrentDateProvider _currentDateProvider;
+
+    public SignatoryFactory(ICurrentDateProvider currentDateProvider)
+    {
+        _currentDateProvider = currentDateProvider;
+    }
+
+    public ISignatory Create(RSA privateKey, X509Certificate x509Certificate)
+    {
+        return new JwsSignatory(x509Certificate, privateKey, _currentDateProvider);
+    }
+    
+    public ISignatory Create(string certificateAlias, string pkcs11LibraryPath, string pin)
+    {
+        return new JwsHardwareTokenSignatory(certificateAlias, pkcs11LibraryPath, pin);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/TaxApiFactory.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Abstraction.Properties;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Clients;
+using TaxCollectData.Library.Properties;
+using TaxCollectData.Library.Providers;
+
+namespace TaxCollectData.Library.Factories;
+
+public class TaxApiFactory
+{
+    private readonly PacketProviderFactory _packetProviderFactory;
+    private readonly IRequestProvider _requestProvider;
+    private readonly TaxProperties _taxProperties;
+    private readonly IHttpHeadersProperties _httpHeadersProperties;
+
+    public TaxApiFactory(TaxProperties taxProperties,
+        IRequestProvider requestProvider,
+        IHttpHeadersProperties httpHeadersProperties)
+    {
+        _taxProperties = taxProperties;
+        _requestProvider = requestProvider;
+        _httpHeadersProperties = httpHeadersProperties;
+        _packetProviderFactory = new PacketProviderFactory(taxProperties);
+    }
+
+    public TaxApiFactory(TaxProperties taxProperties, IUrlProperties urlProperties, IHttpHeadersProperties httpHeadersProperties)
+        : this(taxProperties, new RequestProvider(urlProperties, new Serializer()), httpHeadersProperties)
+    {
+    }
+
+    public TaxApiFactory(string baseUrl, TaxProperties taxProperties)
+        : this(taxProperties, new RequestProvider(new DefaultUrlProperties(baseUrl), new Serializer()), new DefaultHttpHeadersProperties())
+    {
+    }
+
+    public ITaxPublicApi CreatePublicApi(ISignatory signatory)
+    {
+        var lowLevelTaxApi = CreateLowLevelApi(signatory);
+        return new TaxPublicApi(lowLevelTaxApi);
+    }
+
+    public ITaxApi CreateApi(ISignatory signatory, IEncryptor encryptor)
+    {
+        var lowLevelTaxApi = CreateLowLevelApi(signatory);
+        var packetProvider = _packetProviderFactory.CreatePacketProvider(signatory, encryptor);
+        return new TaxApi(lowLevelTaxApi, packetProvider);
+    }
+
+    public LowLevelTaxApi CreateLowLevelApi(ISignatory signatory)
+    {
+        return new LowLevelTaxApi(CreateRestHttpClient(signatory), _requestProvider);
+    }
+
+    private IClient CreateRestHttpClient(ISignatory signatory)
+    {
+        return new RestSharpHttpClient(GetHttpClient(), _taxProperties, signatory, _httpHeadersProperties, new Serializer());
+    }
+    
+    private HttpClient GetHttpClient()
+    {
+        return new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(10)
+        };
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/TaxIdProviderFactory.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Algorithms;
+using TaxCollectData.Library.Providers;
+
+namespace TaxCollectData.Library.Factories;
+
+public class TaxIdProviderFactory
+{
+    public ITaxIdProvider Create()
+    {
+        return new TaxIdProvider(GetErrorDetectionAlgorithm());
+    }
+
+    private IErrorDetectionAlgorithm GetErrorDetectionAlgorithm()
+    {
+        return new VerhoeffAlgorithm();
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Factories/X509CertificateFactory.cs`
+```csharp
+using System.Security.Cryptography.X509Certificates;
+using Org.BouncyCastle.OpenSsl;
+using Org.BouncyCastle.Security;
+
+namespace TaxCollectData.Library.Factories;
+
+public class X509CertificateFactory
+{
+    public X509Certificate ReadCertificateFromFile(string certificatePath)
+    {
+        var pemReader = new PemReader(new StreamReader(certificatePath));
+        return DotNetUtilities.ToX509Certificate((Org.BouncyCastle.X509.X509Certificate)pemReader.ReadObject());
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Middlewares/EmptyMiddleware.cs`
+```csharp
+namespace TaxCollectData.Library.Middlewares;
+
+public class EmptyMiddleware : Middleware
+{
+    public override string Handle(string text)
+    {
+        return HandleNext(text);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Middlewares/EncryptionMiddleware.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Cryptography;
+
+namespace TaxCollectData.Library.Middlewares;
+
+public class EncryptionMiddleware : Middleware
+{
+    private readonly IEncryptor _encryptor;
+
+    public EncryptionMiddleware(IEncryptor encryptor)
+    {
+        _encryptor = encryptor;
+    }
+
+    public override string Handle(string text)
+    {
+        return HandleNext(_encryptor.Encrypt(text));
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Middlewares/Middleware.cs`
+```csharp
+namespace TaxCollectData.Library.Middlewares;
+
+public abstract class Middleware
+{
+    private Middleware _next;
+
+    public static Middleware Link(Middleware first, params Middleware[] chain)
+    {
+        var head = first;
+        foreach (var nextInChain in chain)
+        {
+            head._next = nextInChain;
+            head = nextInChain;
+        }
+
+        return first;
+    }
+
+    public abstract string Handle(string text);
+
+    protected string HandleNext(string text)
+    {
+        return _next == null ? text : _next.Handle(text);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Middlewares/SignatoryMiddleware.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Cryptography;
+
+namespace TaxCollectData.Library.Middlewares;
+
+public class SignatoryMiddleware : Middleware
+{
+    private readonly ISignatory _signatory;
+
+    public SignatoryMiddleware(ISignatory signatory)
+    {
+        _signatory = signatory;
+    }
+
+    public override string Handle(string text)
+    {
+        return HandleNext(_signatory.Sign(text));
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Models/BatchResponseModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class BatchResponseModel
+{
+    public long Timestamp { get; set; }
+    public List<ResponsePacketModel> Result { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/FiscalFullInformationModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class FiscalFullInformationModel
+{
+    public string NameTrade { get; set; }
+    public string FiscalStatus { get; set; }
+    public string SaleThreshold { get; set; }
+    public string EconomicCode { get; set; }
+    public string NationalId { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/InquiryResultModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class InquiryResultModel
+{
+    public string ReferenceNumber { get; set; }
+    public string Uid { get; set; }
+    public string Status { get; set; }
+    public InvoiceValidationResponseModel Data { get; set; }
+    public string PacketType { get; set; }
+    public string FiscalId { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/InvoiceErrorModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class InvoiceErrorModel
+{
+    public InvoiceErrorModel(string code, string message)
+    {
+        Code = code;
+        Message = message;
+    }
+
+    public string Code { get; }
+    public string Message { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/InvoicePacket.cs`
+```csharp
+using TaxCollectData.Library.Dto;
+
+namespace TaxCollectData.Library.Models;
+
+public class InvoicePacket
+{
+    public InvoicePacket(string taxId, PacketDto packetDto)
+    {
+        TaxId = taxId;
+        PacketDto = packetDto;
+    }
+
+    public string TaxId { get; }
+    public PacketDto PacketDto { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/InvoiceResponseModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class InvoiceResponseModel
+{
+    public InvoiceResponseModel(string data, string uid, string referenceNumber, string taxId)
+    {
+        Data = data;
+        Uid = uid;
+        ReferenceNumber = referenceNumber;
+        TaxId = taxId;
+    }
+
+    public string Data { get; }
+    public string Uid { get; }
+    public string ReferenceNumber { get; }
+    public string TaxId { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/InvoiceValidationResponseModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class InvoiceValidationResponseModel
+{
+    public InvoiceValidationResponseModel(List<InvoiceErrorModel> error, List<InvoiceErrorModel> warning, bool success)
+    {
+        Error = error;
+        Warning = warning;
+        Success = success;
+    }
+
+    public List<InvoiceErrorModel> Error { get; }
+    public List<InvoiceErrorModel> Warning { get; }
+    public bool Success { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/KeyModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class KeyModel
+{
+    public string Key { get; set; }
+    public string Id { get; set; }
+    public string Algorithm { get; set; }
+    public int Purpose { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/NonceEntity.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class NonceEntity
+{
+    public string Nonce { get; set; }
+    public string ExpDate { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/ResponseModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class ResponseModel
+{
+    public long Timestamp { get; set; }
+    public ResponsePacketModel Result { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/ResponsePacketModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class ResponsePacketModel
+{
+    public string Uid { get; set; }
+    public string PacketType { get; set; }
+    public string ReferenceNumber { get; set; }
+    public string Data { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/ServerInformationModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class ServerInformationModel
+{
+    public long ServerTime { get; set; }
+    public List<KeyModel> PublicKeys { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/TaxpayerModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class TaxpayerModel
+{
+    public string NameTrade { get; set; }
+    public string TaxpayerStatus { get; set; }
+    public string TaxpayerType { get; set; }
+    public string PostalcodeTaxpayer { get; set; }
+    public string AddressTaxpayer { get; set; }
+    public string NationalId { get; set; }
+}
+```
+
+### File: `TaxCollectData.Library/Models/TokenModel.cs`
+```csharp
+namespace TaxCollectData.Library.Models;
+
+public class TokenModel
+{
+    public TokenModel(string nonce, string clientId)
+    {
+        Nonce = nonce;
+        ClientId = clientId;
+    }
+
+    public string Nonce { get; }
+    public string ClientId { get; }
+}
+```
+
+### File: `TaxCollectData.Library/Providers/AbstractPacketProvider.cs`
+```csharp
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Properties;
+
+namespace TaxCollectData.Library.Providers;
+
+public abstract class AbstractPacketProvider
+{
+    protected readonly TaxProperties PacketProperties;
+
+    protected AbstractPacketProvider(TaxProperties packetProperties)
+    {
+        PacketProperties = packetProperties;
+    }
+
+    protected PacketHeaderDto GetHeader()
+    {
+        var requestTraceId = Guid.NewGuid().ToString();
+        var fiscalId = PacketProperties.MemoryId;
+        return new PacketHeaderDto
+        {
+            RequestTraceId = requestTraceId,
+            FiscalId = fiscalId
+        };
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Providers/CurrentDateProvider.cs`
+```csharp
+
+using System.Globalization;
+using TaxCollectData.Library.Abstraction.Providers;
+
+namespace TaxCollectData.Library.Providers;
+
+public class CurrentDateProvider : ICurrentDateProvider {
+
+    private const string Format = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+
+    public long ToEpochMilli() {
+        return new DateTimeOffset(DateTime.Now).ToUnixTimeMilliseconds();
+    }
+
+    public string ToDateFormat()
+    {
+        return DateTime.UtcNow.ToString(Format, CultureInfo.InvariantCulture);
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Providers/PacketProvider.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Middlewares;
+using TaxCollectData.Library.Properties;
+
+namespace TaxCollectData.Library.Providers;
+
+public class PacketProvider : AbstractPacketProvider, IPacketProvider
+{
+    private readonly EncryptionMiddleware _encryptionMiddleware;
+    private readonly SignatoryMiddleware _signatoryMiddleware;
+    private readonly EmptyMiddleware _emptyMiddleware;
+    private readonly ISerializer _serializer;
+
+    public PacketProvider(TaxProperties packetProperties,
+        ISignatory signatory,
+        IEncryptor encryptor,
+        ISerializer serializer) : base(packetProperties)
+    {
+        _serializer = serializer;
+        _encryptionMiddleware = new EncryptionMiddleware(encryptor);
+        _signatoryMiddleware = new SignatoryMiddleware(signatory);
+        _emptyMiddleware = new EmptyMiddleware();
+    }
+
+
+    public PacketDto CreateInvoicePacket(InvoiceDto invoice)
+    {
+        return CreatePrivatePacket(invoice);
+    }
+
+    private PacketDto CreatePrivatePacket(object dto)
+    {
+        return GetPacketDto(dto, GetCryptographyMiddlewares());
+    }
+
+    private PacketDto CreateInquiryPacket(object dto)
+    {
+        return GetPacketDto(dto, GetEmptyMiddleware());
+    }
+
+    private Middleware GetEmptyMiddleware()
+    {
+        return Middleware.Link(_emptyMiddleware);
+    }
+
+    private Middleware GetCryptographyMiddlewares()
+    {
+        return Middleware.Link(_signatoryMiddleware, _encryptionMiddleware);
+    }
+
+    private PacketDto GetPacketDto(object data, Middleware middleware)
+    {
+        return new PacketDto
+        {
+            Payload = middleware.Handle(_serializer.Serialize(data)),
+            Header = GetHeader()
+        };
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Providers/RequestProvider.cs`
+```csharp
+using System.Text;
+using System.Web;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Abstraction.Properties;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Constants;
+
+namespace TaxCollectData.Library.Providers;
+
+public class RequestProvider : IRequestProvider
+{
+    private const string MemoryId = "memoryId";
+    private const string EconomicCode = "economicCode";
+    private const string ReferenceIds = "referenceIds";
+    private const string UidList = "uidList";
+    private const string FiscalId = "fiscalId";
+    private const string PageSize = "pageSize";
+    private const string PageNumber = "pageNumber";
+    private const string End = "end";
+    private const string Start = "start";
+    private const string Status = "status";
+    private const string MediaType = "application/json";
+    private const string DateTimeFormat = "yyyy-MM-ddTHH:mm:ss.fffffff00K";
+    private readonly IUrlProperties _urlProperties;
+    private readonly ISerializer _serializer;
+
+    public RequestProvider(IUrlProperties urlProperties, ISerializer serializer)
+    {
+        _urlProperties = urlProperties;
+        _serializer = serializer;
+    }
+
+    public HttpRequestMessage GetNonceRequest()
+    {
+        return new HttpRequestMessage(HttpMethod.Get, _urlProperties.GetUrl(PacketTypeConstants.NONCE));
+    }
+
+    public HttpRequestMessage GetServerInformation()
+    {
+        return new HttpRequestMessage(HttpMethod.Get,
+            _urlProperties.GetUrl(PacketTypeConstants.GET_SERVER_INFORMATION));
+    }
+
+    public HttpRequestMessage GetInquiryByTimeRequest(InquiryByTimeRangeDto dto)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        query[Start] = dto.Start.ToString(DateTimeFormat);
+        if (dto.End != null)
+        {
+            query[End] = dto.End?.ToString(DateTimeFormat);
+        }
+
+        if (dto.Status != null)
+        {
+            query[Status] = dto.Status.ToString();
+        }
+
+        if (dto.Pageable != null)
+        {
+            query[PageNumber] = dto.Pageable.PageNumber.ToString();
+            query[PageSize] = dto.Pageable.PageSize.ToString();
+        }
+
+        return GetRequestFromQuery(PacketTypeConstants.INQUIRY_BY_TIME_RANGE, query.ToString());
+    }
+
+
+    public HttpRequestMessage GetInquiryByUidRequest(InquiryByUidDto dto)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        query[FiscalId] = dto.FiscalId;
+        dto.UidList.ForEach(u => query.Add(UidList, u));
+        if (dto.Start != null)
+        {
+            query[Start] = dto.Start?.ToString(DateTimeFormat);
+        }
+        if (dto.End != null)
+        {
+            query[End] = dto.End?.ToString(DateTimeFormat);
+        }
+        return GetRequestFromQuery(PacketTypeConstants.INQUIRY_BY_UID, query.ToString());
+    }
+
+
+    public HttpRequestMessage GetInquiryByReferenceIdRequest(InquiryByReferenceNumberDto dto)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        dto.ReferenceNumbers.ForEach(u => query.Add(ReferenceIds, u));
+        if (dto.Start != null)
+        {
+            query[Start] = dto.Start?.ToString(DateTimeFormat);
+        }
+        if (dto.End != null)
+        {
+            query[End] = dto.End?.ToString(DateTimeFormat);
+        }
+        return GetRequestFromQuery(PacketTypeConstants.INQUIRY_BY_REFERENCE_ID, query.ToString());
+    }
+
+    public HttpRequestMessage GetInvoicesRequest(List<PacketDto> data)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, _urlProperties.GetUrl(PacketTypeConstants.INVOICE));
+        request.Content = new StringContent(_serializer.Serialize(data), Encoding.UTF8, MediaType);
+        return request;
+    }
+
+
+    public HttpRequestMessage GetTaxpayerRequest(string economicCode)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        query[EconomicCode] = economicCode;
+        return GetRequestFromQuery(PacketTypeConstants.GET_TAXPAYER, query.ToString());
+    }
+
+
+    public HttpRequestMessage GetFiscalInformationRequest(string memoryId)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        query[MemoryId] = memoryId;
+        return GetRequestFromQuery(PacketTypeConstants.GET_FISCAL_INFORMATION, query.ToString());
+    }
+
+    private HttpRequestMessage GetRequestFromQuery(string requestUrl, string query)
+    {
+        var uriBuilder = new UriBuilder(_urlProperties.GetUrl(requestUrl))
+        {
+            Query = query
+        };
+        return new HttpRequestMessage(HttpMethod.Get, uriBuilder.ToString());
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Providers/Serializer.cs`
+```csharp
+using System.Text;
+using System.Text.Json;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Configs;
+
+namespace TaxCollectData.Library.Providers;
+
+public class Serializer : ISerializer
+{
+    public string Serialize(object dto)
+    {
+        return Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(dto, JsonSerializerConfig.JsonSerializerOptions));
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Providers/TaxIdProvider.cs`
+```csharp
+using System.Text;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Algorithms;
+
+namespace TaxCollectData.Library.Providers;
+
+public class TaxIdProvider : ITaxIdProvider
+{
+    private readonly IErrorDetectionAlgorithm _errorDetectionAlgorithm;
+
+    public TaxIdProvider(IErrorDetectionAlgorithm errorDetectionAlgorithm)
+    {
+        _errorDetectionAlgorithm = errorDetectionAlgorithm;
+    }
+
+    public string GenerateTaxId(string memoryId, long serial, DateTime createDate)
+    {
+        var timeDayRange = (int)(new DateTimeOffset(createDate).ToUnixTimeSeconds() / (3600 * 24));
+        var hexTime = Convert.ToString(timeDayRange, 16);
+        var hexSerial = Convert.ToString(serial, 16);
+        var initial = $"{memoryId}{hexTime.PadLeft(5, '0')}{hexSerial.PadLeft(10, '0')}";
+        var controlText = $"{ToDecimal(memoryId)}{timeDayRange.ToString().PadLeft(6, '0')}{serial.ToString().PadLeft(12, '0')}";
+        var result = $"{initial}{_errorDetectionAlgorithm.GenerateCheckDigit(controlText)}";
+        return result.ToUpperInvariant();
+    }
+
+    private static string ToDecimal(string memoryId)
+    {
+        var decimalFormat = new StringBuilder();
+        foreach (var ch in memoryId)
+        {
+            if (char.IsDigit(ch))
+            {
+                decimalFormat.Append(ch);
+            }
+            else
+            {
+                decimalFormat.Append((int)ch);
+            }
+        }
+
+        return decimalFormat.ToString();
+    }
+}
+```
+
+### File: `TaxCollectData.Library/Repositories/EncryptionKeyRepository.cs`
+```csharp
+using System.Security.Cryptography;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Abstraction.Repositories;
+using TaxCollectData.Library.Models;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Utilities.Encoders;
+
+namespace TaxCollectData.Library.Repositories;
+
+public class EncryptionKeyRepository : IEncryptionKeyRepository
+{
+    private readonly Random _random = new();
+    private readonly Func<List<KeyModel>> _builder;
+    private RSA _key;
+    private string _keyId;
+    private DateTime _expiredTime;
+
+    public EncryptionKeyRepository(Func<List<KeyModel>> builder)
+    {
+        _builder = builder;
+    }
+
+    public RSA GetKey()
+    {
+        if (NeedRefresh())
+        {
+            Refresh();
+        }
+
+        return _key;
+    }
+
+    public string GetKeyId()
+    {
+        if (NeedRefresh())
+        {
+            Refresh();
+        }
+
+        return _keyId;
+    }
+
+    private void Refresh()
+    {
+        lock (this)
+        {
+            if (!NeedRefresh())
+            {
+                return;
+            }
+
+            var keyModels = _builder.Invoke();
+            var keyModel = keyModels[_random.Next(keyModels.Count)];
+            _key = GetPublicKeyFromBase64(keyModel.Key);
+            _keyId = keyModel.Id;
+            _expiredTime = DateTime.Now.AddHours(1).ToLocalTime();
+        }
+    }
+
+    private bool NeedRefresh()
+    {
+        return _expiredTime == null || DateTime.Now.ToLocalTime() > _expiredTime;
+    }
+    
+    private RSA GetPublicKeyFromBase64(string key)
+    {
+        var decoded = Base64.Decode(key);
+        var asymmetricKeyParameter = PublicKeyFactory.CreateKey(decoded);
+        var rsaParams = DotNetUtilities.ToRSAParameters((RsaKeyParameters)asymmetricKeyParameter);
+        var rsa = RSA.Create();
+        rsa.ImportParameters(rsaParams);
+        return rsa;
+    }
+
+}
+```
+
+### File: `TaxCollectData.Library/TaxCollectData.Library.csproj`
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <Company>Mohaymen</Company>
+        <Version>2.0.9</Version>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.3.44" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+        <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
+        <PackageReference Include="Pkcs11Interop" Version="5.1.2" />
+        <PackageReference Include="RestSharp" Version="108.0.1" />
+        <PackageReference Include="System.Security.Cryptography.Cng" Version="5.0.0" />
+        <PackageReference Include="System.Net.Http.Json" Version="6.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="6.0.0" />
+        <PackageReference Include="jose-jwt" Version="4.1.0" />
+        <PackageReference Include="JWT" Version="10.0.2" />
+        <PackageReference Include="System.Security.Cryptography.Cng" Version="6.0.0-preview.4.21253.7" />
+        <PackageReference Include="System.Security.Cryptography.X509Certificates" Version="4.3.2" />
+        <PackageReference Include="Pkcs11Interop.X509Store" Version="0.4.0" />
+    </ItemGroup>
+
+
+</Project>
+```
+
+### File: `TaxCollectData.Sample/DocumentSample.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Algorithms;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Factories;
+using TaxCollectData.Library.Models;
+using TaxCollectData.Library.Properties;
+using TaxCollectData.Library.Providers;
+using static System.Console;
+
+namespace TaxCollectData.Sample;
+
+public class DocumentSample
+{
+    private const string MemoryId = "A111YO";
+    private const string ApiUrl = "http://master.nta.local/requestsmanager";
+    private const string PrivateKeyPath = "C:/privatekey1.pem";
+    private const string CertificatePath = "C:/cert1.crt";
+
+    public static void Run()
+    {
+        var taxApi = CreateTaxApi();
+
+        var validInvoice = CreateValidInvoice();
+        var invalidInvoice = CreateInvalidInvoice();
+
+        var invoiceList = new List<InvoiceDto>()
+        {
+            validInvoice,
+            invalidInvoice
+        };
+
+        var responseModels =
+            taxApi.SendInvoices(invoiceList);
+
+        Thread.Sleep(10_000);
+        
+        DateTime startDate = DateTime.Now.AddDays(-1).ToLocalTime();
+        DateTime endDate = DateTime.Now.ToLocalTime();
+
+        var inquiryDto = new InquiryByReferenceNumberDto(
+            responseModels.Select(
+                r => r.ReferenceNumber
+            ).ToList(), startDate, endDate);
+        var inquiryResults = 
+            taxApi.InquiryByReferenceId(inquiryDto);
+
+        PrintInquiryResult(inquiryResults);
+    }
+
+    private static void PrintInquiryResult(
+        List<InquiryResultModel> inquiryResults)
+    {
+        foreach (var result in inquiryResults)
+        {
+            WriteLine("========================================");
+            WriteLine("Status = " + result.Status);
+            WriteLine("ReferenceId = " + result.ReferenceNumber);
+            WriteLine("Errors:");
+            var errors = result.Data.Error;
+            foreach (var error in errors)
+            {
+                var code = error.Code;
+                var message = error.Message;
+                WriteLine("Code: " + code + ", Message: " + message);
+            }
+
+            WriteLine("Warnings:");
+            var warnings = result.Data.Warning;
+            foreach (var warning in warnings)
+            {
+                var code = warning.Code;
+                var message = warning.Message;
+                WriteLine("Code: " + code + ", Message: " + message);
+            }
+        }
+    }
+
+    private static ITaxApi CreateTaxApi()
+    {
+        var pkcs8SignatoryFactory = new Pkcs8SignatoryFactory();
+        var encryptorFactory = new EncryptorFactory();
+        var properties = new TaxProperties(MemoryId);
+        var taxApiFactory = new TaxApiFactory(ApiUrl, properties);
+        var signatory = pkcs8SignatoryFactory.Create(PrivateKeyPath, CertificatePath);
+        var publicApi = taxApiFactory.CreatePublicApi(signatory);
+        var encryptor = encryptorFactory.Create(publicApi);
+        return taxApiFactory.CreateApi(signatory, encryptor);
+    }
+
+    private static InvoiceDto CreateValidInvoice()
+    {
+        var random = new Random();
+        var serial = random.NextInt64(1_000_000_000);
+        var now = DateTime.Now;
+        var taxId = GenerateTaxId(serial, now);
+        var inno = serial.ToString("X").PadLeft(10, '0');
+        var indatim = new DateTimeOffset(now).ToUnixTimeMilliseconds();
+
+        var invoice = new InvoiceDto()
+        {
+            Header = new HeaderDto()
+            {
+                taxid = taxId,
+                inno = inno,
+                indatim = indatim,
+                indati2m = indatim,
+                inty = 1,
+                inp = 1,
+                ins = 1,
+                tins = "14003778990",
+                tinb = "10100302746",
+                tprdis = 20_000,
+                tdis = 500,
+                tadis = 19_500,
+                tvam = 1_755,
+                todam = 0,
+                tbill = 21_255,
+                setm = 2
+            },
+            Body = new List<BodyItemDto>()
+            {
+                new()
+                {
+                    sstid = "2710000138624",
+                    sstt = "سرسیلندر قطعات صنعت فولاد سازی",
+                    mu = "164",
+                    am = 2,
+                    fee = 10_000,
+                    prdis = 20_000,
+                    dis = 500,
+                    adis = 19_500,
+                    vra = 9,
+                    vam = 1_755,
+                    tsstam = 21255
+                }
+            }
+        };
+        return invoice;
+    }
+
+    private static InvoiceDto CreateInvalidInvoice()
+    {
+        var random = new Random();
+        var serial = random.NextInt64(1_000_000_000);
+        var now = DateTime.Now;
+        var taxId = GenerateTaxId(serial, now);
+        var inno = serial.ToString("X").PadLeft(10, '0');
+        var indatim = new DateTimeOffset(now).ToUnixTimeMilliseconds();
+
+        var invoice = new InvoiceDto()
+        {
+            Header = new HeaderDto()
+            {
+                taxid = taxId,
+                inno = inno,
+                indatim = indatim,
+                indati2m = indatim,
+                inty = 1,
+                inp = 7,
+                ins = 1,
+                tins = "14003778990",
+                tinb = "10100302746",
+                tprdis = 30_000,
+                tdis = 500,
+                tadis = 19_500,
+                tvam = 1_765,
+                todam = 1_000,
+                tbill = 21_255,
+                setm = 3
+            },
+            Body = new List<BodyItemDto>()
+            {
+                new()
+                {
+                    sstid = "1710000138624",
+                    sstt = "کالای اشتباه",
+                    mu = "164",
+                    am = 2,
+                    fee = 10_000,
+                    prdis = 20_000,
+                    dis = 0,
+                    adis = 19_500,
+                    vra = 10,
+                    vam = 0,
+                    tsstam = 20_000
+                }
+            }
+        };
+        return invoice;
+    }
+
+    private static string GenerateTaxId(long serial, DateTime now)
+    {
+        var taxIdProvider = new TaxIdProvider(new VerhoeffAlgorithm());
+        return taxIdProvider.GenerateTaxId(MemoryId, serial, now);
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/Program.cs`
+```csharp
+namespace TaxCollectData.Sample;
+
+internal class Program
+{
+    public static void Main(string[] args)
+    {
+        new TaxApiWithPkcs8SignatureSample().Run();
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/SampleExportInvoiceCreator.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Factories;
+
+namespace TaxCollectData.Sample;
+
+internal class SampleExportInvoiceCreator
+{
+    private readonly ITaxIdProvider _taxIdProvider;
+
+    public SampleExportInvoiceCreator()
+    {
+        _taxIdProvider = new TaxIdProviderFactory().Create();
+    }
+
+    public List<InvoiceDto> Create(string clientId, int count)
+    {
+        //Generate Random Serial number
+        var random = new Random();
+        long randomSerialDecimal = random.Next(999999999);
+        var now = new DateTimeOffset(DateTime.Now);
+        var taxId = _taxIdProvider.GenerateTaxId(clientId, randomSerialDecimal, DateTime.Now);
+
+        var invoiceDto = new InvoiceDto
+        {
+            Body = new() { GetInvoiceBodyDto() },
+            Header = GetInvoiceHeaderDto(now.ToUnixTimeMilliseconds(), taxId, randomSerialDecimal),
+            Payments = new() { GetPaymentDto() }
+        };
+        return Enumerable.Range(0, count).Select(_ => invoiceDto).ToList();
+    }
+
+    private static PaymentItemDto GetPaymentDto()
+    {
+        var payment = new PaymentItemDto
+        {
+            iinn = "1131244211",
+            acn = "2131244212",
+            trmn = "3131244213",
+            trn = "4131244214"
+        };
+        return payment;
+    }
+
+    private static BodyItemDto GetInvoiceBodyDto()
+    {
+        var body = new BodyItemDto
+        {
+            sstid = "1111111111",
+            sstt = "شیر کم چرب پاستوریزه",
+            mu = "006584",
+            am = 2,
+            fee = 500_000,
+            prdis = 500_000,
+            dis = 0,
+            adis = 500_000,
+            vra = 0,
+            vam = 0,
+            tsstam = 1000_000,
+            nw = 1000_000,
+            ssrv = 1000_000,
+            sscv = 1000_000
+        };
+        return body;
+    }
+
+    private static HeaderDto GetInvoiceHeaderDto(long now, string taxId, long randomSerialDecimal)
+    {
+        var header = new HeaderDto
+        {
+            inty = 1,
+            inp = 7,
+            inno = randomSerialDecimal.ToString(),
+            ins = 1,
+            tins = "14003778990",
+            tprdis = 1000_000,
+            tadis = 1000,
+            tdis = 0,
+            tvam = 0,
+            todam = 0,
+            tbill = 1000_000,
+            setm = 1,
+            cap = 1000_000,
+            insp = 1000_000,
+            tvop = 0,
+            tax17 = 0,
+            indatim = now,
+            indati2m = now,
+            taxid = taxId,
+            cdcd = 12345,
+            cdcn = "12345",
+            tonw = 1000_000,
+            torv = 1000_000,
+            tocv = 1000_000
+        };
+        return header;
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/SampleInvoiceCreator.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Factories;
+
+namespace TaxCollectData.Sample;
+
+internal class SampleInvoiceCreator
+{
+    private readonly ITaxIdProvider _taxIdProvider;
+
+    public SampleInvoiceCreator()
+    {
+        _taxIdProvider = new TaxIdProviderFactory().Create();
+    }
+
+    public List<InvoiceDto> Create(string clientId, int count)
+    {
+        //Generate Random Serial number
+        var random = new Random();
+        var randomSerialDecimal = random.NextInt64(1000000000, 9999999999);
+        var now = new DateTimeOffset(DateTime.Now);
+        var taxId = _taxIdProvider.GenerateTaxId(clientId, randomSerialDecimal, DateTime.Now);
+
+        var invoiceDto = new InvoiceDto
+        {
+            Body = new() { GetInvoiceBodyDto() },
+            Header = GetInvoiceHeaderDto(now.ToUnixTimeMilliseconds(), taxId, randomSerialDecimal),
+            Payments = new()
+        };
+        return Enumerable.Range(0, count).Select(_ => invoiceDto).ToList();
+    }
+
+    private static PaymentItemDto GetPaymentDto()
+    {
+        var payment = new PaymentItemDto
+        {
+            iinn = "1131244211",
+            acn = "2131244212",
+            trmn = "3131244213",
+            trn = "4131244214"
+        };
+        return payment;
+    }
+
+    private static BodyItemDto GetInvoiceBodyDto()
+    {
+        var body = new BodyItemDto
+        {
+            sstid = "2710000138624",
+            sstt = "سرسیلندر قطعات صنعت فولاد سازی",
+            mu = "164",
+            am = 2,
+            fee = 10000,
+            prdis = 20000,
+            dis = 500,
+            adis = 19500,
+            vra = 9,
+            vam = 1755,
+            tsstam = 21255
+        };
+        return body;
+    }
+
+    private static HeaderDto GetInvoiceHeaderDto(long now, string taxId, long randomSerialDecimal)
+    {
+        var header = new HeaderDto
+        {
+            inty = 1,
+            inp = 1,
+            inno = randomSerialDecimal.ToString("X").PadLeft(10, '0'),
+            ins = 1,
+            tob = 2,
+            bid = "10100302746",
+            tins = "14003778990",
+            tinb = "10100302746",
+            tprdis = 20000,
+            tadis = 19500,
+            tdis = 500,
+            tvam = 1755,
+            todam = 0,
+            tbill = 21255,
+            setm = 2,
+            indatim = now,
+            taxid = taxId
+        };
+        return header;
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/SampleTest.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+
+namespace TaxCollectData.Sample;
+
+public class SampleTest
+{
+    private readonly SampleInvoiceCreator _sampleInvoiceCreator = new();
+
+    public void Run(string clientId, ITaxPublicApi publicApi, ITaxApi taxApi)
+    {
+        // var startDate = new DateTime(2023, 5, 1, 3, 4, 5, DateTimeKind.Local);
+        // var endDate = new DateTime(2023, 5, 17, 3, 4, 5, DateTimeKind.Local);
+        var serverInformation = publicApi.GetServerInformation();
+        // var inquiryResultModels = taxApi.InquiryByTime(new(startDate)); 
+        // var inquiryRangeResultModels = taxApi.InquiryByTime(new(startDate, endDate));
+        var invoices = _sampleInvoiceCreator.Create(clientId, 1);
+        var responsePacketModels = taxApi.SendInvoices(invoices);
+        var referenceNumbers = responsePacketModels.Select(r => r.ReferenceNumber).ToList();
+        var uidList = responsePacketModels.Select(r => r.Uid).ToList();
+        Thread.Sleep(20000);
+        var inquiryUidResultModels = taxApi.InquiryByUid(new(uidList, clientId));
+        var inquiryByReferenceIdModels = taxApi.InquiryByReferenceId(new(referenceNumbers));
+        var taxpayer = taxApi.GetTaxpayer("14003778990");
+        var fiscalFullInformationModel = taxApi.GetFiscalInformation(clientId);
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/SampleTestWithArbitraryUid.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Cryptography;
+using TaxCollectData.Library.Clients;
+using TaxCollectData.Library.Configs;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Factories;
+using TaxCollectData.Library.Models;
+using TaxCollectData.Library.Properties;
+using System.Text;
+using System.Text.Json;
+using TaxCollectData.Library.Abstraction.Clients;
+
+namespace TaxCollectData.Sample;
+
+public class SampleTestWithArbitraryUid
+{
+    private const string ClientId = "A11226";
+    private const string BaseUrl = "http://master.nta.local/requestsmanager";
+    private const string PrivateKeyPath = @"privatekey1.pem";
+    private const string CertificatePath = @"cert1.crt";
+    private void TestSendWithUid(InvoiceDto invoice, string uid)
+    {
+        TaxApiFactory taxApiFactory = new TaxApiFactory(BaseUrl, new TaxProperties(ClientId));
+        ISignatory signatory = new Pkcs8SignatoryFactory().Create(PrivateKeyPath, CertificatePath);
+        ITaxPublicApi publicApi = taxApiFactory.CreatePublicApi(signatory);
+        IEncryptor encryptor = new EncryptorFactory().Create(publicApi);
+        LowLevelTaxApi lowLevelApi = taxApiFactory.CreateLowLevelApi(signatory);
+        BatchResponseModel responseModel = lowLevelApi.SendInvoices(new List<PacketDto>
+        {
+            GetPacket(invoice, uid, signatory, encryptor)
+        });
+    }
+    
+    private PacketDto GetPacket(InvoiceDto invoiceDto, string uid, ISignatory signatory, IEncryptor encryptor)
+    {
+        string payload = encryptor.Encrypt(signatory.Sign(Serialize(invoiceDto)));
+        PacketHeaderDto packetHeaderDto = new PacketHeaderDto
+        {
+            RequestTraceId = uid,
+            FiscalId = ClientId
+        };
+        return new PacketDto
+        {
+            Header = packetHeaderDto,
+            Payload = payload
+        };
+    }
+    
+    private string Serialize(object dto)
+    {
+        return Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(dto, JsonSerializerConfig.JsonSerializerOptions));
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/TaxApiWithPkcs11SignatureSample.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Factories;
+using TaxCollectData.Library.Properties;
+
+namespace TaxCollectData.Sample;
+
+internal class TaxApiWithPkcs11SignatureSample
+{
+    private const string ClientId = "A11226";
+
+    // private const string BaseUrl = "http://master.nta.local/requestsmanager/api";
+    private const string BaseUrl = "http://localhost:8055/requestsmanager/api";
+    private const string TokenSerialNumber = "2da4b5e60001000d7ca6";
+
+    private readonly SampleTest _sampleTest = new();
+
+    public void Run()
+    {
+        var taxApi = GetTaxApi(out var publicApi);
+        _sampleTest.Run(ClientId, publicApi, taxApi);
+    }
+
+    private ITaxApi GetTaxApi(out ITaxPublicApi publicApi)
+    {
+        var pkcs11SignatoryFactory = new Pkcs11SignatoryFactory();
+        var encryptorFactory = new EncryptorFactory();
+
+        var properties = new TaxProperties(ClientId);
+        var taxApiFactory = new TaxApiFactory(BaseUrl, properties);
+
+        var pkcs11LibraryPath = @$"{AppContext.BaseDirectory}Cryptography\Pkcs11\ShuttleCsp11_3003.dll";
+        var signatory = pkcs11SignatoryFactory.Create(TokenSerialNumber, pkcs11LibraryPath, "1234");
+        publicApi = taxApiFactory.CreatePublicApi(signatory);
+        var encryptor = encryptorFactory.Create(publicApi);
+
+        return taxApiFactory.CreateApi(signatory, encryptor);
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/TaxApiWithPkcs8SignatureSample.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Factories;
+using TaxCollectData.Library.Properties;
+
+namespace TaxCollectData.Sample;
+
+internal class TaxApiWithPkcs8SignatureSample
+{
+    private const string ClientId = "A1117Z";
+
+    private const string BaseUrl = "http://master.nta.local/requestsmanager";
+    // private const string BaseUrl = "http://localhost:8055/requestsmanager/api";
+    private const string PrivateKeyPath = @"MohammadAminSalemi_expire.key";
+    private const string CertificatePath = @"MohammadAminSalemi_expire.cer";
+
+    private readonly SampleTest _sampleTest = new();
+
+    public void Run()
+    {
+        var taxApi = GetTaxApi(out var publicApi);
+        _sampleTest.Run(ClientId, publicApi, taxApi);
+    }
+
+    private ITaxApi GetTaxApi(out ITaxPublicApi publicApi)
+    {
+        var pkcs8SignatoryFactory = new Pkcs8SignatoryFactory();
+        var encryptorFactory = new EncryptorFactory();
+        var properties = new TaxProperties(ClientId);
+        var taxApiFactory = new TaxApiFactory(BaseUrl, properties);
+        var signatory = pkcs8SignatoryFactory.Create(PrivateKeyPath, CertificatePath);
+        publicApi = taxApiFactory.CreatePublicApi(signatory);
+        var encryptor = encryptorFactory.Create(publicApi);
+        return taxApiFactory.CreateApi(signatory, encryptor);
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/TaxClient.cs`
+```csharp
+using TaxCollectData.Library.Abstraction.Clients;
+using TaxCollectData.Library.Algorithms;
+using TaxCollectData.Library.Dto;
+using TaxCollectData.Library.Enums;
+using TaxCollectData.Library.Factories;
+using TaxCollectData.Library.Properties;
+using TaxCollectData.Library.Providers;
+
+namespace TaxCollectData.Sample;
+
+public static class TaxClient
+{
+    private const string MemoryId = "A111YO";
+    private const string ApiUrl = "http://master.nta.local/requestsmanager";
+    private const string PrivateKeyPath = @"privatekey1.pem";
+    private const string CertificatePath = @"cert1.crt";
+
+    public static void Run()
+    {
+        var taxApi = CreateTaxApi();
+
+        var validInvoice = CreateValidInvoice();
+        var invalidInvoice = CreateInvalidInvoice();
+
+        var invoiceList = new List<InvoiceDto>()
+        {
+            validInvoice,
+            invalidInvoice
+        };
+
+        var responseModels = taxApi.SendInvoices(invoiceList);
+
+        Thread.Sleep(10_000);
+        
+        DateTime startDate = DateTime.Now.AddDays(-1).ToLocalTime();
+        DateTime endDate = DateTime.Now.ToLocalTime();
+
+        var inquiryResultModels = taxApi.InquiryByTime(new(startDate, endDate, null, RequestStatus.PENDING));
+        var inquiryResultModels2 = taxApi.InquiryByTime(new(startDate, endDate, null, RequestStatus.SUCCESS));
+
+        var referenceNumbers = responseModels.Select(r => r.ReferenceNumber).ToList();
+        var inquiryDto = new InquiryByReferenceNumberDto(referenceNumbers, startDate, endDate);
+        var inquiryResults = taxApi.InquiryByReferenceId(inquiryDto);
+    }
+
+    private static ITaxApi CreateTaxApi()
+    {
+        var pkcs8SignatoryFactory = new Pkcs8SignatoryFactory();
+        var encryptorFactory = new EncryptorFactory();
+        var properties = new TaxProperties(MemoryId);
+        var taxApiFactory = new TaxApiFactory(ApiUrl, properties);
+        var signatory = pkcs8SignatoryFactory.Create(PrivateKeyPath, CertificatePath);
+        var publicApi = taxApiFactory.CreatePublicApi(signatory);
+        var encryptor = encryptorFactory.Create(publicApi);
+        return taxApiFactory.CreateApi(signatory, encryptor);
+    }
+
+    private static InvoiceDto CreateValidInvoice()
+    {
+        var random = new Random();
+        var serial = random.NextInt64(1_000_000_000);
+        var now = DateTime.Now;
+        var taxId = GenerateTaxId(serial, now);
+        var inno = serial.ToString("X").PadLeft(10, '0');
+        var indatim = new DateTimeOffset(now).ToUnixTimeMilliseconds();
+
+        var invoice = new InvoiceDto()
+        {
+            Header = new HeaderDto()
+            {
+                taxid = taxId,
+                inno = inno,
+                indatim = indatim,
+                inty = 1,
+                inp = 1,
+                ins = 1,
+                tins = "14003778990",
+                tinb = "10100302746",
+                tprdis = 20_000,
+                tdis = 500,
+                tadis = 19_500,
+                tvam = 1_755,
+                todam = 0, 
+                tbill = 21_255,
+                setm = 2
+            },
+            Body = new List<BodyItemDto>()
+            {
+                new()
+                {
+                    sstid = "2710000138624",
+                    sstt = "سرسیلندر قطعات صنعت فولاد سازی",
+                    mu = "164",
+                    am = 2,
+                    fee = 10_000,
+                    prdis = 20_000,
+                    dis = 500,
+                    adis = 19_500,
+                    vra = 9,
+                    vam = 1_755,
+                    tsstam = 21255
+                }
+            }
+        };
+        return invoice;
+    }
+
+    private static InvoiceDto CreateInvalidInvoice()
+    {
+        var random = new Random();
+        var serial = random.NextInt64(1_000_000_000);
+        var now = DateTime.Now;
+        var taxId = GenerateTaxId(serial, now);
+        var inno = serial.ToString("X").PadLeft(10, '0');
+        var indatim = new DateTimeOffset(now).ToUnixTimeMilliseconds();
+
+        var invoice = new InvoiceDto()
+        {
+            Header = new HeaderDto()
+            {
+                taxid = taxId,
+                inno = inno,
+                indatim = indatim,
+                inty = 1,
+                inp = 7,
+                ins = 1,
+                tins = "14003778990",
+                tinb = "10100302746",
+                tprdis = 30_000,
+                tdis = 500,
+                tadis = 19_500,
+                tvam = 1_765,
+                todam = 1_000,
+                tbill = 21_255,
+                setm = 3
+            },
+            Body = new List<BodyItemDto>()
+            {
+                new()
+                {
+                    sstid = "1710000138624",
+                    sstt = "کالای اشتباه",
+                    mu = "164",
+                    am = 2,
+                    fee = 10_000,
+                    prdis = 20_000,
+                    dis = 0,
+                    adis = 19_500,
+                    vra = 10,
+                    vam = 0,
+                    tsstam = 20_000
+                }
+            }
+        };
+        return invoice;
+    }
+
+    private static string GenerateTaxId(long serial, DateTime now)
+    {
+        var taxIdProvider = new TaxIdProvider(new VerhoeffAlgorithm());
+        return taxIdProvider.GenerateTaxId(MemoryId, serial, now);
+    }
+}
+```
+
+### File: `TaxCollectData.Sample/TaxCollectData.Sample.csproj`
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net7.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\TaxCollectData.Library\TaxCollectData.Library.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="privatekey1.pem">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Include="cert1.crt">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Include="MohammadAminSalemi_expire.cer">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Include="MohammadAminSalemi_expire.key">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Update="ShuttleCsp11_3003.dll">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+</Project>
+```
+
+### File: `TaxCollectData.Test/JweEncryptionTests.cs`
+```csharp
+using System.Collections.Generic;
+using Xunit;
+using TaxCollectData.Library.Cryptography;
+using TaxCollectData.Library.Models;
+using TaxCollectData.Library.Repositories;
+
+
+namespace TaxCollectData.Test;
+
+public class JweEncryptionTests
+{
+    [Fact]
+    public void Test()
+    {
+        var publicKeys = new List<KeyModel>()
+        {
+            new()
+            {
+                Algorithm = "RSA",
+                Id = "6a2bcd88-a871-4245-a393-2843eafe6e02",
+                Key = "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAxdzREOEfk3vBQogDPGTMqdDQ7t0oDhuKMZkA+Wm1lhzjjhAGfSUOuDvOKRoUEQwP8oUcXRmYzcvCUgcfoRT5iz7HbovqH+bIeJwT4rmLmFcbfPke+E3DLUxOtIZifEXrKXWgSVPkRnhMgym6UiAtnzwA1rmKstJoWpk9Nv34CYgTk8DKQN5jQJqb9L/Ng0zOEEtI3zA424tsd9zv/kP4/SaSnbbnj0evqsZ29X6aBypvnTnwH9t3gbWM4I9eAVQhPYClawHTqvdaz/O/feqfm06QBFnCgL+CBdjLs30xQSLsPICjnlV1jMzoTZnAabWP6FRzzj6C2sxw9a/WwlXrKn3gldZ7Ctv6Jso72cEeCeUI1tzHMDJPU3Qy12RQzaXujpMhCz1DVa47RvqiumpTNyK9HfFIdhgoupFkxT14XLDl65S55MF6HuQvo/RHSbBJ93FQ+2/x/Q2MNGB3BXOjNwM2pj3ojbDv3pj9CHzvaYQUYM1yOcFmIJqJ72uvVf9Jx9iTObaNNF6pl52ADmh85GTAH1hz+4pR/E9IAXUIl/YiUneYu0G4tiDY4ZXykYNknNfhSgxmn/gPHT+7kL31nyxgjiEEhK0B0vagWvdRCNJSNGWpLtlq4FlCWTAnPI5ctiFgq925e+sySjNaORCoHraBXNEwyiHT2hu5ZipIW2cCAwEAAQ==",
+                Purpose = 1
+            }
+        };
+
+        var encryptionKeyRepository = new EncryptionKeyRepository(() => publicKeys);
+        var encryptor = new JweEncryptor(encryptionKeyRepository);
+        var s = encryptor.Encrypt("Salam");
+    }
+}
+```
+
+### File: `TaxCollectData.Test/TaxCollectData.Test.csproj`
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <Nullable>enable</Nullable>
+
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0"/>
+        <PackageReference Include="xunit" Version="2.4.1"/>
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="coverlet.collector" Version="3.1.0">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="FluentAssertions" Version="6.7.0"/>
+        <PackageReference Include="Moq" Version="4.18.2"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\TaxCollectData.Library\TaxCollectData.Library.csproj"/>
+    </ItemGroup>
+
+</Project>
+```
+
+### File: `TaxCollectData.Test/VerhoffProviderTests.cs`
+```csharp
+using FluentAssertions;
+using TaxCollectData.Library.Abstraction.Providers;
+using TaxCollectData.Library.Algorithms;
+using Xunit;
+
+namespace TaxCollectData.Test;
+
+public class VerhoffProviderTests
+{
+    private const string Number = "123";
+    private readonly IErrorDetectionAlgorithm _errorDetectionAlgorithm;
+
+    public VerhoffProviderTests()
+    {
+        _errorDetectionAlgorithm = new VerhoeffAlgorithm();
+    }
+
+    [Fact]
+    public void ValidateVerhoeffTest()
+    {
+        _errorDetectionAlgorithm.ValidateCheckDigit(Number).Should().BeFalse();
+    }
+
+    [Fact]
+    public void GenerateVerhoeffTest()
+    {
+        _errorDetectionAlgorithm.GenerateCheckDigit(Number).Should().Be("3");
+    }
+}
+```
+
