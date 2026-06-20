@@ -402,9 +402,31 @@ namespace Prg_Moadian.Bulk
             long invoiceNum = long.Parse(number.ToString());
             // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
-            // 3. serial TaxId = همان عدد Inno → رفع هشدار 1300501 (عدم تطابق serial)
-            // سریال‌های قدیمی رندوم ≤ 999,999,999 بودند؛ serial جدید ≥ 1,404,000,000 → بدون تداخل
-            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
+
+            // 3. بررسی ارسال قبلی — اگر این فاکتور قبلاً با همین حافظه مالیاتی به مودیان رسیده،
+            //    Taxid و Indatim اولین ارسال را دوباره استفاده کن تا خطای 0300101 نگیریم.
+            //    (تغییر serial از رندوم به ثابت در 538fcfd و تغییر ساعت در ce695e2 Taxid را عوض کرد
+            //     و همین باعث «شماره مالیاتی صورتحساب با اطلاعات سامانه منطبق نیست» شد.)
+            string taxId;
+            var prevRecord = _db.DoGetDataSQL<TAXDTL>(
+                @"SELECT TOP 1 Taxid, Indatim_Sec FROM dbo.TAXDTL
+                  WHERE NUMBER=@num AND TAG=@tg
+                    AND SentTaxMemory=@mem
+                    AND Taxid IS NOT NULL AND LEN(Taxid) > 0
+                  ORDER BY IDD ASC",
+                new { num = number, tg = tag, mem = _memoryId }
+            ).FirstOrDefault();
+
+            if (prevRecord?.Taxid != null && !string.IsNullOrWhiteSpace(prevRecord.Taxid))
+            {
+                taxId = prevRecord.Taxid;
+                if (prevRecord.Indatim_Sec.HasValue && prevRecord.Indatim_Sec.Value > 0)
+                    ts = prevRecord.Indatim_Sec.Value;
+            }
+            else
+            {
+                taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
+            }
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto
