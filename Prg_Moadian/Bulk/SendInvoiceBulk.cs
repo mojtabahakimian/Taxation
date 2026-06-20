@@ -402,9 +402,10 @@ namespace Prg_Moadian.Bulk
             long invoiceNum = long.Parse(number.ToString());
             // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
-            // 3. serial TaxId = همان عدد Inno → رفع هشدار 1300501 (عدم تطابق serial)
-            // سریال‌های قدیمی رندوم ≤ 999,999,999 بودند؛ serial جدید ≥ 1,404,000,000 → بدون تداخل
-            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
+
+            // Taxid و Indatim هر دو از DATE_N فاکتور می‌آیند — serial تصادفی تضمین می‌کند
+            // که هر ارسال (از جمله resend پس از ابطالی) یک Taxid منحصربه‌فرد بگیرد.
+            var taxId = _taxService.RequestTaxId(_memoryId, dt);
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto

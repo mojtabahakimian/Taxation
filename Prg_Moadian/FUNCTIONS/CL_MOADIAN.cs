@@ -311,32 +311,31 @@ namespace Prg_Moadian.FUNCTIONS
             string? src_taxid = null;
             long src_Indatim = 0;
             long src_Indati2m = 0;
-            // تعیین DTBASE و src_Indatim
+            var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+            var serverNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZ);
+
             switch (_HEAD_EXTENDED.ins) //نوع صورت حساب
             {
                 case 4: //از نوع برگشتی
                     var rDate = dbms.DoGetDataSQL<string>($"SELECT DATE_N FROM dbo.HEAD_LST_FBK WHERE NUMBER1 = {NUMBER}").FirstOrDefault();
                     DtNowBase = TheFunctions.GetGregorianDateTime(rDate);
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
-                    src_Indatim = TaxService.ConvertDateToLong(DtNowBase); //2.
+                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase);
+                    src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 case 2: //اصلاحی
                 case 3: //یا ابطالی
-                    var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+                    DtNowBase = serverNow;
 
-                    var serverUtcNow = DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
-                    DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
-
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
+                    src_taxid = taxService.RequestTaxId(MemoryID, serverNow);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 default:
                     DtNowBase = TheFunctions.GetGregorianDateTime(L_DRV_TBL_US.First().DATE_N.ToString());
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
+                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
             }
