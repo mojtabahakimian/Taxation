@@ -65,8 +65,8 @@ namespace Prg_Moadian.Service
             var iranOffset = new TimeSpan(3, 30, 0);
             // اگر Kind=Utc بود ابتدا با آفست ثابت ایران تبدیل کن (ایران DST ندارد)
             if (dateTime.Kind == DateTimeKind.Utc)
-                dateTime = DateTime.SpecifyKind(dateTime + iranOffset, DateTimeKind.Unspecified);
-            return new DateTimeOffset(dateTime, iranOffset).ToUnixTimeMilliseconds();
+                dateTime = dateTime + iranOffset;
+            return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified), iranOffset).ToUnixTimeMilliseconds();
         }
 
         public TaxModel.SendInvoicesModel SendInvoices(TaxModel.InvoiceModel.Header header, List<TaxModel.InvoiceModel.Body> body, List<TaxModel.InvoiceModel.Payment> payment)
