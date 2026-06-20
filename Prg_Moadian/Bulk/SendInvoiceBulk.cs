@@ -413,6 +413,7 @@ namespace Prg_Moadian.Bulk
                   WHERE NUMBER=@num AND TAG=@tg
                     AND SentTaxMemory=@mem
                     AND Taxid IS NOT NULL AND LEN(Taxid) > 0
+                    AND TheSuccess = 1
                   ORDER BY IDD ASC",
                 new { num = number, tg = tag, mem = _memoryId }
             ).FirstOrDefault();
@@ -425,7 +426,9 @@ namespace Prg_Moadian.Bulk
             }
             else
             {
-                taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
+                // invoiceNum (مثلاً 2736) ≤ 999,999,999 → serial معتبر
+                // long.Parse(finalInno) (مثلاً 1405002736) > 999,999,999 → serial نامعتبر → خطای 0300101
+                taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, invoiceNum);
             }
 
             // آماده‌سازی Header
