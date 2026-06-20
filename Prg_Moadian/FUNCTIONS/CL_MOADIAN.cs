@@ -311,9 +311,6 @@ namespace Prg_Moadian.FUNCTIONS
             string? src_taxid = null;
             long src_Indatim = 0;
             long src_Indati2m = 0;
-            // زمان جاری سرور — برای تولید Taxid در همه حالت‌ها استفاده می‌شود
-            // (Indatim جداگانه از DATE_N تاریخچه‌ای تنظیم می‌شود؛ Taxid باید هر بار منحصربه‌فرد باشد
-            //  تا پس از ابطال بتوان فاکتور را مجدداً با Taxid جدید ارسال کرد)
             var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
             var serverNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZ);
 
@@ -323,8 +320,9 @@ namespace Prg_Moadian.FUNCTIONS
                     var rDate = dbms.DoGetDataSQL<string>($"SELECT DATE_N FROM dbo.HEAD_LST_FBK WHERE NUMBER1 = {NUMBER}").FirstOrDefault();
                     DtNowBase = TheFunctions.GetGregorianDateTime(rDate);
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, serverNow, NUMBER);
-                    src_Indatim = TaxService.ConvertDateToLong(DtNowBase); //2.
+                    // serial تصادفی: Taxid.TimeComponent = Indatim = DATE_N فاکتور اصلی
+                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase);
+                    src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 case 2: //اصلاحی
@@ -338,7 +336,9 @@ namespace Prg_Moadian.FUNCTIONS
                 default:
                     DtNowBase = TheFunctions.GetGregorianDateTime(L_DRV_TBL_US.First().DATE_N.ToString());
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, serverNow, NUMBER);
+                    // serial تصادفی: هر ارسال (از جمله resend پس از ابطالی) Taxid منحصربه‌فرد می‌گیرد
+                    // و Taxid.TimeComponent = Indatim = DATE_N — هیچ mismatch‌ای با سامانه مودیان نیست
+                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
             }
