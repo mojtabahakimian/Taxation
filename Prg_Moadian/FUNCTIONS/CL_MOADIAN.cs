@@ -311,8 +311,8 @@ namespace Prg_Moadian.FUNCTIONS
             string? src_taxid = null;
             long src_Indatim = 0;
             long src_Indati2m = 0;
-            var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
-            var serverNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZ);
+            // آفست ثابت +03:30 — ایران DST ندارد، نیازی به tzdata یا FindSystemTimeZoneById نیست
+            var serverNow = DateTime.SpecifyKind(DateTime.UtcNow + TokenLifeTime.ServerClockSkew + new TimeSpan(3, 30, 0), DateTimeKind.Unspecified);
 
             switch (_HEAD_EXTENDED.ins) //نوع صورت حساب
             {
