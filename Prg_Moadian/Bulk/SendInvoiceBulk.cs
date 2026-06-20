@@ -403,9 +403,15 @@ namespace Prg_Moadian.Bulk
             // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
 
-            // Taxid و Indatim هر دو از DATE_N فاکتور می‌آیند — serial تصادفی تضمین می‌کند
-            // که هر ارسال (از جمله resend پس از ابطالی) یک Taxid منحصربه‌فرد بگیرد.
-            var taxId = _taxService.RequestTaxId(_memoryId, dt);
+            // idempotency: اگر این فاکتور قبلاً با موفقیت در مودیان ثبت شده، همان TaxId را استفاده کن
+            // تا در صورت timeout شبکه و retry کاربر، ghost invoice در مودیان ایجاد نشود
+            var prevAcceptedTaxId = _db.DoGetDataSQL<TAXDTL>(
+                "SELECT TOP 1 Taxid FROM dbo.TAXDTL WHERE NUMBER=@num AND TAG=@tg AND SentTaxMemory=@mem AND TheSuccess=1",
+                new { num = number, tg = tag, mem = _memoryId }
+            ).FirstOrDefault()?.Taxid;
+            var taxId = string.IsNullOrWhiteSpace(prevAcceptedTaxId)
+                ? _taxService.RequestTaxId(_memoryId, dt)
+                : prevAcceptedTaxId;
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto

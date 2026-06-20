@@ -329,7 +329,11 @@ namespace Prg_Moadian.FUNCTIONS
                 case 3: //یا ابطالی
                     DtNowBase = serverNow; // اصلاحی/ابطالی: Indatim هم زمان جاری سرور است
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, serverNow, NUMBER);
+                    // NUMBER می‌تواند بزرگتر از 999,999,999 باشد — با modulo کلمپ می‌کنیم
+                    long safeSerial = NUMBER > 0 && NUMBER <= 999_999_999
+                        ? NUMBER
+                        : Math.Max(1L, NUMBER % 999_999_999);
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, serverNow, safeSerial);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
