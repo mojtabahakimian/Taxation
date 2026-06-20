@@ -311,32 +311,34 @@ namespace Prg_Moadian.FUNCTIONS
             string? src_taxid = null;
             long src_Indatim = 0;
             long src_Indati2m = 0;
-            // تعیین DTBASE و src_Indatim
+            // زمان جاری سرور — برای تولید Taxid در همه حالت‌ها استفاده می‌شود
+            // (Indatim جداگانه از DATE_N تاریخچه‌ای تنظیم می‌شود؛ Taxid باید هر بار منحصربه‌فرد باشد
+            //  تا پس از ابطال بتوان فاکتور را مجدداً با Taxid جدید ارسال کرد)
+            var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+            var serverNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZ);
+
             switch (_HEAD_EXTENDED.ins) //نوع صورت حساب
             {
                 case 4: //از نوع برگشتی
                     var rDate = dbms.DoGetDataSQL<string>($"SELECT DATE_N FROM dbo.HEAD_LST_FBK WHERE NUMBER1 = {NUMBER}").FirstOrDefault();
                     DtNowBase = TheFunctions.GetGregorianDateTime(rDate);
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, NUMBER);
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, serverNow, NUMBER);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase); //2.
                     break;
 
                 case 2: //اصلاحی
                 case 3: //یا ابطالی
-                    var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+                    DtNowBase = serverNow; // اصلاحی/ابطالی: Indatim هم زمان جاری سرور است
 
-                    var serverUtcNow = DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
-                    DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
-
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, NUMBER);
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, serverNow, NUMBER);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 default:
                     DtNowBase = TheFunctions.GetGregorianDateTime(L_DRV_TBL_US.First().DATE_N.ToString());
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, NUMBER);
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, serverNow, NUMBER);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
             }

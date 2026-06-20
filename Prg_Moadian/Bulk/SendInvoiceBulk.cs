@@ -403,9 +403,12 @@ namespace Prg_Moadian.Bulk
             // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
 
-            // invoiceNum (مثلاً 2736) ≤ 999,999,999 → serial معتبر در Taxid
-            // long.Parse(finalInno) (مثلاً 1405002736) > 999,999,999 → serial نامعتبر → خطای 0300101
-            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, invoiceNum);
+            // Indatim = تاریخ فاکتور (DATE_N) — ثابت، برای انطباق قانونی
+            // Taxid: از زمان جاری سرور استفاده می‌شود تا هر ارسال Taxid منحصربه‌فرد بگیرد.
+            // دلیل: Moadian حتی Taxidهای ابطال‌شده را هم در سیستم نگه می‌دارد و دوباره ثبت نمی‌کند.
+            var iranTZBulk = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+            var serverNowBulk = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow + TokenLifeTime.ServerClockSkew, iranTZBulk);
+            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, serverNowBulk, invoiceNum);
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto
