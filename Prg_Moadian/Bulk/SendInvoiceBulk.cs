@@ -74,8 +74,9 @@ namespace Prg_Moadian.Bulk
         /// <param name="progress">گزارش پیشرفت</param>
         /// <param name="useCustomDate">استفاده از تاریخ سفارشی</param>
         /// <param name="customDateText">متن تاریخ سفارشی (مثال: 1404/08/24)</param>
+        /// <param name="sendOptionalItemName">ارسال نام اختیاری کالا/خدمت در فیلد sstt</param>
         public async Task<BulkSendResult> SendAsync(IEnumerable<long> invoiceNumbers, int tag, int? inty_value = default, int? setm_value = default,
-            IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null)
+            IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
         {
             var cer = new CustomExceptErMsg();
 
@@ -96,7 +97,7 @@ namespace Prg_Moadian.Bulk
 
                 try
                 {
-                    var (dto, records) = BuildDtoAndRecords(number, tag, inty_value, setm_value, useCustomDate, customDateText);
+                    var (dto, records) = BuildDtoAndRecords(number, tag, inty_value, setm_value, useCustomDate, customDateText, sendOptionalItemName);
 
                     allDtos.Add(dto);
                     allRecords[dto] = records;
@@ -175,7 +176,7 @@ namespace Prg_Moadian.Bulk
             return result;
         }
 
-        private (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default, bool useCustomDate = false, string customDateText = null)
+        private (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
         {
             // 1. بارگذاری HEAD_LST_EXTENDED
             var headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
@@ -401,9 +402,10 @@ namespace Prg_Moadian.Bulk
             long invoiceNum = long.Parse(number.ToString());
             // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
-            // 3. serial TaxId = همان عدد Inno → رفع هشدار 1300501 (عدم تطابق serial)
-            // سریال‌های قدیمی رندوم ≤ 999,999,999 بودند؛ serial جدید ≥ 1,404,000,000 → بدون تداخل
-            var taxId = _taxService.RequestTaxIdWithSpecificSerial(_memoryId, dt, long.Parse(finalInno));
+
+            // Taxid و Indatim هر دو از DATE_N فاکتور می‌آیند — serial تصادفی تضمین می‌کند
+            // که هر ارسال (از جمله resend پس از ابطالی) یک Taxid منحصربه‌فرد بگیرد.
+            var taxId = _taxService.RequestTaxId(_memoryId, dt);
 
             // آماده‌سازی Header
             var header = new InvoiceHeaderDto
@@ -484,7 +486,7 @@ namespace Prg_Moadian.Bulk
             {
 
                 Sstid = l.sstid, //شناسه کالا/خدمت //CODE	STUF_DEF
-                Sstt = l.KALA, //شرح کالا/خدمت //NAME	STUF_DEF
+                Sstt = sendOptionalItemName ? l.KALA : null, //شرح اختیاری کالا/خدمت //NAME	STUF_DEF
                 Mu = l.mu, //واحد اندازه گیری //VNAMES	TCOD_VAHEDS
                 Am = l.MEGHk ?? 0, //تعداد/مقدار //MEGH	INVO_LST
                 Fee = l.MABL ?? 0, //مبلغ واحد //MABL	INVO_LST

@@ -55,18 +55,18 @@ namespace Prg_Moadian.Service
 
         public string RequestTaxId(string memoryId, DateTime date)
         {
-            long serial = Random.Shared.Next(999999999);
+            // بازه [1, 999_999_999] — serial=0 نامعتبر است، 999_999_999 حداکثر مجاز مودیان
+            long serial = Random.Shared.Next(1, 1_000_000_000);
             return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
         }
 
         public static long ConvertDateToLong(DateTime dateTime)
         {
-            ////شاید بعدا , صرفا اینجا باشه
-            ////// حذف ثانیه و میلی‌ثانیه 
-            ////dateTime = dateTime.AddTicks(-(dateTime.Ticks % TimeSpan.TicksPerMinute));
-            ////return new DateTimeOffset(dateTime).ToUnixTimeMilliseconds();
-
-            return new DateTimeOffset(dateTime).ToUnixTimeMilliseconds();
+            var iranOffset = new TimeSpan(3, 30, 0);
+            // اگر Kind=Utc بود ابتدا با آفست ثابت ایران تبدیل کن (ایران DST ندارد)
+            if (dateTime.Kind == DateTimeKind.Utc)
+                dateTime = dateTime + iranOffset;
+            return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified), iranOffset).ToUnixTimeMilliseconds();
         }
 
         public TaxModel.SendInvoicesModel SendInvoices(TaxModel.InvoiceModel.Header header, List<TaxModel.InvoiceModel.Body> body, List<TaxModel.InvoiceModel.Payment> payment)

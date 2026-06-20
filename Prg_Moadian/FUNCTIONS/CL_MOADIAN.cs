@@ -311,32 +311,38 @@ namespace Prg_Moadian.FUNCTIONS
             string? src_taxid = null;
             long src_Indatim = 0;
             long src_Indati2m = 0;
-            // تعیین DTBASE و src_Indatim
+            // آفست ثابت +03:30 — ایران DST ندارد، نیازی به tzdata یا FindSystemTimeZoneById نیست
+            var serverNow = DateTime.SpecifyKind(DateTime.UtcNow + TokenLifeTime.ServerClockSkew + new TimeSpan(3, 30, 0), DateTimeKind.Unspecified);
+
             switch (_HEAD_EXTENDED.ins) //نوع صورت حساب
             {
                 case 4: //از نوع برگشتی
                     var rDate = dbms.DoGetDataSQL<string>($"SELECT DATE_N FROM dbo.HEAD_LST_FBK WHERE NUMBER1 = {NUMBER}").FirstOrDefault();
                     DtNowBase = TheFunctions.GetGregorianDateTime(rDate);
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
-                    src_Indatim = TaxService.ConvertDateToLong(DtNowBase); //2.
+                    // serial تصادفی: Taxid.TimeComponent = Indatim = DATE_N فاکتور اصلی
+                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase);
+                    src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 case 2: //اصلاحی
                 case 3: //یا ابطالی
-                    var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+                    DtNowBase = serverNow; // اصلاحی/ابطالی: Indatim هم زمان جاری سرور است
 
-                    var serverUtcNow = DateTime.UtcNow + TokenLifeTime.ServerClockSkew;
-                    DtNowBase = TimeZoneInfo.ConvertTimeFromUtc(serverUtcNow, iranTZ);
-
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
+                    // NUMBER می‌تواند بزرگتر از 999,999,999 باشد — با modulo کلمپ می‌کنیم
+                    long safeSerial = NUMBER > 0 && NUMBER <= 999_999_999
+                        ? NUMBER
+                        : Math.Max(1L, NUMBER % 999_999_999);
+                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, serverNow, safeSerial);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
 
                 default:
                     DtNowBase = TheFunctions.GetGregorianDateTime(L_DRV_TBL_US.First().DATE_N.ToString());
 
-                    src_taxid = taxService.RequestTaxIdWithSpecificSerial(MemoryID, DtNowBase, long.Parse(StarterInnoNumber));
+                    // serial تصادفی: هر ارسال (از جمله resend پس از ابطالی) Taxid منحصربه‌فرد می‌گیرد
+                    // و Taxid.TimeComponent = Indatim = DATE_N — هیچ mismatch‌ای با سامانه مودیان نیست
+                    src_taxid = taxService.RequestTaxId(MemoryID, DtNowBase);
                     src_Indatim = TaxService.ConvertDateToLong(DtNowBase);
                     break;
             }
