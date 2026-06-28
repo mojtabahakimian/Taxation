@@ -68,12 +68,20 @@ namespace Prg_Grpsend.Utility
             // روی sub-STA-thread با timeout اجرا می‌شود تا اگر سرور کند/قطع بود، block نشویم
             var thread = new System.Threading.Thread(() =>
             {
-                TINYLib.Tiny tiny = new TINYLib.Tiny();
-                tiny.ServerIP = Baseknow.SERVERNAM;
-                tiny.NetWorkINIT = true;
-                int err = (int)tiny.TinyErrCode;
-                LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={err}");
-                result = err == 0;
+                try
+                {
+                    TINYLib.Tiny tiny = new TINYLib.Tiny();
+                    tiny.ServerIP = Baseknow.SERVERNAM;
+                    tiny.NetWorkINIT = true;
+                    int err = (int)tiny.TinyErrCode;
+                    LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={err}");
+                    result = err == 0;
+                }
+                catch (Exception ex)
+                {
+                    LockLogger.Write($"[INIT THREAD EX] {ex.GetType().Name}: {ex.Message}");
+                    // result = false باقی می‌ماند
+                }
             });
             thread.SetApartmentState(System.Threading.ApartmentState.STA);
             thread.IsBackground = true;
@@ -146,6 +154,11 @@ namespace Prg_Grpsend.Utility
                         {
                             LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        // exception را داخل thread می‌بلعیم تا app crash نکند
+                        LockLogger.Write($"[KEY THREAD EX] {pw[..8]}... → {ex.GetType().Name}: {ex.Message}");
                     }
                     finally
                     {
