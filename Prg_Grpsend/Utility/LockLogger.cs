@@ -22,13 +22,18 @@ namespace Prg_Grpsend.Utility
 #endif
         }
 
+        private static readonly object _fileLock = new object();
+
         public static void Write(string message)
         {
             if (!IsEnabled) return;
             try
             {
                 var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}";
-                File.AppendAllText(LogPath, line + Environment.NewLine);
+                lock (_fileLock)
+                {
+                    File.AppendAllText(LogPath, line + Environment.NewLine);
+                }
             }
             catch { }
         }
