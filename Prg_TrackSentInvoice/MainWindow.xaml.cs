@@ -248,7 +248,7 @@ namespace Prg_TrackSentInvoice
                 var _YEA_ = dbms.DoGetDataSQL<string>("SELECT TOP 1 YEA FROM dbo.SAZMAN").FirstOrDefault();
                 var _NAME_ = dbms.DoGetDataSQL<string>("SELECT TOP 1 NAME FROM dbo.SAZMAN").FirstOrDefault();
 
-                this.Title = $"استعلام صورت حساب برای {_NAME_} سال مالی {_YEA_} ";
+                this.Title = $"استعلام صورت حساب برای {_NAME_} سال مالی {_YEA_} | {CL_Generaly.AppVersionDisplay}";
             }
             catch (Exception)
             {

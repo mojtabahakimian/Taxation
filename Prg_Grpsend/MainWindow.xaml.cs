@@ -170,7 +170,7 @@ namespace Prg_Grpsend
 
             var _YEA_ = dbms.DoGetDataSQL<string>("SELECT TOP 1 YEA FROM dbo.SAZMAN").FirstOrDefault();
             var _NAME_ = dbms.DoGetDataSQL<string>("SELECT TOP 1 NAME FROM dbo.SAZMAN").FirstOrDefault();
-            this.Title = $"ارسال گروهی صورت حساب به سامانه مودیان | برای {_NAME_} سال مالی {_YEA_} ";
+            this.Title = $"ارسال گروهی صورت حساب به سامانه مودیان | برای {_NAME_} سال مالی {_YEA_} | {CL_Generaly.AppVersionDisplay}";
 
             //نوع صورتحساب:
             CMB_Inty.ItemsSource = new List<COMBOYMODEL>

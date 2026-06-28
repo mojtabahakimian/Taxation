@@ -70,6 +70,7 @@ namespace Prg_Graphicy.Wins
             //activeInstance.Closed += (sender, e) => activeInstance = null;
 
             InitializeComponent();
+            LblVersion.Content = Prg_Moadian.Generaly.CL_Generaly.AppVersionDisplay;
 
             //فقط تایید OK
             if (IsYesNo != true)

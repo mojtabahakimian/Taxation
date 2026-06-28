@@ -10,7 +10,7 @@
         AllowDrop="True"
         WindowStyle="None"
         ShowInTaskbar="False"
-        Title="ارسال صورت حساب به سامانه مودیان" Height="10" Width="10" Loaded="Window_Loaded">
+        Title="" Height="10" Width="10" Loaded="Window_Loaded">
     <Grid>
 
     </Grid>
