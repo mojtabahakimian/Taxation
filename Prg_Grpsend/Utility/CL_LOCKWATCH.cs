@@ -70,44 +70,65 @@ namespace Prg_Grpsend.Utility
         }
 
         /// <summary>
-        /// دقیقاً مثل VBA:
-        /// instance جدید، NetWorkINIT، UserPassWord، ShowTinyInfo — بدون Initialize
-        /// Data باید غیر خالی و غیر صفر باشه (تأیید واقعی match)
+        /// همه کلیدها را به‌صورت موازی (parallel) روی STA thread های جداگانه امتحان می‌کند.
+        /// به جای ۹ بار sequential، همه با هم اجرا می‌شوند → زمان چک از ~۱۰x به ~۱x کاهش می‌یابد.
         /// </summary>
         private bool TryMatchKeys()
         {
+            bool matched = false;
+            string foundData = null;
+            object syncLock = new object();
+            var threads = new List<System.Threading.Thread>();
+
             foreach (var password in TheKeys)
             {
-                TINYLib.Tiny tiny = new TINYLib.Tiny();
-                tiny.ServerIP = Baseknow.SERVERNAM;
-                tiny.NetWorkINIT = true;
-                tiny.UserPassWord = password;
-                tiny.ShowTinyInfo = true;
-                // ← هیچ Initialize نیست
-
-                int err = (int)tiny.TinyErrCode;
-                string serial = tiny.SerialNumber as string ?? "";
-                string data = tiny.DataPartition as string ?? "";
-
-                LockLogger.Write($"[TRY KEY] {password[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
-
-                // ErrCode=0 و Data واقعی (نه خالی، نه همه صفر)
-                bool dataValid = !string.IsNullOrEmpty(data)
-                                 && data.Replace("0", "").Trim().Length > 0;
-
-                if (err == 0 && dataValid)
+                var pw = password;
+                var thread = new System.Threading.Thread(() =>
                 {
-                    Baseknow.tindata = data;
-                    LockLogger.Write($"[MATCHED] Key={password[..8]}... | Serial={serial} | Data={data}");
-                    return true;
-                }
+                    TINYLib.Tiny tiny = new TINYLib.Tiny();
+                    tiny.ServerIP = Baseknow.SERVERNAM;
+                    tiny.NetWorkINIT = true;
+                    tiny.UserPassWord = pw;
+                    tiny.ShowTinyInfo = true;
 
-                if (err == 0 && !dataValid)
-                {
-                    LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
-                }
+                    int err = (int)tiny.TinyErrCode;
+                    string serial = tiny.SerialNumber as string ?? "";
+                    string data = tiny.DataPartition as string ?? "";
+
+                    LockLogger.Write($"[TRY KEY] {pw[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
+
+                    bool dataValid = !string.IsNullOrEmpty(data)
+                                     && data.Replace("0", "").Trim().Length > 0;
+
+                    if (err == 0 && dataValid)
+                    {
+                        lock (syncLock)
+                        {
+                            if (!matched)
+                            {
+                                matched = true;
+                                foundData = data;
+                                LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
+                            }
+                        }
+                    }
+                    else if (err == 0 && !dataValid)
+                    {
+                        LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
+                    }
+                });
+                thread.SetApartmentState(System.Threading.ApartmentState.STA);
+                thread.IsBackground = true;
+                threads.Add(thread);
             }
-            return false;
+
+            foreach (var t in threads) t.Start();
+            foreach (var t in threads) t.Join();
+
+            if (matched)
+                Baseknow.tindata = foundData;
+
+            return matched;
         }
 
         /// <summary>
