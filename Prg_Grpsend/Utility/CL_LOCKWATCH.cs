@@ -272,8 +272,8 @@ namespace Prg_Grpsend.Utility
 
         private void LoadTindataAnyway()
         {
-            try { TryMatchKeys(); }
-            catch { }
+            // bypass path: بهترین تلاش در background — startup را block نمی‌کند
+            _ = System.Threading.Tasks.Task.Run(() => { try { TryMatchKeys(); } catch { } });
         }
 
         private static void ShowLockWin()

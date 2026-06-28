@@ -26,6 +26,8 @@ namespace Prg_Grpsend
         }
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            BtnLogin.IsEnabled = false;
+
             // مرحله ۱: اتصال دیتابیس و خواندن اطلاعات سازمان — روی background thread
             try
             {
@@ -81,6 +83,7 @@ namespace Prg_Grpsend
             await Task.Run(() => CL_ScriptUpdateDB.Go());
 
             LoadingPanel.Visibility = Visibility.Collapsed;
+            BtnLogin.IsEnabled = true;
         }
 
         private static Task<T> RunOnStaThread<T>(Func<T> func)
@@ -163,6 +166,8 @@ namespace Prg_Grpsend
 
         private void BtnLogin_Click(object sender, RoutedEventArgs e)
         {
+            if (dbms == null) return;
+
             string? USERNAME = TxtUsername.Text.Trim();
 
             if (string.IsNullOrEmpty(USERNAME) || string.IsNullOrWhiteSpace(USERNAME))
