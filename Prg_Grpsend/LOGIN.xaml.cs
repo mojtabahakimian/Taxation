@@ -55,8 +55,8 @@ namespace Prg_Grpsend
             }
 
 #if DEBUG
-            //LoadingPanel.Visibility = Visibility.Collapsed;
-            //return;
+            LoadingPanel.Visibility = Visibility.Collapsed;
+            return;
 #endif
 
             // مرحله ۲: چک قفل سخت‌افزاری (TINYLib) روی بک‌گراند
