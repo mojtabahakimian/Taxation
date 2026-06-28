@@ -54,10 +54,10 @@ namespace Prg_Grpsend
                 return;
             }
 
-//#if DEBUG
-//            LoadingPanel.Visibility = Visibility.Collapsed;
-//            return;
-//#endif
+#if DEBUG
+            LoadingPanel.Visibility = Visibility.Collapsed;
+            return;
+#endif
 
             // مرحله ۲: چک قفل سخت‌افزاری (TINYLib) — روی STA thread تا COM مشکل نداشته باشه
             CL_LOCKWATCH Lockwatch = null;
