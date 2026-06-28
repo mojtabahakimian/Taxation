@@ -54,18 +54,24 @@ namespace Prg_Grpsend.Utility
 
         public bool IsSpecial = false;
 
-        // حداکثر زمان انتظار برای چک سرویس قفل (ثانیه)
-        private const int LOCK_SERVICE_TIMEOUT_MS = 15_000;
-        // حداکثر زمان کل برای امتحان همه کلیدها (ثانیه)
-        private const int LOCK_KEYS_TIMEOUT_MS = 30_000;
+        // حداکثر زمان کل برای init + امتحان همه کلیدها روی یک connection (ترتیبی)
+        // 9 کلید × max 5 ثانیه شبکه کند = 45 ثانیه
+        private const int LOCK_KEYS_TIMEOUT_MS = 45_000;
+
+        // دلیل شکست آخرین TryMatchKeys — برای نمایش پیام مناسب در GoCheck
+        private bool _lockServiceWasUnreachable = false;
 
         /// <summary>
-        /// چک اتصال اولیه با timeout — اگر سرور جواب ندهد بعد از 15 ثانیه false برمی‌گرداند.
+        /// یک STA thread، یک Tiny object، امتحان کلیدها به‌صورت ترتیبی روی همان connection.
+        /// Tiny.ocx یک کامپوننت COM/STA با state داخلی است — چند instance همزمان = crash یا ErrCode 8.
+        /// رویکرد صحیح: NetWorkINIT یک بار، سپس loop ترتیبی روی UserPassWord (مثل VBA).
         /// </summary>
-        private bool IsLockServiceAvailable()
+        private bool TryMatchKeys()
         {
-            bool result = false;
-            // روی sub-STA-thread با timeout اجرا می‌شود تا اگر سرور کند/قطع بود، block نشویم
+            bool matched = false;
+            string foundData = null;
+            bool serviceReachable = false;
+
             var thread = new System.Threading.Thread(() =>
             {
                 try
@@ -73,133 +79,64 @@ namespace Prg_Grpsend.Utility
                     TINYLib.Tiny tiny = new TINYLib.Tiny();
                     tiny.ServerIP = Baseknow.SERVERNAM;
                     tiny.NetWorkINIT = true;
-                    int err = (int)tiny.TinyErrCode;
-                    LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={err}");
-                    result = err == 0;
+
+                    int initErr = (int)tiny.TinyErrCode;
+                    LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={initErr}");
+
+                    if (initErr != 0) return; // سرویس در دسترس نیست — serviceReachable=false باقی می‌ماند
+
+                    serviceReachable = true;
+
+                    foreach (var pw in TheKeys)
+                    {
+                        tiny.UserPassWord = pw;
+                        tiny.ShowTinyInfo = true;
+
+                        int err = (int)tiny.TinyErrCode;
+                        string serial = tiny.SerialNumber as string ?? "";
+                        string data = tiny.DataPartition as string ?? "";
+
+                        LockLogger.Write($"[TRY KEY] {pw[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
+
+                        bool dataValid = !string.IsNullOrEmpty(data)
+                                         && data.Replace("0", "").Trim().Length > 0;
+
+                        if (err == 0 && dataValid)
+                        {
+                            matched = true;
+                            foundData = data;
+                            LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
+                            break; // early exit — همان connection باز است، نیازی به cleanup نیست
+                        }
+                        else if (err == 0 && !dataValid)
+                        {
+                            LockLogger.Write("[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    LockLogger.Write($"[INIT THREAD EX] {ex.GetType().Name}: {ex.Message}");
-                    // result = false باقی می‌ماند
+                    LockLogger.Write($"[TRYKEYS EX] {ex.GetType().Name}: {ex.Message}");
                 }
             });
+
             thread.SetApartmentState(System.Threading.ApartmentState.STA);
             thread.IsBackground = true;
             thread.Start();
 
-            bool completed = thread.Join(LOCK_SERVICE_TIMEOUT_MS);
+            bool completed = thread.Join(LOCK_KEYS_TIMEOUT_MS);
+
             if (!completed)
-                LockLogger.Write($"[INIT TIMEOUT] Lock service did not respond in {LOCK_SERVICE_TIMEOUT_MS / 1000}s");
-
-            return result; // اگر timeout شد result=false می‌ماند → caller خطای "سرویس نیست" نشان می‌دهد
-        }
-
-        /// <summary>
-        /// همه کلیدها را به‌صورت موازی (parallel) روی STA thread های جداگانه امتحان می‌کند.
-        /// ویژگی‌ها:
-        ///  - Early exit: به محض پیدا کردن اولین match، بقیه threads را رها می‌کند
-        ///  - Timeout: حداکثر LOCK_KEYS_TIMEOUT_MS منتظر می‌ماند (مناسب برای شبکه‌های کند)
-        ///  - threads باقیمانده IsBackground=true هستند → با بسته شدن app خودکار kill می‌شوند
-        /// </summary>
-        // حداکثر connection موازی به سرور قفل — جلوگیری از ErrCode 7 (تعداد کاربران بیش از حد)
-        private const int MAX_CONCURRENT_LOCK_CONNECTIONS = 3;
-
-        private bool TryMatchKeys()
-        {
-            bool matched = false;
-            string foundData = null;
-            object syncLock = new object();
-
-            // matchFoundEvent: با پیدا شدن اولین match set می‌شود → WaitAny فوری برمی‌گردد
-            // allDoneEvent: وقتی همه threads تمام شدند signal می‌دهد
-            var matchFoundEvent = new System.Threading.ManualResetEventSlim(false);
-            var allDoneEvent = new System.Threading.CountdownEvent(TheKeys.Length);
-            // throttle: حداکثر MAX_CONCURRENT_LOCK_CONNECTIONS connection همزمان به سرور قفل
-            var throttle = new System.Threading.SemaphoreSlim(MAX_CONCURRENT_LOCK_CONNECTIONS, MAX_CONCURRENT_LOCK_CONNECTIONS);
-
-            foreach (var password in TheKeys)
             {
-                var pw = password;
-                var thread = new System.Threading.Thread(() =>
-                {
-                    try
-                    {
-                        // اگر قبلاً match پیدا شده، کار بیشتری نمی‌کنیم
-                        if (matchFoundEvent.IsSet) return;
-
-                        throttle.Wait(); // منتظر slot خالی می‌مانیم
-                        try
-                        {
-                            if (matchFoundEvent.IsSet) return; // بررسی مجدد بعد از انتظار
-
-                            TINYLib.Tiny tiny = new TINYLib.Tiny();
-                            tiny.ServerIP = Baseknow.SERVERNAM;
-                            tiny.NetWorkINIT = true;
-                            tiny.UserPassWord = pw;
-                            tiny.ShowTinyInfo = true;
-
-                            int err = (int)tiny.TinyErrCode;
-                            string serial = tiny.SerialNumber as string ?? "";
-                            string data = tiny.DataPartition as string ?? "";
-
-                            LockLogger.Write($"[TRY KEY] {pw[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
-
-                            bool dataValid = !string.IsNullOrEmpty(data)
-                                             && data.Replace("0", "").Trim().Length > 0;
-
-                            if (err == 0 && dataValid)
-                            {
-                                lock (syncLock)
-                                {
-                                    if (!matched)
-                                    {
-                                        matched = true;
-                                        foundData = data;
-                                        LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
-                                        matchFoundEvent.Set(); // ← سیگنال early exit به WaitAny
-                                    }
-                                }
-                            }
-                            else if (err == 0 && !dataValid)
-                            {
-                                LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
-                            }
-                        }
-                        finally
-                        {
-                            throttle.Release();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // exception را داخل thread می‌بلعیم تا app crash نکند
-                        LockLogger.Write($"[KEY THREAD EX] {pw[..8]}... → {ex.GetType().Name}: {ex.Message}");
-                    }
-                    finally
-                    {
-                        // حتی در صورت exception، countdown را کم می‌کنیم
-                        try { allDoneEvent.Signal(); } catch { }
-                    }
-                });
-                thread.SetApartmentState(System.Threading.ApartmentState.STA);
-                thread.IsBackground = true; // اگر app بسته شد، این thread هم kill می‌شود
-                thread.Start();
+                // thread هنوز در حال اجرا است — متغیرهای shared را نخوانیم (race condition)
+                LockLogger.Write($"[TIMEOUT] Lock check did not complete in {LOCK_KEYS_TIMEOUT_MS / 1000}s");
+                _lockServiceWasUnreachable = true; // timeout را به عنوان "سرویس در دسترس نیست" نمایش می‌دهیم
+                return false;
             }
 
-            // صبر می‌کنیم تا یکی از سه حالت:
-            // 1. اولین match پیدا شد (matchFoundEvent) → فوری برمی‌گردیم
-            // 2. همه threads تمام کردند (allDoneEvent) → نتیجه هر چه باشد برمی‌گردیم
-            // 3. Timeout (LOCK_KEYS_TIMEOUT_MS) → شبکه خیلی کند است، برمی‌گردیم
-            int waitResult = System.Threading.WaitHandle.WaitAny(
-                new[] { matchFoundEvent.WaitHandle, allDoneEvent.WaitHandle },
-                LOCK_KEYS_TIMEOUT_MS);
-
-            if (waitResult == System.Threading.WaitHandle.WaitTimeout)
-                LockLogger.Write($"[KEYS TIMEOUT] No response within {LOCK_KEYS_TIMEOUT_MS / 1000}s");
-
-            if (matched)
-                Baseknow.tindata = foundData;
-
+            // Thread.Join حافظه را sync می‌کند — خواندن متغیرها ایمن است
+            _lockServiceWasUnreachable = !serviceReachable;
+            if (matched) Baseknow.tindata = foundData;
             return matched;
         }
 
@@ -270,48 +207,31 @@ namespace Prg_Grpsend.Utility
 
                 LockLogger.Write("[TRIAL] Trial ended - checking hardware lock");
 
-                try
+                _lockServiceWasUnreachable = false;
+                if (!TryMatchKeys())
                 {
-                    if (!IsLockServiceAvailable())
+                    if (_lockServiceWasUnreachable)
                     {
-                        LockLogger.Write("[FAIL] Lock service not available.");
+                        LockLogger.Write("[FAIL] Lock service not available or timed out.");
                         Application.Current.Dispatcher.Invoke(() =>
                         {
                             new Msgwin(false, LockReasonError("6")).ShowDialog();
                             ShowLockWin();
                         });
-                        return false;
                     }
-                    CheckIsDenafaraz();
-                }
-                catch (System.Runtime.InteropServices.COMException ex)
-                    when (ex.ErrorCode == unchecked((int)0x80040154))
-                {
-                    LockLogger.Write($"[COM ERROR] TINYLib not registered: {ex.Message}");
-                    Application.Current.Dispatcher.Invoke(() =>
-                        new Msgwin(false, "فایل‌های مربوط به قفل (TINYLib) به درستی ثبت نشده‌اند.").ShowDialog());
-                    return false;
-                }
-                catch (Exception ex)
-                {
-                    LockLogger.Write($"[INIT EXCEPTION] {ex.GetType().Name}: {ex.Message}");
-                    Application.Current.Dispatcher.Invoke(() =>
-                        new Msgwin(false, "تنظیمات قفل در دسترس نیست.").ShowDialog());
-                    return false;
-                }
-
-                LockLogger.Write("[PRE-MATCH] Lock service OK - trying keys...");
-
-                if (!TryMatchKeys())
-                {
-                    LockLogger.Write("[NO MATCH] No key matched.");
-                    Application.Current.Dispatcher.Invoke(() =>
+                    else
                     {
-                        new Msgwin(false, "این قفل متعلق به این نرم افزار نیست!").ShowDialog();
-                        new Msgwin(false, LockReasonError("2")).ShowDialog();
-                    });
+                        LockLogger.Write("[NO MATCH] No key matched.");
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            new Msgwin(false, "این قفل متعلق به این نرم افزار نیست!").ShowDialog();
+                            new Msgwin(false, LockReasonError("2")).ShowDialog();
+                        });
+                    }
                     return false;
                 }
+
+                CheckIsDenafaraz();
             }
             catch (System.IO.FileNotFoundException ex)
                 when (ex.HResult == unchecked((int)0x8007007E))
