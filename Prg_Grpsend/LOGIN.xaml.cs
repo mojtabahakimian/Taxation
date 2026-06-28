@@ -7,6 +7,8 @@ using Prg_Moadian.SQLMODELS;
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 
@@ -22,17 +24,21 @@ namespace Prg_Grpsend
 
             this.DataContext = this;
         }
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            BtnLogin.IsEnabled = false;
+
+            // مرحله ۱: اتصال دیتابیس و خواندن اطلاعات سازمان — روی background thread
             try
             {
-                dbms = new CL_CCNNMANAGER();
-
-                var _Sazman_ = dbms.DoGetDataSQL<SAZMAN>("SELECT TOP 1 SERVERNAM,MEMORYID FROM dbo.SAZMAN").FirstOrDefault();
-                Baseknow.SERVERNAM = _Sazman_?.SERVERNAM;
-                Baseknow.MEMORYID = _Sazman_?.MEMORYID;
-
-                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+                await Task.Run(() =>
+                {
+                    dbms = new CL_CCNNMANAGER();
+                    var _Sazman_ = dbms.DoGetDataSQL<SAZMAN>("SELECT TOP 1 SERVERNAM,MEMORYID FROM dbo.SAZMAN").FirstOrDefault();
+                    Baseknow.SERVERNAM = _Sazman_?.SERVERNAM;
+                    Baseknow.MEMORYID = _Sazman_?.MEMORYID;
+                    Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+                });
             }
             catch (Exception er)
             {
@@ -44,28 +50,54 @@ namespace Prg_Grpsend
                      $" {er.HResult} \n " +
                      $" {er.HelpLink} \n " +
                      $"End Log ]\n");
-
                 Application.Current.Shutdown();
+                return;
             }
 
-#if DEBUG
-            return;
-#endif
+//#if DEBUG
+//            LoadingPanel.Visibility = Visibility.Collapsed;
+//            return;
+//#endif
 
-            CL_LOCKWATCH Lockwatch = new CL_LOCKWATCH();
+            // مرحله ۲: چک قفل سخت‌افزاری (TINYLib) — روی STA thread تا COM مشکل نداشته باشه
+            CL_LOCKWATCH Lockwatch = null;
+            bool lockOk = await RunOnStaThread(() =>
+            {
+                Lockwatch = new CL_LOCKWATCH();
+                return Lockwatch.GoCheck();
+            });
 
-            if (Lockwatch.GoCheck() == false)
+            if (!lockOk)
             {
                 new Msgwin(false, "به دلیل عدم ارتباط معتبر با قفل نرم افزار بسته میشود.").ShowDialog();
                 App.Current.Shutdown();
                 return;
             }
-            else if (!Lockwatch.IsSpecial)//IsSuccess
+
+            if (!Lockwatch.IsSpecial)
             {
                 MoadianLockCheck();
             }
 
-            CL_ScriptUpdateDB.Go();
+            // مرحله ۳: آپدیت ساختار دیتابیس — روی background thread
+            await Task.Run(() => CL_ScriptUpdateDB.Go());
+
+            LoadingPanel.Visibility = Visibility.Collapsed;
+            BtnLogin.IsEnabled = true;
+        }
+
+        private static Task<T> RunOnStaThread<T>(Func<T> func)
+        {
+            var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var thread = new Thread(() =>
+            {
+                try { tcs.SetResult(func()); }
+                catch (Exception ex) { tcs.SetException(ex); }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+            return tcs.Task;
         }
 
         private void MoadianLockCheck()
@@ -134,6 +166,8 @@ namespace Prg_Grpsend
 
         private void BtnLogin_Click(object sender, RoutedEventArgs e)
         {
+            if (dbms == null) return;
+
             string? USERNAME = TxtUsername.Text.Trim();
 
             if (string.IsNullOrEmpty(USERNAME) || string.IsNullOrWhiteSpace(USERNAME))
