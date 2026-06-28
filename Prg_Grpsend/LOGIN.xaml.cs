@@ -7,6 +7,7 @@ using Prg_Moadian.SQLMODELS;
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -59,15 +60,30 @@ namespace Prg_Grpsend
             }
 
 #if !DEBUG
-            CL_LOCKWATCH Lockwatch = new CL_LOCKWATCH();
+            LockCheckResult lockCheckResult;
+            try
+            {
+                lockCheckResult = await RunStaTask(() =>
+                {
+                    CL_LOCKWATCH lockwatch = new CL_LOCKWATCH();
+                    return new LockCheckResult(lockwatch.GoCheck(), lockwatch.IsSpecial);
+                });
+            }
+            catch (Exception er)
+            {
+                LogWriter.WriteLog($"\n[ LockCheck Error, Exception : Message: {er.Message}{Environment.NewLine} StackTrace: {er.StackTrace}{Environment.NewLine} End Log ]\n");
+                new Msgwin(false, "خطا در بررسی قفل نرم افزار").ShowDialog();
+                App.Current.Shutdown();
+                return;
+            }
 
-            if (Lockwatch.GoCheck() == false)
+            if (!lockCheckResult.IsValid)
             {
                 new Msgwin(false, "به دلیل عدم ارتباط معتبر با قفل نرم افزار بسته میشود.").ShowDialog();
                 App.Current.Shutdown();
                 return;
             }
-            else if (!Lockwatch.IsSpecial)//IsSuccess
+            else if (!lockCheckResult.IsSpecial)//IsSuccess
             {
                 MoadianLockCheck();
             }
@@ -94,6 +110,41 @@ namespace Prg_Grpsend
             TxtUsername.IsEnabled = isEnabled;
             TxtPassword.IsEnabled = isEnabled;
             BtnLogin.IsEnabled = isEnabled;
+        }
+
+        private static Task<T> RunStaTask<T>(Func<T> action)
+        {
+            TaskCompletionSource<T> taskCompletionSource = new TaskCompletionSource<T>();
+
+            Thread thread = new Thread(() =>
+            {
+                try
+                {
+                    taskCompletionSource.SetResult(action());
+                }
+                catch (Exception er)
+                {
+                    taskCompletionSource.SetException(er);
+                }
+            });
+
+            thread.IsBackground = true;
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+
+            return taskCompletionSource.Task;
+        }
+
+        private readonly struct LockCheckResult
+        {
+            public LockCheckResult(bool isValid, bool isSpecial)
+            {
+                IsValid = isValid;
+                IsSpecial = isSpecial;
+            }
+
+            public bool IsValid { get; }
+            public bool IsSpecial { get; }
         }
 
         private void MoadianLockCheck()
