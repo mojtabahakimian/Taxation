@@ -7,6 +7,7 @@ using Prg_Moadian.SQLMODELS;
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 
@@ -22,17 +23,25 @@ namespace Prg_Grpsend
 
             this.DataContext = this;
         }
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            SetLoginControlsEnabled(false);
+
+            // Let WPF render the login window before starting slow startup work.
+            await Task.Yield();
+
             try
             {
-                dbms = new CL_CCNNMANAGER();
-
-                var _Sazman_ = dbms.DoGetDataSQL<SAZMAN>("SELECT TOP 1 SERVERNAM,MEMORYID FROM dbo.SAZMAN").FirstOrDefault();
-                Baseknow.SERVERNAM = _Sazman_?.SERVERNAM;
-                Baseknow.MEMORYID = _Sazman_?.MEMORYID;
-
                 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+                dbms = await Task.Run(() =>
+                {
+                    var manager = new CL_CCNNMANAGER();
+                    var sazman = manager.DoGetDataSQL<SAZMAN>("SELECT TOP 1 SERVERNAM,MEMORYID FROM dbo.SAZMAN").FirstOrDefault();
+                    Baseknow.SERVERNAM = sazman?.SERVERNAM;
+                    Baseknow.MEMORYID = sazman?.MEMORYID;
+                    return manager;
+                });
             }
             catch (Exception er)
             {
@@ -46,12 +55,10 @@ namespace Prg_Grpsend
                      $"End Log ]\n");
 
                 Application.Current.Shutdown();
+                return;
             }
 
-#if DEBUG
-            return;
-#endif
-
+#if !DEBUG
             CL_LOCKWATCH Lockwatch = new CL_LOCKWATCH();
 
             if (Lockwatch.GoCheck() == false)
@@ -64,8 +71,29 @@ namespace Prg_Grpsend
             {
                 MoadianLockCheck();
             }
+#endif
 
-            CL_ScriptUpdateDB.Go();
+            SetLoginControlsEnabled(true);
+
+            // Database migration scripts are expensive and do not need to block the first login screen.
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    CL_ScriptUpdateDB.Go();
+                }
+                catch (Exception er)
+                {
+                    LogWriter.WriteLog($"\n[ ScriptUpdateDB Error, Exception : Message: {er.Message}{Environment.NewLine} StackTrace: {er.StackTrace}{Environment.NewLine} End Log ]\n");
+                }
+            });
+        }
+
+        private void SetLoginControlsEnabled(bool isEnabled)
+        {
+            TxtUsername.IsEnabled = isEnabled;
+            TxtPassword.IsEnabled = isEnabled;
+            BtnLogin.IsEnabled = isEnabled;
         }
 
         private void MoadianLockCheck()
