@@ -38,17 +38,15 @@ namespace Prg_Grpsend.Utility
 
         public bool IsDenaFarazKey(string key) => DenaFarazKeys.Contains(key);
 
-        public void CheckIsDenafaraz()
+        private void ApplyMatchedKeyMetadata(string matchedKey)
         {
-            foreach (var key in TheKeys)
+            bool isDenaFaraz = IsDenaFarazKey(matchedKey);
+            MainWindow.IsDenafaraz = isDenaFaraz;
+
+            if (isDenaFaraz)
             {
-                if (IsDenaFarazKey(key))
-                {
-                    MainWindow.IsDenafaraz = true;
-                    CL_Generaly.MrCorrect = "d";
-                    LockLogger.Write("[IsDenafaraz] = True");
-                    break;
-                }
+                CL_Generaly.MrCorrect = "d";
+                LockLogger.Write("[IsDenafaraz] = True");
             }
         }
 
@@ -98,6 +96,7 @@ namespace Prg_Grpsend.Utility
                 if (err == 0 && dataValid)
                 {
                     Baseknow.tindata = data;
+                    ApplyMatchedKeyMetadata(password);
                     LockLogger.Write($"[MATCHED] Key={password[..8]}... | Serial={serial} | Data={data}");
                     return true;
                 }
@@ -127,7 +126,10 @@ namespace Prg_Grpsend.Utility
                              && data.Replace("0", "").Trim().Length > 0;
 
             if (err == 0 && dataValid)
+            {
                 Baseknow.tindata = data;
+                ApplyMatchedKeyMetadata(password);
+            }
 
             return err == 0 && dataValid;
         }
@@ -157,14 +159,14 @@ namespace Prg_Grpsend.Utility
         public bool GoCheck()
         {
             LockLogger.Clear();
+            MainWindow.IsDenafaraz = false;
             LockLogger.Write($"=== GoCheck Start | ServerIP: {Baseknow.SERVERNAM} ===");
 
             try
             {
                 if (File.Exists(@"C:\mojmoh.txt"))
                 {
-                    LockLogger.Write("[BYPASS] mojmoh.txt found");
-                    LoadTindataAnyway();
+                    LockLogger.Write("[BYPASS] mojmoh.txt found - skipping hardware key scan");
                     IsSpecial = true;
                     return true;
                 }
@@ -186,7 +188,7 @@ namespace Prg_Grpsend.Utility
                         ShowLockWin();
                         return false;
                     }
-                    CheckIsDenafaraz();
+                    // DenaFaraz metadata is applied only after a real key match.
                 }
                 catch (System.Runtime.InteropServices.COMException ex)
                     when (ex.ErrorCode == unchecked((int)0x80040154))
@@ -233,12 +235,6 @@ namespace Prg_Grpsend.Utility
 
             LockLogger.Write($"=== GoCheck SUCCESS | tindata={Baseknow.tindata} ===");
             return true;
-        }
-
-        private void LoadTindataAnyway()
-        {
-            try { TryMatchKeys(); }
-            catch { }
         }
 
         private static void ShowLockWin()
