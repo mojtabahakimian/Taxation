@@ -9,7 +9,7 @@
         mc:Ignorable="d"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         WindowStartupLocation="CenterScreen"
-        Title="استعلام صورت حساب ها" Height="800" Width="1250" 
+        Title="" Height="800" Width="1250"
         Loaded="Window_Loaded" ContentRendered="Window_ContentRendered"
         Background="#FFF4F6F8"
         TextElement.Foreground="#FF1C1C1E">

@@ -34,6 +34,7 @@ namespace Prg_Graphicy
         }
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            this.Title = $"ارسال صورت حساب به سامانه مودیان | {CL_Generaly.AppVersionDisplay}";
             var _IsSuccess = true;
 
             var args = CL_Generaly.ARG_PARAM;

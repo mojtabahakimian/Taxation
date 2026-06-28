@@ -8,7 +8,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         FontFamily="pack://application:,,,/Prg_Graphicy;component/UIY/FNT/#IRANYekanFN"
         WindowStartupLocation="CenterScreen" Loaded="Window_Loaded" PreviewKeyDown="Window_PreviewKeyDown"
-        Title="ایجاد صورتحساب اصلاحی / برگشتی / ابطالی" d:Width="7000" Height="768" Width="1024">
+        Title="" d:Width="7000" Height="768" Width="1024">
     <Window.Resources>
         <ItemsPanelTemplate x:Key="VSP">
             <VirtualizingStackPanel VirtualizingPanel.IsVirtualizing="True" ScrollViewer.CanContentScroll="True"  VirtualizingPanel.VirtualizationMode="Recycling"/>

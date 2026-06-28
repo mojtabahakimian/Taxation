@@ -240,6 +240,7 @@ VALUES
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            this.Title = $"ایجاد صورتحساب اصلاحی / برگشتی / ابطالی | {CL_Generaly.AppVersionDisplay}";
             AMALIAT();
 
             FILL_ALL_COMBOBOXES();

@@ -11,7 +11,7 @@
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
         xmlns:sfusion="clr-namespace:Syncfusion.UI.Xaml.Grid;assembly=Syncfusion.SfGrid.WPF" 
         WindowStartupLocation="CenterScreen" Loaded="Window_Loaded" ContentRendered="Window_ContentRendered"
-        Title="ارسال گروهی صورت حساب به سامانه مودیان" Height="800" Width="1100"
+        Title="" Height="800" Width="1100"
         Background="#FFF4F6F8"
         TextElement.Foreground="#FF1C1C1E">
 
