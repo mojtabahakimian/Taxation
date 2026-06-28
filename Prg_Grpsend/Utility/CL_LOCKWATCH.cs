@@ -54,76 +54,120 @@ namespace Prg_Grpsend.Utility
 
         public bool IsSpecial = false;
 
+        // حداکثر زمان انتظار برای چک سرویس قفل (ثانیه)
+        private const int LOCK_SERVICE_TIMEOUT_MS = 15_000;
+        // حداکثر زمان کل برای امتحان همه کلیدها (ثانیه)
+        private const int LOCK_KEYS_TIMEOUT_MS = 30_000;
+
         /// <summary>
-        /// چک اتصال اولیه — دقیقاً مثل VBA: فقط ServerIP و NetWorkINIT، بدون Initialize
+        /// چک اتصال اولیه با timeout — اگر سرور جواب ندهد بعد از 15 ثانیه false برمی‌گرداند.
         /// </summary>
         private bool IsLockServiceAvailable()
         {
-            TINYLib.Tiny tiny = new TINYLib.Tiny();
-            tiny.ServerIP = Baseknow.SERVERNAM;
-            tiny.NetWorkINIT = true;
-            // ← هیچ Initialize نیست — دقیقاً مثل VBA
+            bool result = false;
+            // روی sub-STA-thread با timeout اجرا می‌شود تا اگر سرور کند/قطع بود، block نشویم
+            var thread = new System.Threading.Thread(() =>
+            {
+                TINYLib.Tiny tiny = new TINYLib.Tiny();
+                tiny.ServerIP = Baseknow.SERVERNAM;
+                tiny.NetWorkINIT = true;
+                int err = (int)tiny.TinyErrCode;
+                LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={err}");
+                result = err == 0;
+            });
+            thread.SetApartmentState(System.Threading.ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
 
-            int err = (int)tiny.TinyErrCode;
-            LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={err}");
-            return err == 0;
+            bool completed = thread.Join(LOCK_SERVICE_TIMEOUT_MS);
+            if (!completed)
+                LockLogger.Write($"[INIT TIMEOUT] Lock service did not respond in {LOCK_SERVICE_TIMEOUT_MS / 1000}s");
+
+            return result; // اگر timeout شد result=false می‌ماند → caller خطای "سرویس نیست" نشان می‌دهد
         }
 
         /// <summary>
         /// همه کلیدها را به‌صورت موازی (parallel) روی STA thread های جداگانه امتحان می‌کند.
-        /// به جای ۹ بار sequential، همه با هم اجرا می‌شوند → زمان چک از ~۱۰x به ~۱x کاهش می‌یابد.
+        /// ویژگی‌ها:
+        ///  - Early exit: به محض پیدا کردن اولین match، بقیه threads را رها می‌کند
+        ///  - Timeout: حداکثر LOCK_KEYS_TIMEOUT_MS منتظر می‌ماند (مناسب برای شبکه‌های کند)
+        ///  - threads باقیمانده IsBackground=true هستند → با بسته شدن app خودکار kill می‌شوند
         /// </summary>
         private bool TryMatchKeys()
         {
             bool matched = false;
             string foundData = null;
             object syncLock = new object();
-            var threads = new List<System.Threading.Thread>();
+
+            // matchFoundEvent: با پیدا شدن اولین match set می‌شود → WaitAny فوری برمی‌گردد
+            // allDoneEvent: وقتی همه threads تمام شدند signal می‌دهد
+            var matchFoundEvent = new System.Threading.ManualResetEventSlim(false);
+            var allDoneEvent = new System.Threading.CountdownEvent(TheKeys.Length);
 
             foreach (var password in TheKeys)
             {
                 var pw = password;
                 var thread = new System.Threading.Thread(() =>
                 {
-                    TINYLib.Tiny tiny = new TINYLib.Tiny();
-                    tiny.ServerIP = Baseknow.SERVERNAM;
-                    tiny.NetWorkINIT = true;
-                    tiny.UserPassWord = pw;
-                    tiny.ShowTinyInfo = true;
-
-                    int err = (int)tiny.TinyErrCode;
-                    string serial = tiny.SerialNumber as string ?? "";
-                    string data = tiny.DataPartition as string ?? "";
-
-                    LockLogger.Write($"[TRY KEY] {pw[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
-
-                    bool dataValid = !string.IsNullOrEmpty(data)
-                                     && data.Replace("0", "").Trim().Length > 0;
-
-                    if (err == 0 && dataValid)
+                    try
                     {
-                        lock (syncLock)
+                        // اگر قبلاً match پیدا شده، کار بیشتری نمی‌کنیم
+                        if (matchFoundEvent.IsSet) return;
+
+                        TINYLib.Tiny tiny = new TINYLib.Tiny();
+                        tiny.ServerIP = Baseknow.SERVERNAM;
+                        tiny.NetWorkINIT = true;
+                        tiny.UserPassWord = pw;
+                        tiny.ShowTinyInfo = true;
+
+                        int err = (int)tiny.TinyErrCode;
+                        string serial = tiny.SerialNumber as string ?? "";
+                        string data = tiny.DataPartition as string ?? "";
+
+                        LockLogger.Write($"[TRY KEY] {pw[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
+
+                        bool dataValid = !string.IsNullOrEmpty(data)
+                                         && data.Replace("0", "").Trim().Length > 0;
+
+                        if (err == 0 && dataValid)
                         {
-                            if (!matched)
+                            lock (syncLock)
                             {
-                                matched = true;
-                                foundData = data;
-                                LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
+                                if (!matched)
+                                {
+                                    matched = true;
+                                    foundData = data;
+                                    LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
+                                    matchFoundEvent.Set(); // ← سیگنال early exit به WaitAny
+                                }
                             }
                         }
+                        else if (err == 0 && !dataValid)
+                        {
+                            LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
+                        }
                     }
-                    else if (err == 0 && !dataValid)
+                    finally
                     {
-                        LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
+                        // حتی در صورت exception، countdown را کم می‌کنیم
+                        try { allDoneEvent.Signal(); } catch { }
                     }
                 });
                 thread.SetApartmentState(System.Threading.ApartmentState.STA);
-                thread.IsBackground = true;
-                threads.Add(thread);
+                thread.IsBackground = true; // اگر app بسته شد، این thread هم kill می‌شود
+                thread.Start();
             }
 
-            foreach (var t in threads) t.Start();
-            foreach (var t in threads) t.Join();
+            // صبر می‌کنیم تا یکی از سه حالت:
+            // 1. اولین match پیدا شد (matchFoundEvent) → فوری برمی‌گردیم
+            // 2. همه threads تمام کردند (allDoneEvent) → نتیجه هر چه باشد برمی‌گردیم
+            // 3. Timeout (LOCK_KEYS_TIMEOUT_MS) → شبکه خیلی کند است، برمی‌گردیم
+            int waitResult = System.Threading.WaitHandle.WaitAny(
+                new[] { matchFoundEvent.WaitHandle, allDoneEvent.WaitHandle },
+                LOCK_KEYS_TIMEOUT_MS);
+
+            if (waitResult == System.Threading.WaitHandle.WaitTimeout)
+                LockLogger.Write($"[KEYS TIMEOUT] No response within {LOCK_KEYS_TIMEOUT_MS / 1000}s");
 
             if (matched)
                 Baseknow.tindata = foundData;
