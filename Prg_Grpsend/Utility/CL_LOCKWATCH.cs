@@ -182,8 +182,11 @@ namespace Prg_Grpsend.Utility
                     if (!IsLockServiceAvailable())
                     {
                         LockLogger.Write("[FAIL] Lock service not available.");
-                        new Msgwin(false, LockReasonError("6")).ShowDialog();
-                        ShowLockWin();
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            new Msgwin(false, LockReasonError("6")).ShowDialog();
+                            ShowLockWin();
+                        });
                         return false;
                     }
                     CheckIsDenafaraz();
@@ -192,13 +195,15 @@ namespace Prg_Grpsend.Utility
                     when (ex.ErrorCode == unchecked((int)0x80040154))
                 {
                     LockLogger.Write($"[COM ERROR] TINYLib not registered: {ex.Message}");
-                    new Msgwin(false, "فایل‌های مربوط به قفل (TINYLib) به درستی ثبت نشده‌اند.").ShowDialog();
+                    Application.Current.Dispatcher.Invoke(() =>
+                        new Msgwin(false, "فایل‌های مربوط به قفل (TINYLib) به درستی ثبت نشده‌اند.").ShowDialog());
                     return false;
                 }
                 catch (Exception ex)
                 {
                     LockLogger.Write($"[INIT EXCEPTION] {ex.GetType().Name}: {ex.Message}");
-                    new Msgwin(false, "تنظیمات قفل در دسترس نیست.").ShowDialog();
+                    Application.Current.Dispatcher.Invoke(() =>
+                        new Msgwin(false, "تنظیمات قفل در دسترس نیست.").ShowDialog());
                     return false;
                 }
 
@@ -207,8 +212,11 @@ namespace Prg_Grpsend.Utility
                 if (!TryMatchKeys())
                 {
                     LockLogger.Write("[NO MATCH] No key matched.");
-                    new Msgwin(false, "این قفل متعلق به این نرم افزار نیست!").ShowDialog();
-                    new Msgwin(false, LockReasonError("2")).ShowDialog();
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        new Msgwin(false, "این قفل متعلق به این نرم افزار نیست!").ShowDialog();
+                        new Msgwin(false, LockReasonError("2")).ShowDialog();
+                    });
                     return false;
                 }
             }
@@ -216,8 +224,11 @@ namespace Prg_Grpsend.Utility
                 when (ex.HResult == unchecked((int)0x8007007E))
             {
                 LockLogger.Write($"[FILE NOT FOUND] {ex.Message}");
-                new Msgwin(false, "فایل و تنظیمات مربوط به رجیستری قفل روی این سیستم انجام نشده!").ShowDialog();
-                Application.Current.Shutdown();
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    new Msgwin(false, "فایل و تنظیمات مربوط به رجیستری قفل روی این سیستم انجام نشده!").ShowDialog();
+                    Application.Current.Shutdown();
+                });
                 return false;
             }
             catch (Exception ex)
@@ -225,8 +236,11 @@ namespace Prg_Grpsend.Utility
                 LockLogger.Write($"[OUTER EXCEPTION] {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 if (IsTrialTimeEnded())
                 {
-                    new Msgwin(false, "خطا در انجام عملیات , قفل قابل شناسایی نیست").ShowDialog();
-                    ShowLockWin();
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        new Msgwin(false, "خطا در انجام عملیات , قفل قابل شناسایی نیست").ShowDialog();
+                        ShowLockWin();
+                    });
                 }
                 return false;
             }
