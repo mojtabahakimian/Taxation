@@ -101,6 +101,9 @@ namespace Prg_Grpsend.Utility
         ///  - Timeout: حداکثر LOCK_KEYS_TIMEOUT_MS منتظر می‌ماند (مناسب برای شبکه‌های کند)
         ///  - threads باقیمانده IsBackground=true هستند → با بسته شدن app خودکار kill می‌شوند
         /// </summary>
+        // حداکثر connection موازی به سرور قفل — جلوگیری از ErrCode 7 (تعداد کاربران بیش از حد)
+        private const int MAX_CONCURRENT_LOCK_CONNECTIONS = 3;
+
         private bool TryMatchKeys()
         {
             bool matched = false;
@@ -111,6 +114,8 @@ namespace Prg_Grpsend.Utility
             // allDoneEvent: وقتی همه threads تمام شدند signal می‌دهد
             var matchFoundEvent = new System.Threading.ManualResetEventSlim(false);
             var allDoneEvent = new System.Threading.CountdownEvent(TheKeys.Length);
+            // throttle: حداکثر MAX_CONCURRENT_LOCK_CONNECTIONS connection همزمان به سرور قفل
+            var throttle = new System.Threading.SemaphoreSlim(MAX_CONCURRENT_LOCK_CONNECTIONS, MAX_CONCURRENT_LOCK_CONNECTIONS);
 
             foreach (var password in TheKeys)
             {
@@ -122,37 +127,47 @@ namespace Prg_Grpsend.Utility
                         // اگر قبلاً match پیدا شده، کار بیشتری نمی‌کنیم
                         if (matchFoundEvent.IsSet) return;
 
-                        TINYLib.Tiny tiny = new TINYLib.Tiny();
-                        tiny.ServerIP = Baseknow.SERVERNAM;
-                        tiny.NetWorkINIT = true;
-                        tiny.UserPassWord = pw;
-                        tiny.ShowTinyInfo = true;
-
-                        int err = (int)tiny.TinyErrCode;
-                        string serial = tiny.SerialNumber as string ?? "";
-                        string data = tiny.DataPartition as string ?? "";
-
-                        LockLogger.Write($"[TRY KEY] {pw[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
-
-                        bool dataValid = !string.IsNullOrEmpty(data)
-                                         && data.Replace("0", "").Trim().Length > 0;
-
-                        if (err == 0 && dataValid)
+                        throttle.Wait(); // منتظر slot خالی می‌مانیم
+                        try
                         {
-                            lock (syncLock)
+                            if (matchFoundEvent.IsSet) return; // بررسی مجدد بعد از انتظار
+
+                            TINYLib.Tiny tiny = new TINYLib.Tiny();
+                            tiny.ServerIP = Baseknow.SERVERNAM;
+                            tiny.NetWorkINIT = true;
+                            tiny.UserPassWord = pw;
+                            tiny.ShowTinyInfo = true;
+
+                            int err = (int)tiny.TinyErrCode;
+                            string serial = tiny.SerialNumber as string ?? "";
+                            string data = tiny.DataPartition as string ?? "";
+
+                            LockLogger.Write($"[TRY KEY] {pw[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
+
+                            bool dataValid = !string.IsNullOrEmpty(data)
+                                             && data.Replace("0", "").Trim().Length > 0;
+
+                            if (err == 0 && dataValid)
                             {
-                                if (!matched)
+                                lock (syncLock)
                                 {
-                                    matched = true;
-                                    foundData = data;
-                                    LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
-                                    matchFoundEvent.Set(); // ← سیگنال early exit به WaitAny
+                                    if (!matched)
+                                    {
+                                        matched = true;
+                                        foundData = data;
+                                        LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
+                                        matchFoundEvent.Set(); // ← سیگنال early exit به WaitAny
+                                    }
                                 }
                             }
+                            else if (err == 0 && !dataValid)
+                            {
+                                LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
+                            }
                         }
-                        else if (err == 0 && !dataValid)
+                        finally
                         {
-                            LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
+                            throttle.Release();
                         }
                     }
                     catch (Exception ex)
