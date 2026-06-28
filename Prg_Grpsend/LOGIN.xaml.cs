@@ -55,13 +55,14 @@ namespace Prg_Grpsend
             }
 
 #if DEBUG
-            LoadingPanel.Visibility = Visibility.Collapsed;
-            return;
+            //LoadingPanel.Visibility = Visibility.Collapsed;
+            //return;
 #endif
 
-            // مرحله ۲: چک قفل سخت‌افزاری (TINYLib) — روی STA thread تا COM مشکل نداشته باشه
+            // مرحله ۲: چک قفل سخت‌افزاری (TINYLib) روی بک‌گراند
+            // (خود کلاس CL_LOCKWATCH ترِد STA را برای اکتیوایکس می‌سازد)
             CL_LOCKWATCH Lockwatch = null;
-            bool lockOk = await RunOnStaThread(() =>
+            bool lockOk = await Task.Run(() =>
             {
                 Lockwatch = new CL_LOCKWATCH();
                 return Lockwatch.GoCheck();

@@ -74,16 +74,17 @@ namespace Prg_Grpsend.Utility
 
             var thread = new System.Threading.Thread(() =>
             {
+                TINYLib.Tiny tiny = null; // تعریف در سطح متد برای دسترسی در finally
                 try
                 {
-                    TINYLib.Tiny tiny = new TINYLib.Tiny();
+                    tiny = new TINYLib.Tiny();
                     tiny.ServerIP = Baseknow.SERVERNAM;
                     tiny.NetWorkINIT = true;
 
                     int initErr = (int)tiny.TinyErrCode;
                     LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={initErr}");
 
-                    if (initErr != 0) return; // سرویس در دسترس نیست — serviceReachable=false باقی می‌ماند
+                    if (initErr != 0) return; // سرویس در دسترس نیست
 
                     serviceReachable = true;
 
@@ -106,7 +107,7 @@ namespace Prg_Grpsend.Utility
                             matched = true;
                             foundData = data;
                             LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
-                            break; // early exit — همان connection باز است، نیازی به cleanup نیست
+                            break;
                         }
                         else if (err == 0 && !dataValid)
                         {
@@ -118,6 +119,15 @@ namespace Prg_Grpsend.Utility
                 {
                     LockLogger.Write($"[TRYKEYS EX] {ex.GetType().Name}: {ex.Message}");
                 }
+                finally
+                {
+                    // === اینجا حافظه COM به درستی آزاد می‌شود ===
+                    if (tiny != null)
+                    {
+                        System.Runtime.InteropServices.Marshal.ReleaseComObject(tiny);
+                        tiny = null;
+                    }
+                }
             });
 
             thread.SetApartmentState(System.Threading.ApartmentState.STA);
@@ -128,13 +138,11 @@ namespace Prg_Grpsend.Utility
 
             if (!completed)
             {
-                // thread هنوز در حال اجرا است — متغیرهای shared را نخوانیم (race condition)
                 LockLogger.Write($"[TIMEOUT] Lock check did not complete in {LOCK_KEYS_TIMEOUT_MS / 1000}s");
-                _lockServiceWasUnreachable = true; // timeout را به عنوان "سرویس در دسترس نیست" نمایش می‌دهیم
+                _lockServiceWasUnreachable = true;
                 return false;
             }
 
-            // Thread.Join حافظه را sync می‌کند — خواندن متغیرها ایمن است
             _lockServiceWasUnreachable = !serviceReachable;
             if (matched) Baseknow.tindata = foundData;
             return matched;
