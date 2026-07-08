@@ -39,7 +39,7 @@ namespace Prg_Moadian.Bulk
         private readonly CL_FUNTIONS _fn = new CL_FUNTIONS();
 
         public string CALLER_NAME { get; set; } = "m";
-        public Func<string, bool>? OnZeroPriceWarning { get; set; }
+        public Func<string, bool>? OnValidationWarning { get; set; }
 
         private SendInvoiceBulk(CL_CCNNMANAGER db,
                           SAZMAN sazman,
@@ -275,11 +275,33 @@ namespace Prg_Moadian.Bulk
 
                 if (lines.First().tob == 1) // حقیقی
                 {
+                    if (srcEcode.Length == 11)
+                    {
+                        if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({srcEcode}) ۱۱ رقمی است که مربوط به اشخاص حقوقی است، اما در فاکتور {number} نوع شخص 'حقیقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                        {
+                            // continue
+                        }
+                        else
+                        {
+                            throw new InvoiceValidationException(number, $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.");
+                        }
+                    }
                     if (srcEcode.Length > 14) throw new InvoiceValidationException(number, "Over Length 14 Ecode for tob=1");
                     ECODE_M = srcEcode;
                 }
                 else // حقوقی
                 {
+                    if (srcEcode.Length == 10)
+                    {
+                        if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({srcEcode}) ۱۰ رقمی است که مربوط به اشخاص حقیقی است، اما در فاکتور {number} نوع شخص 'حقوقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                        {
+                            // continue
+                        }
+                        else
+                        {
+                            throw new InvoiceValidationException(number, $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.");
+                        }
+                    }
                     if (srcEcode.Length > 11) throw new InvoiceValidationException(number, "Over Length 11 Ecode for tob=2");
                     ECODE_M = srcEcode;
                 }
@@ -301,9 +323,9 @@ namespace Prg_Moadian.Bulk
 
                 if (ln.MABL <= 0 || ln.MABL_K <= 0)
                 {
-                    if (OnZeroPriceWarning != null)
+                    if (OnValidationWarning != null)
                     {
-                        if (!OnZeroPriceWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
+                        if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
                         {
                             throw new InvoiceValidationException(number, $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.");
                         }

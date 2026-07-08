@@ -722,7 +722,7 @@ namespace Prg_Grpsend
                 {
                     var bulk = new SendInvoiceBulk(dbms, CL_MOADIAN.TaxURL);  // دیگر روی UI نیست
 
-                    bulk.OnZeroPriceWarning = (msg) => {
+                    bulk.OnValidationWarning = (msg) => {
                         bool res = false;
                         Application.Current.Dispatcher.Invoke(() => {
                             var msgwin = new Msgwin(true, msg, YesBtnText: "ادامه و ارسال", NoBtnText: "لغو ارسال");

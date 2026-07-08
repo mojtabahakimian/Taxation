@@ -38,7 +38,7 @@
                              FontSize="16">
                 </PasswordBox>
 
-                <Button x:Name="BtnLogin" IsDefault="True"
+                <Button x:Name="BtnLogin" IsDefault="True" IsEnabled="True"
                         Content="ورود"
                         Style="{StaticResource MaterialDesignRaisedButton}"
                         materialDesign:ButtonAssist.CornerRadius="5"

@@ -256,7 +256,7 @@ namespace Prg_Graphicy
                 #endregion
 
 
-                CL_MOADIAN.OnZeroPriceWarning = (msg) => {
+                CL_MOADIAN.OnValidationWarning = (msg) => {
                     bool result = false;
                     Application.Current.Dispatcher.Invoke(() => {
                         var msgwin = new Msgwin(true, msg, YesBtnText: "ادامه و ارسال", NoBtnText: "لغو ارسال");
@@ -272,7 +272,7 @@ namespace Prg_Graphicy
                 }
                 finally
                 {
-                    CL_MOADIAN.OnZeroPriceWarning = null;
+                    CL_MOADIAN.OnValidationWarning = null;
                 }
             }
             catch (Exception er)

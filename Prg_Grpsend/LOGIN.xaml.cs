@@ -56,6 +56,7 @@ namespace Prg_Grpsend
 
 #if DEBUG
             LoadingPanel.Visibility = Visibility.Collapsed;
+            BtnLogin.IsEnabled = true;
             return;
 #endif
 

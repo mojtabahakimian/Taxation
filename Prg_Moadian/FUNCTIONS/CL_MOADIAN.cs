@@ -33,7 +33,7 @@ namespace Prg_Moadian.FUNCTIONS
         public static string TaxURL { get; set; } = "https://sandboxrc.tax.gov.ir/req/api/";
         //اصلی//"https://tp.tax.gov.ir/req/api/"
 
-        public static Func<string, bool>? OnZeroPriceWarning { get; set; }
+        public static Func<string, bool>? OnValidationWarning { get; set; }
 
         public static int IDD_OF_TAXDTL { get; set; } = -1;
 
@@ -355,7 +355,19 @@ namespace Prg_Moadian.FUNCTIONS
                     //کد اقتصادی : Tinb
                     if (src_ECODE is not null) //Real Example : 10840014242 || 411375646679
                     {
-                        if (src_ECODE?.Length > 14)
+                        if (src_ECODE.Length == 11)
+                        {
+                            if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({src_ECODE}) ۱۱ رقمی است که مربوط به اشخاص حقوقی است، اما نوع شخص 'حقیقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                            {
+                                // continue
+                            }
+                            else
+                            {
+                                throw new NullyExceptiony("ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.");
+                            }
+                        }
+
+                        if (src_ECODE.Length > 14)
                         {
                             throw new NullyExceptiony("Over Length 14 Ecode for tob 1");
                         }
@@ -368,7 +380,19 @@ namespace Prg_Moadian.FUNCTIONS
                     //کد اقتصادی : Tinb
                     if (src_ECODE is not null)
                     {
-                        if (src_ECODE?.Length > 11)
+                        if (src_ECODE.Length == 10)
+                        {
+                            if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({src_ECODE}) ۱۰ رقمی است که مربوط به اشخاص حقیقی است، اما نوع شخص 'حقوقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                            {
+                                // continue
+                            }
+                            else
+                            {
+                                throw new NullyExceptiony("ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.");
+                            }
+                        }
+
+                        if (src_ECODE.Length > 11)
                         {
                             throw new NullyExceptiony("Over Length 11 Ecode for tob 2");
                         }
@@ -427,9 +451,9 @@ namespace Prg_Moadian.FUNCTIONS
 
                 if (item.MABL <= 0 || item.MABL_K <= 0)
                 {
-                    if (OnZeroPriceWarning != null)
+                    if (OnValidationWarning != null)
                     {
-                        if (!OnZeroPriceWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
+                        if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
                         {
                             throw new NullyExceptiony("ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.");
                         }
