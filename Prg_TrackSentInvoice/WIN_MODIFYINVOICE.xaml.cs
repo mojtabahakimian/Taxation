@@ -315,10 +315,40 @@ VALUES
             TXT_CUSTOM_DATE.Text = $"{year:0000}/{month:00}/{day:00}";
         }
 
+        private static string NormalizePersianDateText(string? dateText)
+        {
+            if (string.IsNullOrWhiteSpace(dateText))
+            {
+                return string.Empty;
+            }
+
+            var normalized = new StringBuilder(dateText.Trim().Length);
+            foreach (var ch in dateText.Trim())
+            {
+                normalized.Append(ch switch
+                {
+                    '۰' or '٠' => '0',
+                    '۱' or '١' => '1',
+                    '۲' or '٢' => '2',
+                    '۳' or '٣' => '3',
+                    '۴' or '٤' => '4',
+                    '۵' or '٥' => '5',
+                    '۶' or '٦' => '6',
+                    '۷' or '٧' => '7',
+                    '۸' or '٨' => '8',
+                    '۹' or '٩' => '9',
+                    '-' or '.' or '\\' => '/',
+                    _ => ch
+                });
+            }
+
+            return normalized.ToString();
+        }
+
         private bool TryGetCustomIssueDate(out DateTime customIssueDate, out string normalizedDate)
         {
             customIssueDate = default;
-            normalizedDate = TXT_CUSTOM_DATE?.Text?.Trim();
+            normalizedDate = NormalizePersianDateText(TXT_CUSTOM_DATE?.Text);
 
             if (!(CHK_CUSTOM_DATE?.IsChecked ?? false))
             {
@@ -332,7 +362,7 @@ VALUES
             }
 
             var compactDate = normalizedDate.Replace("/", string.Empty).Trim();
-            if (compactDate.Length != 8 || !int.TryParse(compactDate, out _))
+            if (compactDate.Length != 8 || !compactDate.All(char.IsDigit))
             {
                 new Msgwin(false, "فرمت تاریخ سفارشی نامعتبر است. مثال صحیح: 1404/08/24").ShowDialog();
                 return false;
@@ -342,6 +372,7 @@ VALUES
             {
                 customIssueDate = TheFunctions.GetGregorianDateTime(compactDate);
                 normalizedDate = $"{compactDate.Substring(0, 4)}/{compactDate.Substring(4, 2)}/{compactDate.Substring(6, 2)}";
+                TXT_CUSTOM_DATE.Text = normalizedDate;
                 return true;
             }
             catch
