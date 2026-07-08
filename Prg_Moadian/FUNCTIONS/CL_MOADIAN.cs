@@ -32,6 +32,9 @@ namespace Prg_Moadian.FUNCTIONS
 
         public static string TaxURL { get; set; } = "https://sandboxrc.tax.gov.ir/req/api/";
         //اصلی//"https://tp.tax.gov.ir/req/api/"
+
+        public static Func<string, bool>? OnZeroPriceWarning { get; set; }
+
         public static int IDD_OF_TAXDTL { get; set; } = -1;
 
         public static string CALLER_NAME { get; set; }
@@ -420,6 +423,21 @@ namespace Prg_Moadian.FUNCTIONS
                 if (item.N_KOL == 100 || item.JAY > 0)
                 {
                     item.MABL = 1;
+                }
+
+                if (item.MABL <= 0 || item.MABL_K <= 0)
+                {
+                    if (OnZeroPriceWarning != null)
+                    {
+                        if (!OnZeroPriceWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
+                        {
+                            throw new NullyExceptiony("ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.");
+                        }
+                    }
+                    else
+                    {
+                        throw new NullyExceptiony($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' نمی‌تواند صفر یا منفی باشد.");
+                    }
                 }
 
                 if (_HEAD_EXTENDED.ins == 4)   //اگر از نوع برگشتی است

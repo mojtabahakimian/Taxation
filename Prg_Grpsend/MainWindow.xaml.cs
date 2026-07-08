@@ -721,6 +721,17 @@ namespace Prg_Grpsend
                 var result = await Task.Run(async () =>
                 {
                     var bulk = new SendInvoiceBulk(dbms, CL_MOADIAN.TaxURL);  // دیگر روی UI نیست
+
+                    bulk.OnZeroPriceWarning = (msg) => {
+                        bool res = false;
+                        Application.Current.Dispatcher.Invoke(() => {
+                            var msgwin = new Msgwin(true, msg, YesBtnText: "ادامه و ارسال", NoBtnText: "لغو ارسال");
+                            msgwin.ShowDialog();
+                            res = msgwin.DialogResult == true;
+                        });
+                        return res;
+                    };
+
                     return await bulk.SendAsync(
                                  selected, 2,
                                  inty,

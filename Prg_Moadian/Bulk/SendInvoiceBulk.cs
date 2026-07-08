@@ -39,6 +39,7 @@ namespace Prg_Moadian.Bulk
         private readonly CL_FUNTIONS _fn = new CL_FUNTIONS();
 
         public string CALLER_NAME { get; set; } = "m";
+        public Func<string, bool>? OnZeroPriceWarning { get; set; }
 
         private SendInvoiceBulk(CL_CCNNMANAGER db,
                           SAZMAN sazman,
@@ -296,6 +297,21 @@ namespace Prg_Moadian.Bulk
                 if (ln.N_KOL == 100 || ln.JAY > 0)
                 {
                     ln.MABL = 1;
+                }
+
+                if (ln.MABL <= 0 || ln.MABL_K <= 0)
+                {
+                    if (OnZeroPriceWarning != null)
+                    {
+                        if (!OnZeroPriceWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
+                        {
+                            throw new InvoiceValidationException(number, $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.");
+                        }
+                    }
+                    else
+                    {
+                        throw new InvoiceValidationException(number, $"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' نمی‌تواند صفر یا منفی باشد.");
+                    }
                 }
 
                 ln.MEGHk = Math.Round(ln.MEGHk ?? 0, 4);
