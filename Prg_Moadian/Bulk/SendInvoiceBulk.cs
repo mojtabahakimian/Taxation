@@ -60,10 +60,18 @@ namespace Prg_Moadian.Bulk
                 .Replace("-----BEGIN PRIVATE KEY-----\r\n", string.Empty)
                 .Replace("\r\n-----END PRIVATE KEY-----\r\n", string.Empty)
                 .Trim();
+
+            // Fix sandbox tax url if it comes in without /req/api/
+            if (taxUrl.Equals("https://sandboxrc.tax.gov.ir", StringComparison.OrdinalIgnoreCase))
+            {
+                taxUrl = "https://sandboxrc.tax.gov.ir/req/api/";
+            }
+
             _taxService = new TaxService(_memoryId, privateKey, taxUrl);
 
 
             RequestTokenModel? model = _taxService.RequestToken();
+
         }
 
         /// <summary>
@@ -283,7 +291,9 @@ namespace Prg_Moadian.Bulk
                         }
                         else
                         {
-                            throw new InvoiceValidationException(number, $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.");
+                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.";
+                            RecordFailedInvoiceLocal(number, tag, errMsg);
+                            throw new InvoiceValidationException(number, errMsg);
                         }
                     }
                     if (srcEcode.Length > 14) throw new InvoiceValidationException(number, "Over Length 14 Ecode for tob=1");
@@ -299,7 +309,9 @@ namespace Prg_Moadian.Bulk
                         }
                         else
                         {
-                            throw new InvoiceValidationException(number, $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.");
+                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.";
+                            RecordFailedInvoiceLocal(number, tag, errMsg);
+                            throw new InvoiceValidationException(number, errMsg);
                         }
                     }
                     if (srcEcode.Length > 11) throw new InvoiceValidationException(number, "Over Length 11 Ecode for tob=2");
@@ -327,12 +339,16 @@ namespace Prg_Moadian.Bulk
                     {
                         if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
                         {
-                            throw new InvoiceValidationException(number, $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.");
+                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
+                            RecordFailedInvoiceLocal(number, tag, errMsg);
+                            throw new InvoiceValidationException(number, errMsg);
                         }
                     }
                     else
                     {
-                        throw new InvoiceValidationException(number, $"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' نمی‌تواند صفر یا منفی باشد.");
+                        string errMsg = $"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' نمی‌تواند صفر یا منفی باشد.";
+                        RecordFailedInvoiceLocal(number, tag, errMsg);
+                        throw new InvoiceValidationException(number, errMsg);
                     }
                 }
 
@@ -647,6 +663,27 @@ namespace Prg_Moadian.Bulk
             }
 
             return _db.DoGetDataSQL<DRV_TBL>(string.Format(sql, number, tag)).ToList();
+        }
+
+        private void RecordFailedInvoiceLocal(long number, int tag, string errorMessage)
+        {
+            try
+            {
+                var idd = _fn.GetNewIDD();
+                var inno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), number);
+                byte apiType = (byte)(_isSandbox ? 0 : 1);
+
+                string sql = @"
+                    INSERT INTO dbo.TAXDTL
+                    (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent)
+                    VALUES
+                    (@Inno, @Number, @Tag, 'FAILED', @Error, @IDD, GETDATE(), @Api)";
+                _db.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType });
+            }
+            catch (Exception ex)
+            {
+                // Ignored
+            }
         }
 
         private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag)

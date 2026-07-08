@@ -75,6 +75,28 @@ namespace Prg_Moadian.FUNCTIONS
         /// MAIN
         /// </summary>
         /// <param name="args"></param>
+        private static void RecordFailedInvoiceLocal(double number, double tag, string errorMessage)
+        {
+            try
+            {
+                var idd = TheFunctions.GetNewIDD();
+                var yea = dbms.DoGetDataSQL<int>("SELECT TOP 1 YEA FROM dbo.SAZMAN").FirstOrDefault();
+                var inno = TheFunctions.GenerateFixedLengthInno(yea.ToString(), (long)number);
+                byte apiType = (byte)(TaxURL == "https://tp.tax.gov.ir/req/api/" ? 1 : 0);
+
+                string sql = @"
+                    INSERT INTO dbo.TAXDTL
+                    (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent)
+                    VALUES
+                    (@Inno, @Number, @Tag, 'FAILED', @Error, @IDD, GETDATE(), @Api)";
+                dbms.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType });
+            }
+            catch (Exception ex)
+            {
+                CL_Generaly.DoGetwriteAppenLog($"Failed to record failed invoice: {ex.Message}");
+            }
+        }
+
         public static void DoSendInvoice(string[] args)
         {
             L_TAXDTL_US = new List<TAXDTL>();
@@ -363,7 +385,9 @@ namespace Prg_Moadian.FUNCTIONS
                             }
                             else
                             {
-                                throw new NullyExceptiony("ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.");
+                                string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.";
+                                RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                                throw new NullyExceptiony(errMsg);
                             }
                         }
 
@@ -388,7 +412,9 @@ namespace Prg_Moadian.FUNCTIONS
                             }
                             else
                             {
-                                throw new NullyExceptiony("ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.");
+                                string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.";
+                                RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                                throw new NullyExceptiony(errMsg);
                             }
                         }
 
@@ -455,12 +481,16 @@ namespace Prg_Moadian.FUNCTIONS
                     {
                         if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
                         {
-                            throw new NullyExceptiony("ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.");
+                            string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
+                            RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                            throw new NullyExceptiony(errMsg);
                         }
                     }
                     else
                     {
-                        throw new NullyExceptiony($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' نمی‌تواند صفر یا منفی باشد.");
+                        string errMsg = $"قیمت واحد یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است.";
+                        RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                        throw new NullyExceptiony(errMsg);
                     }
                 }
 
