@@ -85,7 +85,7 @@ namespace Prg_Moadian.Bulk
         /// <param name="customDateText">متن تاریخ سفارشی (مثال: 1404/08/24)</param>
         /// <param name="sendOptionalItemName">ارسال نام اختیاری کالا/خدمت در فیلد sstt</param>
         public async Task<BulkSendResult> SendAsync(IEnumerable<long> invoiceNumbers, int tag, int? inty_value = default, int? setm_value = default,
-            IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
+    IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
         {
             var cer = new CustomExceptErMsg();
 
@@ -101,38 +101,32 @@ namespace Prg_Moadian.Bulk
             // 1. تبدیل به DTO و جمع‌آوری رکوردها
             var allDtos = new List<InvoiceDto>();
             var allRecords = new Dictionary<InvoiceDto, List<TAXDTL>>();
+
             foreach (var number in numbers)
             {
-
                 try
                 {
                     var (dto, records) = BuildDtoAndRecords(number, tag, inty_value, setm_value, useCustomDate, customDateText, sendOptionalItemName);
-
                     allDtos.Add(dto);
                     allRecords[dto] = records;
                 }
                 catch (InvoiceValidationException ex)
                 {
-                    // فاکتور نامعتبر را به لیست خطاها اضافه می‌کنیم و ادامه می‌دهیم
                     result.Failures[ex.InvoiceNumber] = ex.Message;
-                    //continue;
                 }
                 catch (Exception ex)
                 {
-                    // بقیه‌ی خطاها را هم ثبت می‌کنیم
-                    // و به کاربر فقط پیام مناسب
                     var friendly = cer.ExpecMsgEr(ex) ?? $"خطای داخلی در پردازش فاکتور {number} . لطفاً بعداً تلاش کنید.";
-
-                    result.Failures[number] = friendly + $" شماره {number} ";
-                    //result.Failures[number] = ex.Message;
-
-                    //continue;
+                    result.Failures[number] = friendly;
                 }
-
-                // ✅ هوشمندانه گزارش پیشرفت در مرحله‌ی ساخت
-                buildProgress++;
-                double buildPercent = (double)buildProgress / totalNumbers;
-                progress?.Report((int)(buildPercent * 50));  // ← تا ۵۰٪ مربوط به مرحله ساخت
+                finally
+                {
+                    // این را در finally گذاشتیم تا حتی اگر فاکتوری خطا داد، 
+                    // نوار پیشرفت (Progress) آپدیت شود و روی صفحه گیر نکند
+                    buildProgress++;
+                    double buildPercent = (double)buildProgress / totalNumbers;
+                    progress?.Report((int)(buildPercent * 50));
+                }
             }
 
             // 2. بسته‌بندی در بسته‌های MaxPerRequest و ارسال
@@ -145,27 +139,81 @@ namespace Prg_Moadian.Bulk
             {
                 try
                 {
-                    //------------------------------------
-                    // ❶ یک «تخمینی» قبل از ارسال (اختیاری)
                     progress?.Report(0);
 
-                    //var response = TaxApiService.Instance.TaxApis.SendInvoices(batch, null);
+                    // ۱. متغیرهایی برای نگهداری وضعیت پاسخ سرور
+                    List<PacketResponse> responsesToSave = new List<PacketResponse>();
+                    string batchErrorMessage = null;
 
-                    //------------------------------------
-                    // ❷ فراخوانی وب‌سرویس (ترجیحاً نسخهٔ async)
-                    var response = await Task
-                        .Run(() => TaxApiService.Instance.TaxApis.SendInvoices(batch, null))
-                        .ConfigureAwait(false);
+                    try
+                    {
+                        // ❷ فراخوانی وب‌سرویس
+                        var response = await Task.Run(() => TaxApiService.Instance.TaxApis.SendInvoices(batch, null)).ConfigureAwait(false);
 
+                        // بررسی قطعی بودن پاسخ سرور
+                        if (response == null || response.Body == null)
+                        {
+                            batchErrorMessage = $"پاسخ نامعتبر از سرور (کد وضعیت: {response?.Status}). احتمالاً سامانه دچار تایم‌اوت شده است.";
+                        }
+                        else if (response.Body.Errors != null && response.Body.Errors.Any())
+                        {
+                            // اگر Detail نال بود، ErrorCode را نشان بده
+                            batchErrorMessage = string.Join(" | ", response.Body.Errors.Select(e => !string.IsNullOrEmpty(e.Detail) ? e.Detail : e.ErrorCode));
+                        }
+                        else if (response.Body.Result == null || !response.Body.Result.Any())
+                        {
+                            batchErrorMessage = "ارسال انجام شد اما سرور مودیان هیچ نتیجه‌ای (Reference Number) برنگرداند.";
+                        }
+                        else
+                        {
+                            // اگر هیچ خطایی نبود، لیست پاسخ‌های واقعی را بگیرید
+                            responsesToSave = response.Body.Result.ToList();
+                        }
+                    }
+                    catch (Exception reqEx)
+                    {
+                        // اگر اینترنت قطع بود یا DNS مشکل داشت
+                        batchErrorMessage = cer.ExpecMsgEr(reqEx) ?? "قطعی ارتباط یا خطای شبکه‌ای در اتصال به سرور مودیان.";
+                    }
 
+                    // ---------------------------------------------------------------------
+                    // ❸ ثبت در دیتابیس (تحت هر شرایطی باید اجرا شود)
+                    // ---------------------------------------------------------------------
+
+                    // اگر خطایی رخ داده بود، یک لیست فیک می‌سازیم تا متد PersistChunk کرش نکند 
+                    if (batchErrorMessage != null)
+                    {
+                        foreach (var dto in batch)
+                        {
+                            responsesToSave.Add(new PacketResponse(null, null, "SYS_ERR", batchErrorMessage));
+                        }
+                    }
+
+                    // گرفتن رکوردهای دیتابیسی مربوط به این بچ
                     var batchRecords = batch.Select(dto => allRecords[dto]).ToList();
 
-                    // درج در پایگاه
-                    PersistChunk(batch, batchRecords, response.Body.Result, tag);
-                    result.Success += response.Body.Result.Count;
+                    // ذخیره در دیتابیس!
+                    PersistChunk(batch, batchRecords, responsesToSave, tag);
 
+                    // ---------------------------------------------------------------------
+                    // ❹ گزارش‌دهی به کاربر
+                    // ---------------------------------------------------------------------
 
-                    progress?.Report(response.Body.Result.Count);
+                    if (batchErrorMessage == null)
+                    {
+                        // کاملاً موفق بود
+                        result.Success += responsesToSave.Count;
+                        progress?.Report(responsesToSave.Count);
+                    }
+                    else
+                    {
+                        // ثبت خطاها برای نمایش به کاربر (با استخراج کاملاً امنِ شماره فاکتور)
+                        foreach (var dto in batch)
+                        {
+                            long num = (long)allRecords[dto].First().NUMBER!;
+                            result.Failures[num] = batchErrorMessage;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -173,10 +221,7 @@ namespace Prg_Moadian.Bulk
                     // اگر ارسال یک بسته به کل شکست خورد، برای همه‌ی DTOهای آن بسته خطا بزن
                     foreach (var dto in batch)
                     {
-                        // استخراج شماره از Inno
-                        var num = long.Parse(dto.Header.Inno!.Substring(_sazman.YEA.ToString().Length + 2));
-                        //result.Failures[num] = ex.Message;
-
+                        long num = (long)allRecords[dto].First().NUMBER!;
                         result.Failures[num] = friendly;
                     }
                 }
