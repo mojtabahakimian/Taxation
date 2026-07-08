@@ -32,6 +32,9 @@ namespace Prg_Moadian.FUNCTIONS
 
         public static string TaxURL { get; set; } = "https://sandboxrc.tax.gov.ir/req/api/";
         //اصلی//"https://tp.tax.gov.ir/req/api/"
+
+        public static Func<string, bool>? OnValidationWarning { get; set; }
+
         public static int IDD_OF_TAXDTL { get; set; } = -1;
 
         public static string CALLER_NAME { get; set; }
@@ -72,6 +75,28 @@ namespace Prg_Moadian.FUNCTIONS
         /// MAIN
         /// </summary>
         /// <param name="args"></param>
+        private static void RecordFailedInvoiceLocal(double number, double tag, string errorMessage)
+        {
+            try
+            {
+                var idd = TheFunctions.GetNewIDD();
+                var yea = dbms.DoGetDataSQL<int>("SELECT TOP 1 YEA FROM dbo.SAZMAN").FirstOrDefault();
+                var inno = TheFunctions.GenerateFixedLengthInno(yea.ToString(), (long)number);
+                byte apiType = (byte)(TaxURL == "https://tp.tax.gov.ir/req/api/" ? 1 : 0);
+
+                string sql = @"
+                    INSERT INTO dbo.TAXDTL
+                    (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent)
+                    VALUES
+                    (@Inno, @Number, @Tag, 'FAILED', @Error, @IDD, GETDATE(), @Api)";
+                dbms.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType });
+            }
+            catch (Exception ex)
+            {
+                CL_Generaly.DoGetwriteAppenLog($"Failed to record failed invoice: {ex.Message}");
+            }
+        }
+
         public static void DoSendInvoice(string[] args)
         {
             L_TAXDTL_US = new List<TAXDTL>();
@@ -352,7 +377,21 @@ namespace Prg_Moadian.FUNCTIONS
                     //کد اقتصادی : Tinb
                     if (src_ECODE is not null) //Real Example : 10840014242 || 411375646679
                     {
-                        if (src_ECODE?.Length > 14)
+                        if (src_ECODE.Length == 11)
+                        {
+                            if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({src_ECODE}) ۱۱ رقمی است که مربوط به اشخاص حقوقی است، اما نوع شخص 'حقیقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                            {
+                                // continue
+                            }
+                            else
+                            {
+                                string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.";
+                                RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                                throw new NullyExceptiony(errMsg);
+                            }
+                        }
+
+                        if (src_ECODE.Length > 14)
                         {
                             throw new NullyExceptiony("Over Length 14 Ecode for tob 1");
                         }
@@ -365,7 +404,21 @@ namespace Prg_Moadian.FUNCTIONS
                     //کد اقتصادی : Tinb
                     if (src_ECODE is not null)
                     {
-                        if (src_ECODE?.Length > 11)
+                        if (src_ECODE.Length == 10)
+                        {
+                            if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({src_ECODE}) ۱۰ رقمی است که مربوط به اشخاص حقیقی است، اما نوع شخص 'حقوقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                            {
+                                // continue
+                            }
+                            else
+                            {
+                                string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.";
+                                RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                                throw new NullyExceptiony(errMsg);
+                            }
+                        }
+
+                        if (src_ECODE.Length > 11)
                         {
                             throw new NullyExceptiony("Over Length 11 Ecode for tob 2");
                         }
@@ -420,6 +473,25 @@ namespace Prg_Moadian.FUNCTIONS
                 if (item.N_KOL == 100 || item.JAY > 0)
                 {
                     item.MABL = 1;
+                }
+
+                if (item.MABL <= 0 || item.MABL_K <= 0)
+                {
+                    if (OnValidationWarning != null)
+                    {
+                        if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
+                        {
+                            string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
+                            RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                            throw new NullyExceptiony(errMsg);
+                        }
+                    }
+                    else
+                    {
+                        string errMsg = $"قیمت واحد یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است.";
+                        RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                        throw new NullyExceptiony(errMsg);
+                    }
                 }
 
                 if (_HEAD_EXTENDED.ins == 4)   //اگر از نوع برگشتی است
