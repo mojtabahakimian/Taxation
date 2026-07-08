@@ -327,6 +327,14 @@
                     <TextBlock x:Name="GrandTotalText" Text="مبلغ نهایی: 0" FontWeight="Bold" Foreground="DarkGreen"/>
                 </StackPanel>
 
+                <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" Margin="10,-6,10,10" VerticalAlignment="Center">
+                    <CheckBox x:Name="CHK_CUSTOM_DATE" Content="تاریخ سفارشی:" IsChecked="False" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TXT_CUSTOM_DATE" Width="120" materialDesign:HintAssist.Hint="مثال: 1404/08/24"
+                             IsEnabled="{Binding ElementName=CHK_CUSTOM_DATE,Path=IsChecked,UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
+                    <TextBlock Text="در صورت فعال بودن، تاریخ صدور ارسالی برای اصلاحی/برگشتی/ابطالی از این مقدار گرفته می‌شود."
+                               Margin="12,0,0,0" Opacity="0.7" VerticalAlignment="Center"/>
+                </StackPanel>
+
                 <UniformGrid Margin="10,-6,10,16">
                     <Button x:Name="BTN_SEND"
                     Click="BTN_SEND_Click"
