@@ -39,6 +39,7 @@ namespace Prg_Moadian.Bulk
         private readonly CL_FUNTIONS _fn = new CL_FUNTIONS();
 
         public string CALLER_NAME { get; set; } = "m";
+        public Func<string, bool>? OnValidationWarning { get; set; }
 
         private SendInvoiceBulk(CL_CCNNMANAGER db,
                           SAZMAN sazman,
@@ -59,10 +60,24 @@ namespace Prg_Moadian.Bulk
                 .Replace("-----BEGIN PRIVATE KEY-----\r\n", string.Empty)
                 .Replace("\r\n-----END PRIVATE KEY-----\r\n", string.Empty)
                 .Trim();
+
+            // Fix sandbox tax url if it comes in without /req/api/
+            if (taxUrl.Equals("https://sandboxrc.tax.gov.ir", StringComparison.OrdinalIgnoreCase))
+            {
+                taxUrl = "https://sandboxrc.tax.gov.ir/req/api/";
+            }
+
             _taxService = new TaxService(_memoryId, privateKey, taxUrl);
 
 
-            RequestTokenModel? model = _taxService.RequestToken();
+            try
+            {
+                RequestTokenModel? model = _taxService.RequestToken();
+            }
+            catch
+            {
+                // Ignore failure on RequestToken during constructor, will be caught later if api fails
+            }
         }
 
         /// <summary>
@@ -274,11 +289,37 @@ namespace Prg_Moadian.Bulk
 
                 if (lines.First().tob == 1) // حقیقی
                 {
+                    if (srcEcode.Length == 11)
+                    {
+                        if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({srcEcode}) ۱۱ رقمی است که مربوط به اشخاص حقوقی است، اما در فاکتور {number} نوع شخص 'حقیقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                        {
+                            // continue
+                        }
+                        else
+                        {
+                                string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.";
+                                RecordFailedInvoiceLocal(number, tag, errMsg);
+                                throw new InvoiceValidationException(number, errMsg);
+                        }
+                    }
                     if (srcEcode.Length > 14) throw new InvoiceValidationException(number, "Over Length 14 Ecode for tob=1");
                     ECODE_M = srcEcode;
                 }
                 else // حقوقی
                 {
+                    if (srcEcode.Length == 10)
+                    {
+                        if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({srcEcode}) ۱۰ رقمی است که مربوط به اشخاص حقیقی است، اما در فاکتور {number} نوع شخص 'حقوقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                        {
+                            // continue
+                        }
+                        else
+                        {
+                                string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.";
+                                RecordFailedInvoiceLocal(number, tag, errMsg);
+                                throw new InvoiceValidationException(number, errMsg);
+                        }
+                    }
                     if (srcEcode.Length > 11) throw new InvoiceValidationException(number, "Over Length 11 Ecode for tob=2");
                     ECODE_M = srcEcode;
                 }
@@ -296,6 +337,13 @@ namespace Prg_Moadian.Bulk
                 if (ln.N_KOL == 100 || ln.JAY > 0)
                 {
                     ln.MABL = 1;
+                }
+
+                if (ln.MABL <= 0 || ln.MABL_K <= 0)
+                {
+                    string errMsg = $"قیمت واحد یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است.";
+                    RecordFailedInvoiceLocal(number, tag, errMsg);
+                    throw new InvoiceValidationException(number, errMsg);
                 }
 
                 ln.MEGHk = Math.Round(ln.MEGHk ?? 0, 4);
@@ -609,6 +657,27 @@ namespace Prg_Moadian.Bulk
             }
 
             return _db.DoGetDataSQL<DRV_TBL>(string.Format(sql, number, tag)).ToList();
+        }
+
+        private void RecordFailedInvoiceLocal(long number, int tag, string errorMessage)
+        {
+            try
+            {
+                var idd = _fn.GetNewIDD();
+                var inno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), number);
+                byte apiType = (byte)(_isSandbox ? 0 : 1);
+
+                string sql = @"
+                    INSERT INTO dbo.TAXDTL
+                    (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent)
+                    VALUES
+                    (@Inno, @Number, @Tag, 'FAILED', @Error, @IDD, GETDATE(), @Api)";
+                _db.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType });
+            }
+            catch (Exception ex)
+            {
+                // Ignored
+            }
         }
 
         private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag)
