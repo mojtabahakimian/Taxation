@@ -477,9 +477,21 @@ namespace Prg_Moadian.FUNCTIONS
 
                 if (item.MABL <= 0 || item.MABL_K <= 0)
                 {
-                    string errMsg = $"قیمت واحد یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است.";
-                    RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
-                    throw new NullyExceptiony(errMsg);
+                    if (OnValidationWarning != null)
+                    {
+                        if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
+                        {
+                            string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
+                            RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                            throw new NullyExceptiony(errMsg);
+                        }
+                    }
+                    else
+                    {
+                        string errMsg = $"قیمت واحد یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است.";
+                        RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                        throw new NullyExceptiony(errMsg);
+                    }
                 }
 
                 if (_HEAD_EXTENDED.ins == 4)   //اگر از نوع برگشتی است

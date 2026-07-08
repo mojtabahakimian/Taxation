@@ -341,9 +341,21 @@ namespace Prg_Moadian.Bulk
 
                 if (ln.MABL <= 0 || ln.MABL_K <= 0)
                 {
-                    string errMsg = $"قیمت واحد یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است.";
-                    RecordFailedInvoiceLocal(number, tag, errMsg);
-                    throw new InvoiceValidationException(number, errMsg);
+                    if (OnValidationWarning != null)
+                    {
+                        if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
+                        {
+                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
+                            RecordFailedInvoiceLocal(number, tag, errMsg);
+                            throw new InvoiceValidationException(number, errMsg);
+                        }
+                    }
+                    else
+                    {
+                        string errMsg = $"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' نمی‌تواند صفر یا منفی باشد.";
+                        RecordFailedInvoiceLocal(number, tag, errMsg);
+                        throw new InvoiceValidationException(number, errMsg);
+                    }
                 }
 
                 ln.MEGHk = Math.Round(ln.MEGHk ?? 0, 4);
