@@ -591,6 +591,17 @@ namespace Prg_TrackSentInvoice
                         break;
 
                     case "SUCCESS":
+                        try
+                        {
+                            const string updateIrtaxidSql = @"
+UPDATE hle
+SET hle.irtaxid = t.Taxid
+FROM dbo.HEAD_LST_EXTENDED hle
+INNER JOIN dbo.TAXDTL t ON hle.NUMBER = t.NUMBER AND hle.TGU = t.TAG
+WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
+                            dbms.DoExecuteSQL(updateIrtaxidSql, new { RefrenceNumber = referenceCode });
+                        }
+                        catch (Exception) { }
                         new Msgwin(false, @"صورت‌حساب با موفقیت در سامانه ثبت شده است.").ShowDialog();
                         break;
 
@@ -617,6 +628,17 @@ namespace Prg_TrackSentInvoice
 
                                     if (status2 == "SUCCESS")
                                     {
+                                        try
+                                        {
+                                            const string updateIrtaxidSql = @"
+UPDATE hle
+SET hle.irtaxid = t.Taxid
+FROM dbo.HEAD_LST_EXTENDED hle
+INNER JOIN dbo.TAXDTL t ON hle.NUMBER = t.NUMBER AND hle.TGU = t.TAG
+WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
+                                            dbms.DoExecuteSQL(updateIrtaxidSql, new { RefrenceNumber = referenceCode });
+                                        }
+                                        catch (Exception) { }
                                         new Msgwin(false, @"(استعلام ثانویه) صورت‌حساب شما با موفقیت ثبت شده است.").ShowDialog();
                                         break;
                                     }
