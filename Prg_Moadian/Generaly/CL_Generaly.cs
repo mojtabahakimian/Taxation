@@ -5,7 +5,7 @@ namespace Prg_Moadian.Generaly
 {
     public static class CL_Generaly
     {
-        public static string AppVersion = "8.9.5";
+        public static string AppVersion = "8.9.6";
         public static string AppDateShamsi = "1403/04/18";
         public static string AppVersionDisplay => $"نسخه {AppVersion} - {AppDateShamsi}";
 

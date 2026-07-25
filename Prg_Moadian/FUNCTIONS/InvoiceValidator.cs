@@ -138,11 +138,11 @@ namespace Prg_Moadian.FUNCTIONS
                 result.AddError($"خطای مهم (02002): تاریخ صدور فاکتور ({indatim.ToLocalTime():yyyy/MM/dd HH:mm}) در آینده است!");
             }
 
-            // قانون 21 روزه دارایی
+            // قانون ۱۲ روزه دارایی (طبق آخرین بخشنامه‌های اجرایی)
             var daysDiff = (serverNow - indatim).TotalDays;
-            if (daysDiff > 21)
+            if (daysDiff > 12)
             {
-                result.AddError($"تاریخ صدور ({indatim.ToLocalTime():yyyy/MM/dd}) بیش از ۲۱ روز ({daysDiff:F0} روز) با امروز فاصله دارد. سامانه مودیان قطعاً این فاکتور را به دلیل اتمام مهلت زمانی رد می‌کند.");
+                result.AddError($"تاریخ صدور ({indatim.ToLocalTime():yyyy/MM/dd}) بیش از ۱۲ روز ({daysDiff:F0} روز) با امروز فاصله دارد. سامانه مودیان قطعاً این فاکتور را به دلیل اتمام مهلت قانونی رد می‌کند.");
             }
         }
 

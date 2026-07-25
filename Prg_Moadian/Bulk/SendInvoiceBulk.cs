@@ -497,21 +497,71 @@ namespace Prg_Moadian.Bulk
             // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
             var ts = TaxService.ConvertDateToLong(dt);
 
-            // 1. دریافت شماره فاکتور (مثلاً 10391)
+            // =================================================================
+            // ❶ محاسبه زمان "همین الان" بر اساس ساعت دقیق و سینک‌شده‌ی سرور دارایی
+            // =================================================================
+            var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+
+            // فرض بر این است که متد/کلاس TimeSync شما TimeOffset را برمی‌گرداند
+            // (یا اگر در متغیر دیگری مثل TokenLifeTime.ServerClockSkew ذخیره کردید، از آن استفاده کنید)
+            var nowUtcOffset = DateTimeOffset.UtcNow.Add(TokenLifeTime.ServerClockSkew); // یا TimeSync.TimeOffset
+            var serverNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtcOffset.UtcDateTime, iranTZ);
+
+
+            // =================================================================
+            // ❷ محاسبه "تاریخ صدور" (Indatim) - بر اساس تاریخ سفارشی یا تاریخ واقعی
+            // =================================================================
+            DateTime issueDate;
+            if (useCustomDate && !string.IsNullOrWhiteSpace(customDateText))
+            {
+                try
+                {
+                    // تبدیل تاریخ شمسی سفارشی به میلادی (کاربر می‌خواهد فاکتور قدیمی را جدید جا بزند)
+                    var customDateInt = int.Parse(customDateText.Replace("/", ""));
+                    issueDate = _fn.GetGregorianDateTime(customDateInt.ToString());
+                }
+                catch
+                {
+                    // در صورت خطای تایپی کاربر در تاریخ سفارشی، بازگشت به تاریخ اصلی فاکتور
+                    issueDate = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
+                }
+            }
+            else
+            {
+                // استفاده از تاریخ واقعی خود فاکتور از دیتابیس
+                issueDate = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
+            }
+
+
+            // =================================================================
+            // ❸ تولید TaxId و تبدیل تاریخ‌ها به فرمت Unix Timestamp
+            // =================================================================
+
+            // 1. TaxId باید حتماً بر اساس تاریخ صدور (issueDate) ساخته شود
+            var taxId = _taxService.RequestTaxId(_memoryId, issueDate);
+
+            // 2. زمان صدور معامله (برای گذشته یا امروز)
+            var indatim_Timestamp = TaxService.ConvertDateToLong(issueDate);
+
+            // 3. زمان ایجاد فایل (همیشه زمان الانِ سینک‌شده با سرور)
+            long indati2m_Timestamp = TaxService.ConvertDateToLong(serverNow); //default
+            if (useCustomDate)
+            {
+                indati2m_Timestamp = TaxService.ConvertDateToLong(issueDate);
+            }
+
+            // 4. تولید شماره سریال داخلی (Inno)
             long invoiceNum = long.Parse(number.ToString());
-            // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
 
-            // Taxid و Indatim هر دو از DATE_N فاکتور می‌آیند — serial تصادفی تضمین می‌کند
-            // که هر ارسال (از جمله resend پس از ابطالی) یک Taxid منحصربه‌فرد بگیرد.
-            var taxId = _taxService.RequestTaxId(_memoryId, dt);
-
-            // آماده‌سازی Header
+            // =================================================================
+            // ❹ آماده‌سازی Header
+            // =================================================================
             var header = new InvoiceHeaderDto
             {
                 Taxid = taxId,
-                Indatim = ts,
-                Indati2m = ts,
+                Indatim = indatim_Timestamp,     // زمان صدور (ترفند تاریخ سفارشی در اینجا اعمال می‌شود)
+                Indati2m = indati2m_Timestamp,   // زمان ساخت فایل (زمان دقیق سرور دارایی)
                 Inty = headExt.inty ?? 1,
                 Inno = finalInno, //// _fn.InnoAddZeroes($"{_sazman.YEA}00{number}")
                 Irtaxid = null,
@@ -535,6 +585,10 @@ namespace Prg_Moadian.Bulk
                 Insp = headExt.insp,
                 Tvop = headExt.tvop,
                 Tax17 = headExt.tax17,
+
+                //Insr = null, // قاعده ارسال صورتحساب (اگر ندارید Null بفرستید)
+                //Nti1 = null, // یادداشت 1
+                //Nti2 = null  // یادداشت 2
 
                 #region MINE
                 //Taxid = taxId, //شماره منحصر به فرد مالیاتی
@@ -596,6 +650,12 @@ namespace Prg_Moadian.Bulk
                 Vam = l.IMBAA ?? 0, //مبلغ مالیات بر ارزش افزوده //IMBAA	 INVO_LST
                 Tsstam = l.mabkn ?? 0, //مبلغ کل کالا/خدمت //MABL_K	INVO_LST
 
+                //// مقادیر پیش‌فرض برای فیلدهای جدید بدنه در V7.8 (برای الگوهای خاص)
+                //Cfee = 0,
+                //Nw = 0,
+                //Ssrv = 0,
+                //Sscv = 0
+
             }).ToList();
 
             var dto = new InvoiceDto
@@ -613,8 +673,8 @@ namespace Prg_Moadian.Bulk
                 TAG = tag,
                 DATE_N = (int?)lines.First().DATE_N,      // <— این خط اضافه شد
                 Taxid = header.Taxid,
-                Indatim_Sec = header.Indatim,
-                Indati2m_Sec = header.Indati2m,
+                Indatim_Sec = header.Indatim,     // زمان صدور
+                Indati2m_Sec = header.Indati2m,   // زمان ایجاد (همین الان)
                 Inty = header.Inty,
                 Inno = header.Inno,
                 Inp = header.Inp,
