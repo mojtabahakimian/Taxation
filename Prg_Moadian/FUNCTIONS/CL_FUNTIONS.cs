@@ -521,6 +521,22 @@ namespace Prg_Moadian.FUNCTIONS
 
             dbms.DoExecuteSQL(updateSql, updateParams);
 
+            if (root.status == "SUCCESS")
+            {
+                try
+                {
+                    const string updateIrtaxidSql = @"
+UPDATE hle
+SET hle.irtaxid = t.Taxid
+FROM dbo.HEAD_LST_EXTENDED hle
+INNER JOIN dbo.TAXDTL t ON hle.NUMBER = t.NUMBER AND hle.TGU = t.TAG
+WHERE t.IDD = @IDD AND t.Taxid IS NOT NULL";
+                    dbms.DoExecuteSQL(updateIrtaxidSql, new { IDD = _idd });
+                }
+                catch (Exception) { }
+            }
+
+
             //string? test = $"UPDATE dbo.TAXDTL SET TheConfirmationReferenceId=N'{root.confirmationReferenceId}', TheError=N'{(ERVALS)}' ,TheStatus=N'{root.status}', TheSuccess={Convert.ToByte(root.success)} WHERE IDD={_idd}";
             //dbms.DoExecuteSQL(test);
         }

@@ -39,6 +39,7 @@ namespace Prg_Moadian.Bulk
         private readonly CL_FUNTIONS _fn = new CL_FUNTIONS();
 
         public string CALLER_NAME { get; set; } = "m";
+        public Func<string, bool>? OnValidationWarning { get; set; }
 
         private SendInvoiceBulk(CL_CCNNMANAGER db,
                           SAZMAN sazman,
@@ -59,10 +60,18 @@ namespace Prg_Moadian.Bulk
                 .Replace("-----BEGIN PRIVATE KEY-----\r\n", string.Empty)
                 .Replace("\r\n-----END PRIVATE KEY-----\r\n", string.Empty)
                 .Trim();
+
+            // Fix sandbox tax url if it comes in without /req/api/
+            if (taxUrl.Equals("https://sandboxrc.tax.gov.ir", StringComparison.OrdinalIgnoreCase))
+            {
+                taxUrl = "https://sandboxrc.tax.gov.ir/req/api/";
+            }
+
             _taxService = new TaxService(_memoryId, privateKey, taxUrl);
 
 
             RequestTokenModel? model = _taxService.RequestToken();
+
         }
 
         /// <summary>
@@ -76,7 +85,7 @@ namespace Prg_Moadian.Bulk
         /// <param name="customDateText">متن تاریخ سفارشی (مثال: 1404/08/24)</param>
         /// <param name="sendOptionalItemName">ارسال نام اختیاری کالا/خدمت در فیلد sstt</param>
         public async Task<BulkSendResult> SendAsync(IEnumerable<long> invoiceNumbers, int tag, int? inty_value = default, int? setm_value = default,
-            IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
+    IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
         {
             var cer = new CustomExceptErMsg();
 
@@ -92,38 +101,32 @@ namespace Prg_Moadian.Bulk
             // 1. تبدیل به DTO و جمع‌آوری رکوردها
             var allDtos = new List<InvoiceDto>();
             var allRecords = new Dictionary<InvoiceDto, List<TAXDTL>>();
+
             foreach (var number in numbers)
             {
-
                 try
                 {
                     var (dto, records) = BuildDtoAndRecords(number, tag, inty_value, setm_value, useCustomDate, customDateText, sendOptionalItemName);
-
                     allDtos.Add(dto);
                     allRecords[dto] = records;
                 }
                 catch (InvoiceValidationException ex)
                 {
-                    // فاکتور نامعتبر را به لیست خطاها اضافه می‌کنیم و ادامه می‌دهیم
                     result.Failures[ex.InvoiceNumber] = ex.Message;
-                    //continue;
                 }
                 catch (Exception ex)
                 {
-                    // بقیه‌ی خطاها را هم ثبت می‌کنیم
-                    // و به کاربر فقط پیام مناسب
                     var friendly = cer.ExpecMsgEr(ex) ?? $"خطای داخلی در پردازش فاکتور {number} . لطفاً بعداً تلاش کنید.";
-
-                    result.Failures[number] = friendly + $" شماره {number} ";
-                    //result.Failures[number] = ex.Message;
-
-                    //continue;
+                    result.Failures[number] = friendly;
                 }
-
-                // ✅ هوشمندانه گزارش پیشرفت در مرحله‌ی ساخت
-                buildProgress++;
-                double buildPercent = (double)buildProgress / totalNumbers;
-                progress?.Report((int)(buildPercent * 50));  // ← تا ۵۰٪ مربوط به مرحله ساخت
+                finally
+                {
+                    // این را در finally گذاشتیم تا حتی اگر فاکتوری خطا داد، 
+                    // نوار پیشرفت (Progress) آپدیت شود و روی صفحه گیر نکند
+                    buildProgress++;
+                    double buildPercent = (double)buildProgress / totalNumbers;
+                    progress?.Report((int)(buildPercent * 50));
+                }
             }
 
             // 2. بسته‌بندی در بسته‌های MaxPerRequest و ارسال
@@ -136,27 +139,81 @@ namespace Prg_Moadian.Bulk
             {
                 try
                 {
-                    //------------------------------------
-                    // ❶ یک «تخمینی» قبل از ارسال (اختیاری)
                     progress?.Report(0);
 
-                    //var response = TaxApiService.Instance.TaxApis.SendInvoices(batch, null);
+                    // ۱. متغیرهایی برای نگهداری وضعیت پاسخ سرور
+                    List<PacketResponse> responsesToSave = new List<PacketResponse>();
+                    string batchErrorMessage = null;
 
-                    //------------------------------------
-                    // ❷ فراخوانی وب‌سرویس (ترجیحاً نسخهٔ async)
-                    var response = await Task
-                        .Run(() => TaxApiService.Instance.TaxApis.SendInvoices(batch, null))
-                        .ConfigureAwait(false);
+                    try
+                    {
+                        // ❷ فراخوانی وب‌سرویس
+                        var response = await Task.Run(() => TaxApiService.Instance.TaxApis.SendInvoices(batch, null)).ConfigureAwait(false);
 
+                        // بررسی قطعی بودن پاسخ سرور
+                        if (response == null || response.Body == null)
+                        {
+                            batchErrorMessage = $"پاسخ نامعتبر از سرور (کد وضعیت: {response?.Status}). احتمالاً سامانه دچار تایم‌اوت شده است.";
+                        }
+                        else if (response.Body.Errors != null && response.Body.Errors.Any())
+                        {
+                            // اگر Detail نال بود، ErrorCode را نشان بده
+                            batchErrorMessage = string.Join(" | ", response.Body.Errors.Select(e => !string.IsNullOrEmpty(e.Detail) ? e.Detail : e.ErrorCode));
+                        }
+                        else if (response.Body.Result == null || !response.Body.Result.Any())
+                        {
+                            batchErrorMessage = "ارسال انجام شد اما سرور مودیان هیچ نتیجه‌ای (Reference Number) برنگرداند.";
+                        }
+                        else
+                        {
+                            // اگر هیچ خطایی نبود، لیست پاسخ‌های واقعی را بگیرید
+                            responsesToSave = response.Body.Result.ToList();
+                        }
+                    }
+                    catch (Exception reqEx)
+                    {
+                        // اگر اینترنت قطع بود یا DNS مشکل داشت
+                        batchErrorMessage = cer.ExpecMsgEr(reqEx) ?? "قطعی ارتباط یا خطای شبکه‌ای در اتصال به سرور مودیان.";
+                    }
 
+                    // ---------------------------------------------------------------------
+                    // ❸ ثبت در دیتابیس (تحت هر شرایطی باید اجرا شود)
+                    // ---------------------------------------------------------------------
+
+                    // اگر خطایی رخ داده بود، یک لیست فیک می‌سازیم تا متد PersistChunk کرش نکند 
+                    if (batchErrorMessage != null)
+                    {
+                        foreach (var dto in batch)
+                        {
+                            responsesToSave.Add(new PacketResponse(null, null, "SYS_ERR", batchErrorMessage));
+                        }
+                    }
+
+                    // گرفتن رکوردهای دیتابیسی مربوط به این بچ
                     var batchRecords = batch.Select(dto => allRecords[dto]).ToList();
 
-                    // درج در پایگاه
-                    PersistChunk(batch, batchRecords, response.Body.Result, tag);
-                    result.Success += response.Body.Result.Count;
+                    // ذخیره در دیتابیس!
+                    PersistChunk(batch, batchRecords, responsesToSave, tag);
 
+                    // ---------------------------------------------------------------------
+                    // ❹ گزارش‌دهی به کاربر
+                    // ---------------------------------------------------------------------
 
-                    progress?.Report(response.Body.Result.Count);
+                    if (batchErrorMessage == null)
+                    {
+                        // کاملاً موفق بود
+                        result.Success += responsesToSave.Count;
+                        progress?.Report(responsesToSave.Count);
+                    }
+                    else
+                    {
+                        // ثبت خطاها برای نمایش به کاربر (با استخراج کاملاً امنِ شماره فاکتور)
+                        foreach (var dto in batch)
+                        {
+                            long num = (long)allRecords[dto].First().NUMBER!;
+                            result.Failures[num] = batchErrorMessage;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -164,10 +221,7 @@ namespace Prg_Moadian.Bulk
                     // اگر ارسال یک بسته به کل شکست خورد، برای همه‌ی DTOهای آن بسته خطا بزن
                     foreach (var dto in batch)
                     {
-                        // استخراج شماره از Inno
-                        var num = long.Parse(dto.Header.Inno!.Substring(_sazman.YEA.ToString().Length + 2));
-                        //result.Failures[num] = ex.Message;
-
+                        long num = (long)allRecords[dto].First().NUMBER!;
                         result.Failures[num] = friendly;
                     }
                 }
@@ -274,11 +328,37 @@ namespace Prg_Moadian.Bulk
 
                 if (lines.First().tob == 1) // حقیقی
                 {
+                    if (srcEcode.Length == 11)
+                    {
+                        if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({srcEcode}) ۱۱ رقمی است که مربوط به اشخاص حقوقی است، اما در فاکتور {number} نوع شخص 'حقیقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                        {
+                            // continue
+                        }
+                        else
+                        {
+                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.";
+                            RecordFailedInvoiceLocal(number, tag, errMsg);
+                            throw new InvoiceValidationException(number, errMsg);
+                        }
+                    }
                     if (srcEcode.Length > 14) throw new InvoiceValidationException(number, "Over Length 14 Ecode for tob=1");
                     ECODE_M = srcEcode;
                 }
                 else // حقوقی
                 {
+                    if (srcEcode.Length == 10)
+                    {
+                        if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({srcEcode}) ۱۰ رقمی است که مربوط به اشخاص حقیقی است، اما در فاکتور {number} نوع شخص 'حقوقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
+                        {
+                            // continue
+                        }
+                        else
+                        {
+                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.";
+                            RecordFailedInvoiceLocal(number, tag, errMsg);
+                            throw new InvoiceValidationException(number, errMsg);
+                        }
+                    }
                     if (srcEcode.Length > 11) throw new InvoiceValidationException(number, "Over Length 11 Ecode for tob=2");
                     ECODE_M = srcEcode;
                 }
@@ -296,6 +376,25 @@ namespace Prg_Moadian.Bulk
                 if (ln.N_KOL == 100 || ln.JAY > 0)
                 {
                     ln.MABL = 1;
+                }
+
+                if (ln.MABL <= 0 || ln.MABL_K <= 0)
+                {
+                    if (OnValidationWarning != null)
+                    {
+                        if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
+                        {
+                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
+                            RecordFailedInvoiceLocal(number, tag, errMsg);
+                            throw new InvoiceValidationException(number, errMsg);
+                        }
+                    }
+                    else
+                    {
+                        string errMsg = $"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' نمی‌تواند صفر یا منفی باشد.";
+                        RecordFailedInvoiceLocal(number, tag, errMsg);
+                        throw new InvoiceValidationException(number, errMsg);
+                    }
                 }
 
                 ln.MEGHk = Math.Round(ln.MEGHk ?? 0, 4);
@@ -398,21 +497,71 @@ namespace Prg_Moadian.Bulk
             // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
             var ts = TaxService.ConvertDateToLong(dt);
 
-            // 1. دریافت شماره فاکتور (مثلاً 10391)
+            // =================================================================
+            // ❶ محاسبه زمان "همین الان" بر اساس ساعت دقیق و سینک‌شده‌ی سرور دارایی
+            // =================================================================
+            var iranTZ = TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time");
+
+            // فرض بر این است که متد/کلاس TimeSync شما TimeOffset را برمی‌گرداند
+            // (یا اگر در متغیر دیگری مثل TokenLifeTime.ServerClockSkew ذخیره کردید، از آن استفاده کنید)
+            var nowUtcOffset = DateTimeOffset.UtcNow.Add(TokenLifeTime.ServerClockSkew); // یا TimeSync.TimeOffset
+            var serverNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtcOffset.UtcDateTime, iranTZ);
+
+
+            // =================================================================
+            // ❷ محاسبه "تاریخ صدور" (Indatim) - بر اساس تاریخ سفارشی یا تاریخ واقعی
+            // =================================================================
+            DateTime issueDate;
+            if (useCustomDate && !string.IsNullOrWhiteSpace(customDateText))
+            {
+                try
+                {
+                    // تبدیل تاریخ شمسی سفارشی به میلادی (کاربر می‌خواهد فاکتور قدیمی را جدید جا بزند)
+                    var customDateInt = int.Parse(customDateText.Replace("/", ""));
+                    issueDate = _fn.GetGregorianDateTime(customDateInt.ToString());
+                }
+                catch
+                {
+                    // در صورت خطای تایپی کاربر در تاریخ سفارشی، بازگشت به تاریخ اصلی فاکتور
+                    issueDate = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
+                }
+            }
+            else
+            {
+                // استفاده از تاریخ واقعی خود فاکتور از دیتابیس
+                issueDate = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
+            }
+
+
+            // =================================================================
+            // ❸ تولید TaxId و تبدیل تاریخ‌ها به فرمت Unix Timestamp
+            // =================================================================
+
+            // 1. TaxId باید حتماً بر اساس تاریخ صدور (issueDate) ساخته شود
+            var taxId = _taxService.RequestTaxId(_memoryId, issueDate);
+
+            // 2. زمان صدور معامله (برای گذشته یا امروز)
+            var indatim_Timestamp = TaxService.ConvertDateToLong(issueDate);
+
+            // 3. زمان ایجاد فایل (همیشه زمان الانِ سینک‌شده با سرور)
+            long indati2m_Timestamp = TaxService.ConvertDateToLong(serverNow); //default
+            if (useCustomDate)
+            {
+                indati2m_Timestamp = TaxService.ConvertDateToLong(issueDate);
+            }
+
+            // 4. تولید شماره سریال داخلی (Inno)
             long invoiceNum = long.Parse(number.ToString());
-            // 2. تولید Inno استاندارد ۱۰ رقمی (مثلاً 1404010391)
             string finalInno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), invoiceNum);
 
-            // Taxid و Indatim هر دو از DATE_N فاکتور می‌آیند — serial تصادفی تضمین می‌کند
-            // که هر ارسال (از جمله resend پس از ابطالی) یک Taxid منحصربه‌فرد بگیرد.
-            var taxId = _taxService.RequestTaxId(_memoryId, dt);
-
-            // آماده‌سازی Header
+            // =================================================================
+            // ❹ آماده‌سازی Header
+            // =================================================================
             var header = new InvoiceHeaderDto
             {
                 Taxid = taxId,
-                Indatim = ts,
-                Indati2m = ts,
+                Indatim = indatim_Timestamp,     // زمان صدور (ترفند تاریخ سفارشی در اینجا اعمال می‌شود)
+                Indati2m = indati2m_Timestamp,   // زمان ساخت فایل (زمان دقیق سرور دارایی)
                 Inty = headExt.inty ?? 1,
                 Inno = finalInno, //// _fn.InnoAddZeroes($"{_sazman.YEA}00{number}")
                 Irtaxid = null,
@@ -436,6 +585,10 @@ namespace Prg_Moadian.Bulk
                 Insp = headExt.insp,
                 Tvop = headExt.tvop,
                 Tax17 = headExt.tax17,
+
+                //Insr = null, // قاعده ارسال صورتحساب (اگر ندارید Null بفرستید)
+                //Nti1 = null, // یادداشت 1
+                //Nti2 = null  // یادداشت 2
 
                 #region MINE
                 //Taxid = taxId, //شماره منحصر به فرد مالیاتی
@@ -497,6 +650,12 @@ namespace Prg_Moadian.Bulk
                 Vam = l.IMBAA ?? 0, //مبلغ مالیات بر ارزش افزوده //IMBAA	 INVO_LST
                 Tsstam = l.mabkn ?? 0, //مبلغ کل کالا/خدمت //MABL_K	INVO_LST
 
+                //// مقادیر پیش‌فرض برای فیلدهای جدید بدنه در V7.8 (برای الگوهای خاص)
+                //Cfee = 0,
+                //Nw = 0,
+                //Ssrv = 0,
+                //Sscv = 0
+
             }).ToList();
 
             var dto = new InvoiceDto
@@ -514,8 +673,8 @@ namespace Prg_Moadian.Bulk
                 TAG = tag,
                 DATE_N = (int?)lines.First().DATE_N,      // <— این خط اضافه شد
                 Taxid = header.Taxid,
-                Indatim_Sec = header.Indatim,
-                Indati2m_Sec = header.Indati2m,
+                Indatim_Sec = header.Indatim,     // زمان صدور
+                Indati2m_Sec = header.Indati2m,   // زمان ایجاد (همین الان)
                 Inty = header.Inty,
                 Inno = header.Inno,
                 Inp = header.Inp,
@@ -609,6 +768,27 @@ namespace Prg_Moadian.Bulk
             }
 
             return _db.DoGetDataSQL<DRV_TBL>(string.Format(sql, number, tag)).ToList();
+        }
+
+        private void RecordFailedInvoiceLocal(long number, int tag, string errorMessage)
+        {
+            try
+            {
+                var idd = _fn.GetNewIDD();
+                var inno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), number);
+                byte apiType = (byte)(_isSandbox ? 0 : 1);
+
+                string sql = @"
+                    INSERT INTO dbo.TAXDTL
+                    (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent)
+                    VALUES
+                    (@Inno, @Number, @Tag, 'FAILED', @Error, @IDD, GETDATE(), @Api)";
+                _db.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType });
+            }
+            catch (Exception ex)
+            {
+                // Ignored
+            }
         }
 
         private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag)

@@ -38,7 +38,7 @@
                              FontSize="16">
                 </PasswordBox>
 
-                <Button x:Name="BtnLogin" IsDefault="True"
+                <Button x:Name="BtnLogin" IsDefault="True" IsEnabled="True"
                         Content="ورود"
                         Style="{StaticResource MaterialDesignRaisedButton}"
                         materialDesign:ButtonAssist.CornerRadius="5"
@@ -54,6 +54,16 @@
 
             </StackPanel>
         </materialDesign:Card>
-
+        
+        <Grid x:Name="LoadingPanel" Panel.ZIndex="10" Visibility="Visible">
+            <Border Background="#AA000000" CornerRadius="10"/>
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="220" Height="5" Margin="0,0,0,12" Style="{StaticResource MaterialDesignLinearProgressBar}"
+                             Foreground="{DynamicResource PrimaryHueMidBrush}"/>
+                <TextBlock Text="در حال بارگذاری..." Foreground="White" 
+                           FontSize="14" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+        
     </Grid>
 </Window>

@@ -245,6 +245,8 @@ VALUES
 
             FILL_ALL_COMBOBOXES();
 
+            GetPersianTodayDate();
+
             ReGetData();
         }
 
@@ -303,6 +305,83 @@ VALUES
             }
             catch { }
         }
+        private void GetPersianTodayDate()
+        {
+            var persianCalendar = new PersianCalendar();
+            var today = DateTime.Now;
+            var year = persianCalendar.GetYear(today);
+            var month = persianCalendar.GetMonth(today);
+            var day = persianCalendar.GetDayOfMonth(today);
+            TXT_CUSTOM_DATE.Text = $"{year:0000}/{month:00}/{day:00}";
+        }
+
+        private static string NormalizePersianDateText(string? dateText)
+        {
+            if (string.IsNullOrWhiteSpace(dateText))
+            {
+                return string.Empty;
+            }
+
+            var normalized = new StringBuilder(dateText.Trim().Length);
+            foreach (var ch in dateText.Trim())
+            {
+                normalized.Append(ch switch
+                {
+                    '۰' or '٠' => '0',
+                    '۱' or '١' => '1',
+                    '۲' or '٢' => '2',
+                    '۳' or '٣' => '3',
+                    '۴' or '٤' => '4',
+                    '۵' or '٥' => '5',
+                    '۶' or '٦' => '6',
+                    '۷' or '٧' => '7',
+                    '۸' or '٨' => '8',
+                    '۹' or '٩' => '9',
+                    '-' or '.' or '\\' => '/',
+                    _ => ch
+                });
+            }
+
+            return normalized.ToString();
+        }
+
+        private bool TryGetCustomIssueDate(out DateTime customIssueDate, out string normalizedDate)
+        {
+            customIssueDate = default;
+            normalizedDate = NormalizePersianDateText(TXT_CUSTOM_DATE?.Text);
+
+            if (!(CHK_CUSTOM_DATE?.IsChecked ?? false))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(normalizedDate))
+            {
+                new Msgwin(false, "تاریخ سفارشی را وارد کنید.").ShowDialog();
+                return false;
+            }
+
+            var compactDate = normalizedDate.Replace("/", string.Empty).Trim();
+            if (compactDate.Length != 8 || !compactDate.All(char.IsDigit))
+            {
+                new Msgwin(false, "فرمت تاریخ سفارشی نامعتبر است. مثال صحیح: 1404/08/24").ShowDialog();
+                return false;
+            }
+
+            try
+            {
+                customIssueDate = TheFunctions.GetGregorianDateTime(compactDate);
+                normalizedDate = $"{compactDate.Substring(0, 4)}/{compactDate.Substring(4, 2)}/{compactDate.Substring(6, 2)}";
+                TXT_CUSTOM_DATE.Text = normalizedDate;
+                return true;
+            }
+            catch
+            {
+                new Msgwin(false, "تاریخ سفارشی وارد شده معتبر نیست. مثال صحیح: 1404/08/24").ShowDialog();
+                return false;
+            }
+        }
+
         private void FILL_ALL_COMBOBOXES()
         {
             VAHEDHA = dbms.DoGetDataSQL<VAHEDS>("SELECT IDD, NAME_MO FROM dbo.TCOD_VAHED_EXTENDED").ToList();
@@ -745,7 +824,15 @@ VALUES
                 }
             }
 
-            Msgwin msgwin1 = new Msgwin(true, $"آیا از ارسال صورت حساب از نوع [{GetMessageBasedOnId((int)TAXDTL_DATA.FirstOrDefault().Ins)}] با مقادیر انتخاب شده مطمئن هستید ؟ ");
+            if (!TryGetCustomIssueDate(out var customIssueDate, out var normalizedCustomDate))
+            {
+                return;
+            }
+
+            bool useCustomDate = CHK_CUSTOM_DATE?.IsChecked ?? false;
+            string dateStatus = useCustomDate ? $"تاریخ سفارشی ({normalizedCustomDate})" : "تاریخ لحظه ارسال";
+
+            Msgwin msgwin1 = new Msgwin(true, $"آیا از ارسال صورت حساب از نوع [{GetMessageBasedOnId((int)TAXDTL_DATA.FirstOrDefault().Ins)}] با مقادیر انتخاب شده و مبنای تاریخ [{dateStatus}] مطمئن هستید ؟ ");
             msgwin1.ShowDialog();
             if (msgwin1.DialogResult != true)
             {
@@ -794,10 +881,13 @@ VALUES
                 var nowUtcOffset = DateTimeOffset.UtcNow.Add(TimeSync.TimeOffset);
                 var now = TimeZoneInfo.ConvertTimeFromUtc(nowUtcOffset.UtcDateTime, iranTZ);
 
-                var taxidNew = taxService.RequestTaxId(_memoryId, now);
-
-                long indatim = nowUtcOffset.ToUnixTimeMilliseconds();
+                DateTime issueDateForTaxId = useCustomDate ? customIssueDate : now;
+                long indatim = useCustomDate
+                    ? TaxService.ConvertDateToLong(customIssueDate)
+                    : nowUtcOffset.ToUnixTimeMilliseconds();
                 long indatim2 = indatim;
+
+                var taxidNew = taxService.RequestTaxId(_memoryId, issueDateForTaxId);
 
                 //بروز رسانی آیتم های حیاتی تغییر یافته برای ارسال جدید:
                 foreach (var taxrow in TAXDTL_DATA)

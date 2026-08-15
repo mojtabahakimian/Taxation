@@ -256,7 +256,24 @@ namespace Prg_Graphicy
                 #endregion
 
 
-                CL_MOADIAN.DoSendInvoice(CL_Generaly.ARG_PARAM);
+                CL_MOADIAN.OnValidationWarning = (msg) => {
+                    bool result = false;
+                    Application.Current.Dispatcher.Invoke(() => {
+                        var msgwin = new Msgwin(true, msg, YesBtnText: "ادامه و ارسال", NoBtnText: "لغو ارسال");
+                        msgwin.ShowDialog();
+                        result = msgwin.DialogResult == true;
+                    });
+                    return result;
+                };
+
+                try
+                {
+                    CL_MOADIAN.DoSendInvoice(CL_Generaly.ARG_PARAM);
+                }
+                finally
+                {
+                    CL_MOADIAN.OnValidationWarning = null;
+                }
             }
             catch (Exception er)
             {

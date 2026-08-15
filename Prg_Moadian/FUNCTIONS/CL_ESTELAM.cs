@@ -161,6 +161,21 @@ namespace Prg_Moadian.FUNCTIONS
                 RefrenceNumber = SafeString(_the_refrence_code_, 100)
             };
             dbms.DoExecuteSQL(updateSql, updateParams);
+
+            if (root.status == "SUCCESS")
+            {
+                try
+                {
+                    const string updateIrtaxidSql = @"
+UPDATE hle
+SET hle.irtaxid = t.Taxid
+FROM dbo.HEAD_LST_EXTENDED hle
+INNER JOIN dbo.TAXDTL t ON hle.NUMBER = t.NUMBER AND hle.TGU = t.TAG
+WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
+                    dbms.DoExecuteSQL(updateIrtaxidSql, new { RefrenceNumber = SafeString(_the_refrence_code_, 100) });
+                }
+                catch (Exception) { }
+            }
         }
 
         private static string? SafeString(string? value, int maxLength)

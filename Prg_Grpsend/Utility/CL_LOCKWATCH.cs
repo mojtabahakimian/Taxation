@@ -54,60 +54,98 @@ namespace Prg_Grpsend.Utility
 
         public bool IsSpecial = false;
 
-        /// <summary>
-        /// چک اتصال اولیه — دقیقاً مثل VBA: فقط ServerIP و NetWorkINIT، بدون Initialize
-        /// </summary>
-        private bool IsLockServiceAvailable()
-        {
-            TINYLib.Tiny tiny = new TINYLib.Tiny();
-            tiny.ServerIP = Baseknow.SERVERNAM;
-            tiny.NetWorkINIT = true;
-            // ← هیچ Initialize نیست — دقیقاً مثل VBA
+        // حداکثر زمان کل برای init + امتحان همه کلیدها روی یک connection (ترتیبی)
+        // 9 کلید × max 5 ثانیه شبکه کند = 45 ثانیه
+        private const int LOCK_KEYS_TIMEOUT_MS = 45_000;
 
-            int err = (int)tiny.TinyErrCode;
-            LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={err}");
-            return err == 0;
-        }
+        // دلیل شکست آخرین TryMatchKeys — برای نمایش پیام مناسب در GoCheck
+        private bool _lockServiceWasUnreachable = false;
 
         /// <summary>
-        /// دقیقاً مثل VBA:
-        /// instance جدید، NetWorkINIT، UserPassWord، ShowTinyInfo — بدون Initialize
-        /// Data باید غیر خالی و غیر صفر باشه (تأیید واقعی match)
+        /// یک STA thread، یک Tiny object، امتحان کلیدها به‌صورت ترتیبی روی همان connection.
+        /// Tiny.ocx یک کامپوننت COM/STA با state داخلی است — چند instance همزمان = crash یا ErrCode 8.
+        /// رویکرد صحیح: NetWorkINIT یک بار، سپس loop ترتیبی روی UserPassWord (مثل VBA).
         /// </summary>
         private bool TryMatchKeys()
         {
-            foreach (var password in TheKeys)
+            bool matched = false;
+            string foundData = null;
+            bool serviceReachable = false;
+
+            var thread = new System.Threading.Thread(() =>
             {
-                TINYLib.Tiny tiny = new TINYLib.Tiny();
-                tiny.ServerIP = Baseknow.SERVERNAM;
-                tiny.NetWorkINIT = true;
-                tiny.UserPassWord = password;
-                tiny.ShowTinyInfo = true;
-                // ← هیچ Initialize نیست
-
-                int err = (int)tiny.TinyErrCode;
-                string serial = tiny.SerialNumber as string ?? "";
-                string data = tiny.DataPartition as string ?? "";
-
-                LockLogger.Write($"[TRY KEY] {password[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
-
-                // ErrCode=0 و Data واقعی (نه خالی، نه همه صفر)
-                bool dataValid = !string.IsNullOrEmpty(data)
-                                 && data.Replace("0", "").Trim().Length > 0;
-
-                if (err == 0 && dataValid)
+                TINYLib.Tiny tiny = null; // تعریف در سطح متد برای دسترسی در finally
+                try
                 {
-                    Baseknow.tindata = data;
-                    LockLogger.Write($"[MATCHED] Key={password[..8]}... | Serial={serial} | Data={data}");
-                    return true;
-                }
+                    tiny = new TINYLib.Tiny();
+                    tiny.ServerIP = Baseknow.SERVERNAM;
+                    tiny.NetWorkINIT = true;
 
-                if (err == 0 && !dataValid)
-                {
-                    LockLogger.Write($"[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
+                    int initErr = (int)tiny.TinyErrCode;
+                    LockLogger.Write($"[INIT] ServerIP={Baseknow.SERVERNAM} | ErrCode={initErr}");
+
+                    if (initErr != 0) return; // سرویس در دسترس نیست
+
+                    serviceReachable = true;
+
+                    foreach (var pw in TheKeys)
+                    {
+                        tiny.UserPassWord = pw;
+                        tiny.ShowTinyInfo = true;
+
+                        int err = (int)tiny.TinyErrCode;
+                        string serial = tiny.SerialNumber as string ?? "";
+                        string data = tiny.DataPartition as string ?? "";
+
+                        LockLogger.Write($"[TRY KEY] {pw[..8]}... → ErrCode={err} | Serial={serial} | Data={data}");
+
+                        bool dataValid = !string.IsNullOrEmpty(data)
+                                         && data.Replace("0", "").Trim().Length > 0;
+
+                        if (err == 0 && dataValid)
+                        {
+                            matched = true;
+                            foundData = data;
+                            LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
+                            break;
+                        }
+                        else if (err == 0 && !dataValid)
+                        {
+                            LockLogger.Write("[SKIP] ErrCode=0 but Data invalid (false positive) — skipping");
+                        }
+                    }
                 }
+                catch (Exception ex)
+                {
+                    LockLogger.Write($"[TRYKEYS EX] {ex.GetType().Name}: {ex.Message}");
+                }
+                finally
+                {
+                    // === اینجا حافظه COM به درستی آزاد می‌شود ===
+                    if (tiny != null)
+                    {
+                        System.Runtime.InteropServices.Marshal.ReleaseComObject(tiny);
+                        tiny = null;
+                    }
+                }
+            });
+
+            thread.SetApartmentState(System.Threading.ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+
+            bool completed = thread.Join(LOCK_KEYS_TIMEOUT_MS);
+
+            if (!completed)
+            {
+                LockLogger.Write($"[TIMEOUT] Lock check did not complete in {LOCK_KEYS_TIMEOUT_MS / 1000}s");
+                _lockServiceWasUnreachable = true;
+                return false;
             }
-            return false;
+
+            _lockServiceWasUnreachable = !serviceReachable;
+            if (matched) Baseknow.tindata = foundData;
+            return matched;
         }
 
         /// <summary>
@@ -177,47 +215,41 @@ namespace Prg_Grpsend.Utility
 
                 LockLogger.Write("[TRIAL] Trial ended - checking hardware lock");
 
-                try
-                {
-                    if (!IsLockServiceAvailable())
-                    {
-                        LockLogger.Write("[FAIL] Lock service not available.");
-                        new Msgwin(false, LockReasonError("6")).ShowDialog();
-                        ShowLockWin();
-                        return false;
-                    }
-                    CheckIsDenafaraz();
-                }
-                catch (System.Runtime.InteropServices.COMException ex)
-                    when (ex.ErrorCode == unchecked((int)0x80040154))
-                {
-                    LockLogger.Write($"[COM ERROR] TINYLib not registered: {ex.Message}");
-                    new Msgwin(false, "فایل‌های مربوط به قفل (TINYLib) به درستی ثبت نشده‌اند.").ShowDialog();
-                    return false;
-                }
-                catch (Exception ex)
-                {
-                    LockLogger.Write($"[INIT EXCEPTION] {ex.GetType().Name}: {ex.Message}");
-                    new Msgwin(false, "تنظیمات قفل در دسترس نیست.").ShowDialog();
-                    return false;
-                }
-
-                LockLogger.Write("[PRE-MATCH] Lock service OK - trying keys...");
-
+                _lockServiceWasUnreachable = false;
                 if (!TryMatchKeys())
                 {
-                    LockLogger.Write("[NO MATCH] No key matched.");
-                    new Msgwin(false, "این قفل متعلق به این نرم افزار نیست!").ShowDialog();
-                    new Msgwin(false, LockReasonError("2")).ShowDialog();
+                    if (_lockServiceWasUnreachable)
+                    {
+                        LockLogger.Write("[FAIL] Lock service not available or timed out.");
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            new Msgwin(false, LockReasonError("6")).ShowDialog();
+                            ShowLockWin();
+                        });
+                    }
+                    else
+                    {
+                        LockLogger.Write("[NO MATCH] No key matched.");
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            new Msgwin(false, "این قفل متعلق به این نرم افزار نیست!").ShowDialog();
+                            new Msgwin(false, LockReasonError("2")).ShowDialog();
+                        });
+                    }
                     return false;
                 }
+
+                CheckIsDenafaraz();
             }
             catch (System.IO.FileNotFoundException ex)
                 when (ex.HResult == unchecked((int)0x8007007E))
             {
                 LockLogger.Write($"[FILE NOT FOUND] {ex.Message}");
-                new Msgwin(false, "فایل و تنظیمات مربوط به رجیستری قفل روی این سیستم انجام نشده!").ShowDialog();
-                Application.Current.Shutdown();
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    new Msgwin(false, "فایل و تنظیمات مربوط به رجیستری قفل روی این سیستم انجام نشده!").ShowDialog();
+                    Application.Current.Shutdown();
+                });
                 return false;
             }
             catch (Exception ex)
@@ -225,8 +257,11 @@ namespace Prg_Grpsend.Utility
                 LockLogger.Write($"[OUTER EXCEPTION] {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 if (IsTrialTimeEnded())
                 {
-                    new Msgwin(false, "خطا در انجام عملیات , قفل قابل شناسایی نیست").ShowDialog();
-                    ShowLockWin();
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        new Msgwin(false, "خطا در انجام عملیات , قفل قابل شناسایی نیست").ShowDialog();
+                        ShowLockWin();
+                    });
                 }
                 return false;
             }
@@ -237,8 +272,8 @@ namespace Prg_Grpsend.Utility
 
         private void LoadTindataAnyway()
         {
-            try { TryMatchKeys(); }
-            catch { }
+            // bypass path: بهترین تلاش در background — startup را block نمی‌کند
+            _ = System.Threading.Tasks.Task.Run(() => { try { TryMatchKeys(); } catch { } });
         }
 
         private static void ShowLockWin()

@@ -19,38 +19,76 @@ namespace Prg_Moadian.Service
         {
             lock (_initLock)
             {
-                TaxApiService.Instance.Init(MemoryId, new SignatoryConfig(PrivateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxUrl);
-                ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
-
-                var serverTimeMs = serverInformation.ServerTime;
-                // SDK هیچ caching‌ای ندارد — هر بار HTTP call می‌زند، پس ServerTime همیشه معتبر است.
-                // این زمان برای جبران ساعت اشتباه سیستم‌های مشتری استفاده می‌شود (فقط برای عملیات
-                // real-time مثل اصلاحی/ابطالی — نه برای تاریخ تاریخچه‌ای فاکتور که از DATE_N می‌آید).
-                if (serverTimeMs > 0)
+                try
                 {
-                    var serverUtc = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime; //ساعت مودیان
-                    var skew = serverUtc - DateTime.UtcNow; //ساعت داخلی خود کاربر
-                    // اگر اختلاف بیشتر از 12 ساعت بود، پاسخ سرور ناهنجار است — sync انجام نمی‌شود
-                    if (Math.Abs(skew.TotalHours) < 12)
+                    TaxApiService.Instance.Init(MemoryId, new SignatoryConfig(PrivateKey, null), new NormalProperties(ClientType.SELF_TSP), TaxUrl);
+                    ServerInformationModel serverInformation = TaxApiService.Instance.TaxApis.GetServerInformation();
+
+                    if (serverInformation != null)
                     {
-                        TimeSync.SyncWithServer(serverTimeMs);
-                        TokenLifeTime.ServerUtcTime = serverUtc;
-                        TokenLifeTime.ServerClockSkew = skew;
+                        var serverTimeMs = serverInformation.ServerTime;
+                        if (serverTimeMs > 0)
+                        {
+                            var serverUtc = DateTimeOffset.FromUnixTimeMilliseconds(serverTimeMs).UtcDateTime;
+                            var skew = serverUtc - DateTime.UtcNow;
+                            if (Math.Abs(skew.TotalHours) < 12)
+                            {
+                                TimeSync.SyncWithServer(serverTimeMs);
+                                TokenLifeTime.ServerUtcTime = serverUtc;
+                                TokenLifeTime.ServerClockSkew = skew;
+                            }
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    // دور زدن محدودیت internal بودن کلاس خطا
+                    if (ex.GetType().Name == "TaxApiException")
+                    {
+                        throw new Exception("خطا در دریافت اطلاعات سرور مودیان. احتمالاً سامانه در دسترس نیست یا قطع می‌باشد.");
+                    }
+
+                    throw new Exception($"خطای ناشناخته در ارتباط اولیه: {ex.Message}");
                 }
             }
         }
 
         public TaxModel.RequestTokenModel RequestToken()
         {
-            TokenModel tokenModel = TaxApiService.Instance.TaxApis.RequestToken();
-            var TMRT = new TaxModel.RequestTokenModel();
-            if (tokenModel?.ExpiresIn != null)
+            try
             {
-                TMRT.ExpireIn = tokenModel.ExpiresIn;
+                TokenModel tokenModel = TaxApiService.Instance.TaxApis.RequestToken();
+
+                if (tokenModel == null || string.IsNullOrEmpty(tokenModel.Token))
+                {
+                    throw new Exception("پاسخ دریافتی از سامانه مودیان خالی است.");
+                }
+
+                var TMRT = new TaxModel.RequestTokenModel();
+                if (tokenModel.ExpiresIn != null)
+                {
+                    TMRT.ExpireIn = tokenModel.ExpiresIn;
+                }
+                TMRT.Token = tokenModel.Token;
+                return TMRT;
             }
-            TMRT.Token = tokenModel.Token;
-            return TMRT;
+            catch (Exception ex)
+            {
+                // دور زدن محدودیت internal
+                if (ex.GetType().Name == "TaxApiException")
+                {
+                    // پیام کاملاً کاربردی و قابل فهم برای مشتری
+                    string userFriendlyMessage =
+                        "ارتباط نرم‌افزار با سامانه مودیان برقرار نشد (خطای احراز هویت).\n\n" +
+                        "دلیل: شناسه حافظه مالیاتی (۶ کاراکتری) یا فایل کلید ثبت شده در نرم‌افزار نامعتبر است.\n\n" +
+                        "راه حل: لطفاً وارد کارپوشه مالیاتی خود (my.tax.gov.ir) شوید، در بخش عضویت، " +
+                        "یک «شناسه یکتای حافظه مالیاتی جدید» دریافت کنید و آن را در تنظیمات نرم‌افزار جایگزین نمایید.";
+
+                    throw new Exception(userFriendlyMessage);
+                }
+
+                throw new Exception($"خطا در اتصال به سامانه مودیان: {ex.Message}");
+            }
         }
 
         public string RequestTaxId(string memoryId, DateTime date)
