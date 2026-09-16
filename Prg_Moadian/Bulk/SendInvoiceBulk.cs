@@ -412,14 +412,18 @@ namespace Prg_Moadian.Bulk
                     ln.N_MOIN = ln.MABL_K;
                 }
 
-                ln.mabkbt = ln.MABL_K - (ln.N_MOIN ?? 0);
-                if ((ln.vra ?? 0) > 0 && (ln.IMBAA ?? 0) <= 0)
+                ln.mabkbt = (ln.MABL_K ?? 0) - (ln.N_MOIN ?? 0);
+                if ((ln.mabkbt ?? 0) > 0 && (ln.vra ?? 0) > 0 && (ln.IMBAA ?? 0) <= 0)
                     throw new InvoiceValidationException(number, "NO IMBAA BUT HAS VRA");
                 if ((ln.IMBAA ?? 0) > 0)
                 {
                     ln.IMBAA = Math.Truncate((decimal)(ln.mabkbt * (ln.vra ?? 0) / 100));
                 }
-                ln.mabkn = ln.mabkbt + (ln.IMBAA ?? 0);
+                else if ((ln.mabkbt ?? 0) <= 0)
+                {
+                    ln.IMBAA = 0;
+                }
+                ln.mabkn = (ln.mabkbt ?? 0) + (ln.IMBAA ?? 0);
             }
 
             if (Setm_Value != null) //اگر کاربر انتخاب کرده , مقدار انتخابی اون رو اعمال کن و کاری به مقدار داخل دیتابیس برای فقط همین فیلد نداشته باش

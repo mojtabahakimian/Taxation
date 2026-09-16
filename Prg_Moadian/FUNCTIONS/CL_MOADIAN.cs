@@ -527,23 +527,24 @@ namespace Prg_Moadian.FUNCTIONS
                     item.N_MOIN = item.MABL_K;
                 }
 
-                item.mabkbt = item.MABL_K - item.N_MOIN;  //مجموع مبلغ پس از کسر تخفیف    //dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt
+                item.mabkbt = (item.MABL_K ?? 0) - (item.N_MOIN ?? 0);  //مجموع مبلغ پس از کسر تخفیف    //dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt
 
-                if (item?.vra > 0 && item.IMBAA <= 0) //نرخ درصد مالیات داره اما خود مبلغ مالیات نداره
+                if ((item.mabkbt ?? 0) > 0 && (item?.vra ?? 0) > 0 && (item.IMBAA ?? 0) <= 0) //نرخ درصد مالیات داره اما خود مبلغ مالیات نداره
                 {
                     throw new NullyExceptiony("NO IMBAA BUT HAS VRA");
                 }
 
                 //حاصلضرب مبلغ کالا پس از کسر تخفیفات و سایر مبالغ که در قانون اشاره شده در نرخ مالیات بر ارزش افزوده.
-                if (item.IMBAA > 0)
+                if ((item.IMBAA ?? 0) > 0)
                 {
-                    item.IMBAA = item.mabkbt * item.vra / 100;
-
-                    //4-IMBAA Cutter
-                    item.IMBAA = Math.Truncate((decimal)item.IMBAA);
+                    item.IMBAA = Math.Truncate((decimal)((item.mabkbt ?? 0) * (item.vra ?? 0) / 100));
+                }
+                else if ((item.mabkbt ?? 0) <= 0)
+                {
+                    item.IMBAA = 0;
                 }
 
-                item.mabkn = item.mabkbt + item.IMBAA; //مبلغ کل کالا /خدمت  // dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn
+                item.mabkn = (item.mabkbt ?? 0) + (item.IMBAA ?? 0); //مبلغ کل کالا /خدمت  // dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn
 
             }
             #endregion
