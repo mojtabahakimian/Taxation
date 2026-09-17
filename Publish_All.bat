@@ -211,6 +211,10 @@ echo "%TARGET_DIR%"
 echo ===============================================================================
 dir "%TARGET_DIR%\*.exe"
 echo.
+
+:: Open destination folder in Windows Explorer
+explorer.exe "%TARGET_DIR%"
+
 pause
 exit /b 0
 
