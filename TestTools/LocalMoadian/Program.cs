@@ -47,6 +47,9 @@ internal static class Program
         Banner("گروه ۲۴ — دکمه ارسال مجدد فاکتور");
         ResendPath.Run(Check, Console.WriteLine, args.Contains("--bulk"));
 
+        Banner("گروه ۲۵ — یافته‌های پژوهش سند، سنجیده با داده واقعی");
+        SpecFindings.Run(Check, Console.WriteLine, args.Contains("--bulk"));
+
         if (!ServerAlive())
         {
             Console.WriteLine();
