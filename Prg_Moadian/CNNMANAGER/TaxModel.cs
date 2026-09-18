@@ -26,6 +26,13 @@
 
                 public int Ins { get; set; }
 
+                /// <summary>
+                /// قاعده ارسال صورتحساب (جدول ۸۶ صفحه ۹۳ V7.9).
+                /// اگر فاصله صدور تا ارسال از مهلت مجاز سازمان بیشتر شد، باید ۱ باشد تا
+                /// صورتحساب به عنوان «موضوع ماده ۹» پذیرفته شود. در غیر این صورت null.
+                /// </summary>
+                public int? Insr { get; set; }
+
                 public string? Tins { get; set; }
 
                 public int Tob { get; set; }

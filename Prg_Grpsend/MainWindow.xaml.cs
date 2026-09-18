@@ -290,12 +290,15 @@ namespace Prg_Grpsend
             if (!selected.Any())
                 return true;
 
+            string condition = IsDenafaraz ? "2" : "13";
+
             // چک کردن تعداد فاکتورهایی که قبلاً ارسال شده‌اند
             string checkSql = $@"SELECT COUNT(DISTINCT NUMBER) FROM dbo.TAXDTL
                                  WHERE NUMBER IN ({string.Join(",", selected)})
+                                 AND TAG = {condition}
                                  AND ApiTypeSent = 1
                                  AND Ins = 1
-                                 AND TheStatus IN ('SUCCESS', 'PENDING')";
+                                 AND TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN')";
 
             int alreadySentCount = 0;
             try
@@ -345,8 +348,9 @@ namespace Prg_Grpsend
                                                                           FROM dbo.TAXDTL
                                                                           WHERE
                                                                               dbo.TAXDTL.NUMBER = dbo.HEAD_LST.NUMBER AND
+                                                                              dbo.TAXDTL.TAG = dbo.HEAD_LST.TAG AND
                                                                               dbo.TAXDTL.Ins = 1 AND
-                                                                              dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING') AND
+                                                                              dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN') AND
                                                                               {apiSqlCondition}
                                                                       )";
 
@@ -404,7 +408,7 @@ namespace Prg_Grpsend
                     FROM
                         dbo.HEAD_LST
                     LEFT OUTER JOIN
-                        dbo.HEAD_LST_EXTENDED ON dbo.HEAD_LST.NUMBER = dbo.HEAD_LST_EXTENDED.NUMBER
+                        dbo.HEAD_LST_EXTENDED ON dbo.HEAD_LST.NUMBER = dbo.HEAD_LST_EXTENDED.NUMBER AND dbo.HEAD_LST.TAG = dbo.HEAD_LST_EXTENDED.tgu
                     LEFT OUTER JOIN
                         dbo.PRICE_PAYNO ON dbo.HEAD_LST.MODAT_PPID = dbo.PRICE_PAYNO.PPID
                     LEFT OUTER JOIN
@@ -421,7 +425,7 @@ namespace Prg_Grpsend
                         dbo.CUST_HESAB ON dbo.HEAD_LST.CUST_NO = dbo.CUST_HESAB.hes
                      WHERE
                          (dbo.HEAD_LST.TAG = {condition}) AND
-                         (dbo.HEAD_LST_EXTENDED.irtaxid IS NULL OR dbo.HEAD_LST_EXTENDED.irtaxid = N'0' OR dbo.HEAD_LST_EXTENDED.irtaxid = N'') -- اونهایی که صورت حساب مرجع شون خالیه
+                         (ISNULL(dbo.HEAD_LST_EXTENDED.ins, 1) = 1 OR dbo.HEAD_LST_EXTENDED.irtaxid IS NULL OR dbo.HEAD_LST_EXTENDED.irtaxid = N'0' OR dbo.HEAD_LST_EXTENDED.irtaxid = N'')
                          {notExistsCondition}
                      ORDER BY dbo.HEAD_LST.NUMBER1,dbo.HEAD_LST.NUMBER DESC";
 

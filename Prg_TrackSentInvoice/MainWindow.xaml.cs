@@ -121,6 +121,10 @@ namespace Prg_TrackSentInvoice
                 List<TRACK_TAXDTL> UndecidedData = TAXDTL_DATA.Where(item =>
                 item.TheStatus == null ||
                 item.TheStatus == "PENDING" ||
+                // توجه: UNKNOWN عمداً اینجا نیست. آن ردیف‌ها اصلاً کد رهگیری ندارند
+                // (پاسخی از سامانه نرسیده) و تنها استعلامِ پیاده‌سازی‌شده در برنامه
+                // InquiryByReferenceId است. تعیین تکلیف آن‌ها باید از کارپوشه و با
+                // شماره مالیاتی انجام شود؛ تا آن زمان ارسال مجددشان مسدود است.
                 item.TheStatus == "" ||
                 item.TheStatus == "NULL").ToList();
 
@@ -133,7 +137,7 @@ namespace Prg_TrackSentInvoice
                         {
                             dbms.DoExecuteSQL($"UPDATE dbo.TAXDTL SET TheStatus = N'EXPIRED' WHERE IDD = {UndecidedData[i].IDD}");
                         }
-                        else
+                        else if (!string.IsNullOrWhiteSpace(UndecidedData[i].RefrenceNumber))
                         {
                             ESTELAM.GETESTELAM_REFCODE_UPDATE(UndecidedData[i].RefrenceNumber);
                         }
@@ -160,7 +164,7 @@ namespace Prg_TrackSentInvoice
 
 
                                 CL_Generaly.DoWritePRGLOG("GETESTELAM_REFCODE_UPDATE : \n" +
-                                    $"خطا در انجام عملیات استعلام {UndecidedData[i].RefrenceNumber} , از {_whichtype} ,  برای فاکتور (حواله) شماره : {Convert.ToInt64(UndecidedData[i].Inno)}", er);
+                                    $"خطا در انجام عملیات استعلام {UndecidedData[i].RefrenceNumber} , از {_whichtype} ,  برای فاکتور (حواله) شماره : {UndecidedData[i].NUMBER}", er);
                             }
                         }));
                     }
@@ -358,6 +362,8 @@ namespace Prg_TrackSentInvoice
                                                          ROW_NUMBER() OVER (ORDER BY MAX(T.CRT) DESC) AS RowNumber,
                                                          T.Taxid,
                                                          MAX(T.Inno) AS Inno,
+                                                         MAX(T.NUMBER) AS NUMBER,
+                                                         MAX(T.TAG) AS TAG,
                                                          MAX(T.Inty) AS Inty,
                                                          MAX(T.Inp) AS Inp,
                                                          MAX(T.Ins) AS Ins,
@@ -377,12 +383,11 @@ namespace Prg_TrackSentInvoice
                                                          MAX(H.SHARAYET) AS SHARAYET
                                                      FROM 
                                                          dbo.TAXDTL T
+                                                     -- اتصال مستقیم با شماره فاکتور، نه با تجزیه Inno.
+                                                     -- Inno حالا سریال هگزادسیمال حافظه مالیاتی است و
+                                                     -- شش کاراکتر آخرش دیگر شماره فاکتور نیست.
                                                      LEFT OUTER JOIN dbo.HEAD_LST H ON 
-                                                         CASE 
-                                                             WHEN ISNUMERIC(RIGHT(T.Inno, 6)) = 1 
-                                                             THEN CAST(RIGHT(T.Inno, 6) AS float) 
-                                                             ELSE NULL 
-                                                         END = H.NUMBER 
+                                                         T.NUMBER = H.NUMBER 
                                                          AND H.TAG = 2
                                                      WHERE 
                                                          T.ApiTypeSent = {_apitypesent} 
@@ -398,6 +403,8 @@ namespace Prg_TrackSentInvoice
                                                          ROW_NUMBER() OVER (ORDER BY MAX(T.CRT) DESC) AS RowNumber,
                                                          T.Taxid,
                                                          MAX(T.Inno) AS Inno,
+                                                         MAX(T.NUMBER) AS NUMBER,
+                                                         MAX(T.TAG) AS TAG,
                                                          MAX(T.Inty) AS Inty,
                                                          MAX(T.Inp) AS Inp,
                                                          MAX(T.Ins) AS Ins,
@@ -417,12 +424,11 @@ namespace Prg_TrackSentInvoice
                                                          MAX(H.SHARAYET) AS SHARAYET
                                                      FROM 
                                                          dbo.TAXDTL T
+                                                     -- اتصال مستقیم با شماره فاکتور، نه با تجزیه Inno.
+                                                     -- Inno حالا سریال هگزادسیمال حافظه مالیاتی است و
+                                                     -- شش کاراکتر آخرش دیگر شماره فاکتور نیست.
                                                      LEFT OUTER JOIN dbo.HEAD_LST H ON 
-                                                         CASE 
-                                                             WHEN ISNUMERIC(RIGHT(T.Inno, 6)) = 1 
-                                                             THEN CAST(RIGHT(T.Inno, 6) AS float) 
-                                                             ELSE NULL 
-                                                         END = H.NUMBER 
+                                                         T.NUMBER = H.NUMBER 
                                                          AND H.TAG = 2
                                                      WHERE 
                                                          T.ApiTypeSent = {_apitypesent}
@@ -435,7 +441,9 @@ namespace Prg_TrackSentInvoice
             {
 
 
-                item.Inno = Convert.ToString(item.Inno)?.TrimStart('0');
+                // Inno دیگر «سال + شماره فاکتور» نیست، بلکه سریال هگزادسیمال حافظه
+                // مالیاتی است و صفرهای ابتدایش بخشی از مقدار ارسالی‌اند — حذفشان
+                // باعث می‌شد مقدار نمایش‌داده‌شده با مقدار واقعی فرق کند.
                 item.PersianCRT = Functions.ConvertToPersianDate((DateTime)item.CRT);
             }
 
@@ -461,6 +469,9 @@ namespace Prg_TrackSentInvoice
                 (item.IDD?.ToString().ToLower().Contains(searchText) ?? false) ||
                 (item.TheStatus?.ToLower().Contains(searchText) ?? false) ||
                 (item.Inno?.ToLower().Contains(searchText) ?? false) ||
+                // شماره فاکتور داخلی دیگر داخل Inno نیست، پس باید مستقیم روی NUMBER هم
+                // جستجو شود وگرنه کاربر نمی‌تواند فاکتورش را پیدا کند.
+                (item.NUMBER?.ToString("0").Contains(searchText) ?? false) ||
                 (item.RefrenceNumber?.ToLower().Contains(searchText) ?? false) ||
                 (item.TheConfirmationReferenceId?.ToLower().Contains(searchText) ?? false) ||
                 (item.TheError?.ToLower().Contains(searchText) ?? false) ||
@@ -773,6 +784,28 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
                 if (_msgitem?.TheStatus is "PENDING")
                 {
                     return;
+                }
+
+                // هشدار، نه سد. قواعد سامانه ناپایدارند و ممکن است منسوخ شوند؛
+                // تصمیم نهایی با کاربر است.
+                if (_msgitem?.TheStatus is "UNKNOWN")
+                {
+                    var warnU = new Msgwin(true,
+                        "هشدار: وضعیت صورتحساب " + _msgitem.Inno + " نامعلوم است؛ پاسخ سامانه دریافت نشده است." +
+                        "\n\nممکن است در کارپوشه ثبت شده باشد یا نشده باشد. توصیه می‌شود ابتدا از کارپوشه با شماره مالیاتی بررسی کنید." +
+                        "\n\nآیا با این وجود ادامه می‌دهید؟");
+                    warnU.ShowDialog();
+                    if (warnU.DialogResult != true) { IsOtherProccessingNow = false; return; }
+                }
+
+                if (_msgitem?.TheStatus is "LOCAL_ERROR")
+                {
+                    var warnL = new Msgwin(true,
+                        "هشدار: صورتحساب " + _msgitem.Inno + " طبق ثبت محلی به سامانه ارسال نشده و احتمالا مرجع معتبری ندارد." +
+                        "\n\nمعمولا برای این مورد باید خود فاکتور دوباره ارسال شود، نه صورتحساب اصلاحی/ابطالی." +
+                        "\n\nآیا با این وجود ادامه می‌دهید؟");
+                    warnL.ShowDialog();
+                    if (warnL.DialogResult != true) { IsOtherProccessingNow = false; return; }
                 }
 
                 //if (_msgitem?.Ins is 1) //اصلی
@@ -1693,7 +1726,8 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
             if (row.Ins != null) h.Ins = row.Ins.Value; //موضوع صورتحساب //ابطالی , اصلاحی 
             if (row.Tins != null) h.Tins = row.Tins;/*"10840014242"*/ //WAS "MCODE" BEFORE //شماره اقتصادی فروشنده //توی نرم افزار شماره ثبت هم در درباره تهیه کنندگان زده
             if (row.Tob != null) h.Tob = row.Tob.Value; //نوع شخص خریدار
-            if (row.Bid != null) h.Bid = row.Bid;/*item.MCODEM*/ //شناسه ملی/ شماره ملی/ شناسه مشارکت مدنی/ کد فراگیر اتباع غیر ایرانی خریدار
+            // همان دلیل فرم اصلاحی: مقدار قدیمی با طول نامعتبر نباید دوباره ارسال شود.
+            h.Bid = MoadianRules.SanitizeBid(Convert.ToInt32(row.Tob ?? 0), row.Bid);/*item.MCODEM*/ //شناسه ملی/ شماره ملی/ شناسه مشارکت مدنی/ کد فراگیر اتباع غیر ایرانی خریدار
             if (row.Tinb != null) h.Tinb = row.Tinb;/*item.MCODEM*/ // شماره اقتصادی خریدار
             if (row.Sbc != null) h.Sbc = row.Sbc; //کد شعبه فروشنده
             if (!string.IsNullOrEmpty(row.Bbc)) h.Bbc = row.Bbc; //کد شعبه خریدار

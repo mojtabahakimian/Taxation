@@ -360,6 +360,16 @@
                                                         <Setter Property="Background" Value="#FFF5F5F5"/>
                                                         <Setter Property="BorderBrush" Value="#FFEEEEEE"/>
                                                     </DataTrigger>
+                                                    <!-- سرنوشت نامعلوم: پاسخ سامانه نرسیده، باید استعلام شود -->
+                                                    <DataTrigger Binding="{Binding TheStatus}" Value="UNKNOWN">
+                                                        <Setter Property="Background" Value="#FFEDE7F6"/>
+                                                        <Setter Property="BorderBrush" Value="#FFB39DDB"/>
+                                                    </DataTrigger>
+                                                    <!-- اصلاً به سامانه نرفته -->
+                                                    <DataTrigger Binding="{Binding TheStatus}" Value="LOCAL_ERROR">
+                                                        <Setter Property="Background" Value="#FFECEFF1"/>
+                                                        <Setter Property="BorderBrush" Value="#FFB0BEC5"/>
+                                                    </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
@@ -387,6 +397,14 @@
                                                             <Setter Property="Text" Value="منقضی شده" />
                                                             <Setter Property="Foreground" Value="#FF616161"/>
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding TheStatus}" Value="UNKNOWN">
+                                                            <Setter Property="Text" Value="نامعلوم - استعلام کنید" />
+                                                            <Setter Property="Foreground" Value="#FF5E35B1"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding TheStatus}" Value="LOCAL_ERROR">
+                                                            <Setter Property="Text" Value="خطای محلی (ارسال نشده)" />
+                                                            <Setter Property="Foreground" Value="#FF455A64"/>
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
@@ -396,7 +414,9 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <DataGridTextColumn x:Name="innoColumn" Binding="{Binding Inno}" Header="شماره فاکتور (حواله) داخلی" Width="Auto"/>
+                        <!-- شماره فاکتور داخلی حالا از ستون NUMBER می‌آید؛ Inno دیگر شماره فاکتور را در خود ندارد -->
+                        <DataGridTextColumn Binding="{Binding NUMBER, StringFormat='{}{0:0}'}" Header="شماره فاکتور (حواله) داخلی" Width="Auto"/>
+                        <DataGridTextColumn x:Name="innoColumn" Binding="{Binding Inno}" Header="سریال حافظه مالیاتی Inno" Width="Auto"/>
                         <DataGridTextColumn Binding="{Binding CUST_NO}" Header="کد مشتری" Width="Auto"/>
                         <DataGridTextColumn Binding="{Binding MOLAH}" Header="ملاحظات" Width="Auto"/>
                         <DataGridTextColumn Binding="{Binding SHARAYET}" Header="متن پایین" Width="Auto"/>

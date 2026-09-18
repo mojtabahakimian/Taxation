@@ -97,7 +97,7 @@ namespace Prg_Graphicy
                         //-- 1 = اصلی
                         //var _number = TheFunctions.InnoAddZeroes(_NUMBER_.ToString());
                         //فاکترو های فروش ارسال شده به سامانه اصلی با این شماره فاکتور داخلی نرم افزار
-                        var _Issent = dbms.DoGetDataSQL<string>($"SELECT TheStatus FROM dbo.TAXDTL WHERE ApiTypeSent = 1 AND Ins = 1 AND TheStatus IN ('SUCCESS', 'PENDING') AND NUMBER = {_NUMBER_} AND TAG = {_TAG_}  ").ToList();
+                        var _Issent = dbms.DoGetDataSQL<string>($"SELECT TheStatus FROM dbo.TAXDTL WHERE ApiTypeSent = 1 AND Ins = 1 AND TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN') AND NUMBER = {_NUMBER_} AND TAG = {_TAG_}  ").ToList();
                         if (_Issent.Count > 0)
                         {
                             if (_Issent.Contains("SUCCESS"))
@@ -112,6 +112,15 @@ namespace Prg_Graphicy
                             else if (_Issent.Contains("PENDING"))
                             {
                                 Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن هنوز در انتظار (PENDING) است , آیا مایلید مجددا ارسال کنید ؟");
+                                msgwinv.ShowDialog();
+                                if (msgwinv.DialogResult is false)
+                                {
+                                    GoFullExitNow();
+                                }
+                            }
+                            else if (_Issent.Contains("UNKNOWN"))
+                            {
+                                Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                                 msgwinv.ShowDialog();
                                 if (msgwinv.DialogResult is false)
                                 {
@@ -147,6 +156,17 @@ namespace Prg_Graphicy
                         else if (_Corrective_.Contains("SUCCESS") && CL_MOADIAN.TaxURL == "https://tp.tax.gov.ir/req/api/")
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع اصلاحی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟");
+                            msgwinv.ShowDialog();
+                            if (msgwinv.DialogResult is false)
+                            {
+                                GoFullExitNow();
+                            }
+                        }
+                        else if (_Corrective_.Contains("UNKNOWN"))
+                        {
+                            // پاسخ سامانه نرسیده؛ ممکن است در کارپوشه ثبت شده باشد.
+                            // سند اصلاحی تکراری سخت‌ترین حالت برای جبران است.
+                            Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
                             if (msgwinv.DialogResult is false)
                             {
@@ -194,6 +214,17 @@ namespace Prg_Graphicy
                                 GoFullExitNow();
                             }
                         }
+                        else if (_Cancely_.Contains("UNKNOWN"))
+                        {
+                            // پاسخ سامانه نرسیده؛ ممکن است در کارپوشه ثبت شده باشد.
+                            // سند ابطالی تکراری سخت‌ترین حالت برای جبران است.
+                            Msgwin msgwinv = new Msgwin(true, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
+                            msgwinv.ShowDialog();
+                            if (msgwinv.DialogResult is false)
+                            {
+                                GoFullExitNow();
+                            }
+                        }
                         else if (_Cancely_.Contains("FAILED"))
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
@@ -227,6 +258,17 @@ namespace Prg_Graphicy
                         else if (_Returny_.Contains("SUCCESS") && CL_MOADIAN.TaxURL == "https://tp.tax.gov.ir/req/api/")
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع برگشتی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟");
+                            msgwinv.ShowDialog();
+                            if (msgwinv.DialogResult is false)
+                            {
+                                GoFullExitNow();
+                            }
+                        }
+                        else if (_Returny_.Contains("UNKNOWN"))
+                        {
+                            // پاسخ سامانه نرسیده؛ ممکن است در کارپوشه ثبت شده باشد.
+                            // سند برگشتی تکراری سخت‌ترین حالت برای جبران است.
+                            Msgwin msgwinv = new Msgwin(true, $"این صورت حساب برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
                             if (msgwinv.DialogResult is false)
                             {

@@ -44,15 +44,18 @@ echo [INFO] MSBuild: "%MSBUILD%"
 :: 3. Detect Version from Prg_Graphicy\Prg_Graphicy.csproj
 set "VERSION=%~1"
 if "%VERSION%"=="" (
-    for /f "usebackq tokens=*" %%v in (`powershell -NoProfile -Command "([xml](Get-Content '%ROOT_DIR%Prg_Graphicy\Prg_Graphicy.csproj')).SelectSingleNode('//FileVersion').InnerText.Trim()"`) do (
+    for /f "usebackq tokens=*" %%v in (`powershell -NoProfile -NoLogo -Command "([xml](Get-Content '%ROOT_DIR%Prg_Graphicy\Prg_Graphicy.csproj')).SelectSingleNode('//FileVersion').InnerText.Trim()"`) do (
         set "VERSION=%%v"
     )
 )
 
 if "%VERSION%"=="" (
-    echo [WARN] Could not detect FileVersion from Prg_Graphicy.csproj!
-    set /p "VERSION=Please enter version (e.g. 8.9.7): "
+    echo [WARN] Could not detect Version from project files!
+    set /p "VERSION=Please enter version (e.g. 8.9.9): "
 )
+
+:: Trim spaces
+if not "%VERSION%"=="" set "VERSION=%VERSION: =%"
 
 echo [INFO] Detected Version: %VERSION%
 
@@ -74,7 +77,7 @@ echo ---------------------------------------------------------------------------
 set "PUB_GRAPHICY=%TEMP_DIR%\Graphicy"
 if exist "%PUB_GRAPHICY%" rd /s /q "%PUB_GRAPHICY%"
 
-"%MSBUILD%" "%ROOT_DIR%Prg_Graphicy\Prg_Graphicy.csproj" -restore -t:Publish -p:PublishProfile=FolderProfile -p:PublishDir="%PUB_GRAPHICY%\\" -v:m -nologo
+"%MSBUILD%" "%ROOT_DIR%Prg_Graphicy\Prg_Graphicy.csproj" -restore -t:Publish -p:PublishProfile=FolderProfile -p:PublishDir="%PUB_GRAPHICY%\\" -p:FileVersion=%VERSION% -p:AssemblyVersion=%VERSION% -v:m -nologo
 if errorlevel 1 (
     echo [ERROR] Failed to compile Prg_Graphicy!
     goto :FAILED
@@ -99,7 +102,7 @@ echo ---------------------------------------------------------------------------
 set "PUB_GRPSEND=%TEMP_DIR%\Grpsend"
 if exist "%PUB_GRPSEND%" rd /s /q "%PUB_GRPSEND%"
 
-"%MSBUILD%" "%ROOT_DIR%Prg_Grpsend\Prg_Grpsend.csproj" -restore -t:Publish -p:PublishProfile=FolderProfile -p:PublishDir="%PUB_GRPSEND%\\" -v:m -nologo
+"%MSBUILD%" "%ROOT_DIR%Prg_Grpsend\Prg_Grpsend.csproj" -restore -t:Publish -p:PublishProfile=FolderProfile -p:PublishDir="%PUB_GRPSEND%\\" -p:FileVersion=%VERSION% -p:AssemblyVersion=%VERSION% -v:m -nologo
 if errorlevel 1 (
     echo [ERROR] Failed to compile Prg_Grpsend!
     goto :FAILED
@@ -144,7 +147,7 @@ if exist "%ROOT_DIR%Prg_TrackSentInvoice\obj" rd /s /q "%ROOT_DIR%Prg_TrackSentI
 set "PUB_MAINTAX=%TEMP_DIR%\MainTax"
 if exist "%PUB_MAINTAX%" rd /s /q "%PUB_MAINTAX%"
 
-"%MSBUILD%" "%ROOT_DIR%Prg_TrackSentInvoice\Prg_TrackSentInvoice.csproj" -restore -t:Publish -p:PublishProfile=FolderProfile -p:PublishDir="%PUB_MAINTAX%\\" -v:m -nologo
+"%MSBUILD%" "%ROOT_DIR%Prg_TrackSentInvoice\Prg_TrackSentInvoice.csproj" -restore -t:Publish -p:PublishProfile=FolderProfile -p:PublishDir="%PUB_MAINTAX%\\" -p:FileVersion=%VERSION% -p:AssemblyVersion=%VERSION% -v:m -nologo
 if errorlevel 1 (
     echo [ERROR] Failed to compile MainTax!
     goto :FAILED
@@ -180,7 +183,7 @@ if exist "%ROOT_DIR%Prg_TrackSentInvoice\obj" rd /s /q "%ROOT_DIR%Prg_TrackSentI
 set "PUB_SANDBOX=%TEMP_DIR%\SandBoxTax"
 if exist "%PUB_SANDBOX%" rd /s /q "%PUB_SANDBOX%"
 
-"%MSBUILD%" "%ROOT_DIR%Prg_TrackSentInvoice\Prg_TrackSentInvoice.csproj" -restore -t:Publish -p:PublishProfile=FolderProfile -p:PublishDir="%PUB_SANDBOX%\\" -v:m -nologo
+"%MSBUILD%" "%ROOT_DIR%Prg_TrackSentInvoice\Prg_TrackSentInvoice.csproj" -restore -t:Publish -p:PublishProfile=FolderProfile -p:PublishDir="%PUB_SANDBOX%\\" -p:FileVersion=%VERSION% -p:AssemblyVersion=%VERSION% -v:m -nologo
 if errorlevel 1 (
     echo [ERROR] Failed to compile SandBoxTax!
     goto :FAILED

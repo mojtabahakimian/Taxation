@@ -228,20 +228,30 @@ namespace Prg_Moadian.FUNCTIONS
             if (decimalSerial.Length <= serialLen)
             {
                 // اگر جا می‌شود (مثلاً 10391 در 6 رقم)، با صفر پر کن: 1404010391
+                // این مسیر دقیقاً همان رفتار قبلی است و دست‌نخورده می‌ماند.
                 return year + decimalSerial.PadLeft(serialLen, '0');
             }
-            else
-            {
-                // 2. اگر جا نمی‌شود (مثلاً 1000000 که 7 رقم است)، سوئیچ به هگز
-                // 1000000 در هگز می‌شود F4240 (پنج رقم) که راحت جا می‌شود.
-                string hexSerial = invoiceNumber.ToString("X"); // حروف بزرگ
 
-                // بررسی نهایی که حتی هگز هم سرریز نکند (بعید است تا 16 میلیون)
-                if (hexSerial.Length > serialLen)
-                    throw new Exception($"Serial number {invoiceNumber} is too large even for Hex!");
+            // 2. شماره از ظرفیت ده‌دهی گذشته (بیش از 999,999 برای سال ۴ رقمی).
+            //
+            // مشکل نسخه قبلی: مستقیم هگز می‌گرفت و همین باعث تصادم می‌شد —
+            // فاکتور 100000 (ده‌دهی) و فاکتور 1048576 (که هگزش 100000 است) هر دو
+            // خروجی «1404100000» می‌دادند، یعنی دو فاکتور با یک Inno.
+            //
+            // راه‌حل: مقدار را به بازه‌ای می‌بریم که رقم اولش حتماً A تا F باشد.
+            // چون مسیر ده‌دهی فقط رشته‌های تماماً عددی تولید می‌کند، این دو بازه
+            // هرگز با هم برخورد نمی‌کنند.
+            long decimalMax = (long)Math.Pow(10, serialLen) - 1;              // 999,999
+            long hexBase = 10L * (long)Math.Pow(16, serialLen - 1);           // 0xA00000
+            long hexMax = (long)Math.Pow(16, serialLen) - 1;                  // 0xFFFFFF
+            long capacity = hexMax - hexBase + 1;
 
-                return year + hexSerial.PadLeft(serialLen, '0');
-            }
+            long offset = invoiceNumber - decimalMax - 1;
+            if (offset >= capacity)
+                throw new Exception($"Serial number {invoiceNumber} is too large even for Hex! (حداکثر مجاز: {decimalMax + capacity})");
+
+            string hexSerial = (hexBase + offset).ToString("X"); // حروف بزرگ
+            return year + hexSerial.PadLeft(serialLen, '0');
         }
         public static string CODEUN(string cody)
         {

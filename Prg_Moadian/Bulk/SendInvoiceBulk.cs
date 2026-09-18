@@ -145,6 +145,13 @@ namespace Prg_Moadian.Bulk
                     List<PacketResponse> responsesToSave = new List<PacketResponse>();
                     string batchErrorMessage = null;
 
+                    // آیا سرنوشت بسته نامعلوم است؟
+                    // اگر درخواست رفته باشد ولی پاسخ نرسیده باشد، ممکن است سامانه آن را
+                    // ثبت کرده باشد. در این حالت نباید FAILED ثبت کرد و نباید بدون
+                    // استعلام دوباره فرستاد — FAQ ص۴۰ س۱۱-۲۶ می‌گوید ارسال مجدد با
+                    // شماره مالیاتی جدید باعث سند تکراری در کارپوشه می‌شود.
+                    bool outcomeUnknown = false;
+
                     try
                     {
                         // ❷ فراخوانی وب‌سرویس
@@ -154,6 +161,7 @@ namespace Prg_Moadian.Bulk
                         if (response == null || response.Body == null)
                         {
                             batchErrorMessage = $"پاسخ نامعتبر از سرور (کد وضعیت: {response?.Status}). احتمالاً سامانه دچار تایم‌اوت شده است.";
+                            outcomeUnknown = true; // سرنوشت نامعلوم است
                         }
                         else if (response.Body.Errors != null && response.Body.Errors.Any())
                         {
@@ -163,6 +171,7 @@ namespace Prg_Moadian.Bulk
                         else if (response.Body.Result == null || !response.Body.Result.Any())
                         {
                             batchErrorMessage = "ارسال انجام شد اما سرور مودیان هیچ نتیجه‌ای (Reference Number) برنگرداند.";
+                            outcomeUnknown = true; // درخواست رفته ولی نتیجه‌ای نداریم
                         }
                         else
                         {
@@ -174,6 +183,9 @@ namespace Prg_Moadian.Bulk
                     {
                         // اگر اینترنت قطع بود یا DNS مشکل داشت
                         batchErrorMessage = cer.ExpecMsgEr(reqEx) ?? "قطعی ارتباط یا خطای شبکه‌ای در اتصال به سرور مودیان.";
+
+                        // نمی‌دانیم درخواست به سامانه رسیده یا نه — نباید FAILED ثبت شود.
+                        outcomeUnknown = true;
                     }
 
                     // ---------------------------------------------------------------------
@@ -193,7 +205,7 @@ namespace Prg_Moadian.Bulk
                     var batchRecords = batch.Select(dto => allRecords[dto]).ToList();
 
                     // ذخیره در دیتابیس!
-                    PersistChunk(batch, batchRecords, responsesToSave, tag);
+                    PersistChunk(batch, batchRecords, responsesToSave, tag, outcomeUnknown);
 
                     // ---------------------------------------------------------------------
                     // ❹ گزارش‌دهی به کاربر
@@ -303,7 +315,14 @@ namespace Prg_Moadian.Bulk
                 }
             }
             if (!contin)
-                throw new InvoiceValidationException(number, $"Validation failed (empty SSTID or MU) for invoice {number}");
+            {
+                var idMsg = $"فاکتور {number}: شناسه کالا/خدمت (sstid) یا واحد اندازه‌گیری (mu) برای بعضی ردیف‌ها خالی است.";
+                if (OnValidationWarning == null || !OnValidationWarning($"{idMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                {
+                    RecordFailedInvoiceLocal(number, tag, idMsg);
+                    throw new InvoiceValidationException(number, idMsg);
+                }
+            }
 
             // 4. اصلاح آدرس و شعبه از جدول DEPART
             var depart = _db
@@ -320,47 +339,40 @@ namespace Prg_Moadian.Bulk
             string ECODE_M = null, CODEMELI_M = null;//= lines.First().MCODEM;
             if (headExt.inty == 1)
             {
-                // بررسی خالی نبودن کد اقتصادی برای نوع اول صورتحساب
-                if (string.IsNullOrWhiteSpace(srcEcode))
-                {
-                    throw new NullyExceptiony("ECODE is null or empty");
-                }
+                // نکته: اینجا دیگر روی خالی بودن ECODE بی‌قید و شرط استثنا پرتاب نمی‌شود.
+                // جدول ۱۱ ص۳۴ ردیف ۴ برای خریدار حقیقی/اتباع مسیر جایگزین
+                // «شماره ملی/کد فراگیر + کد پستی» را مجاز می‌داند؛ پرتاب زودهنگام
+                // آن مسیر را غیرقابل دسترس می‌کرد. تصمیم به ValidateBuyer واگذار شد.
+                int tobValue = lines.First().tob ?? 2;
 
-                if (lines.First().tob == 1) // حقیقی
+                ECODE_M = string.IsNullOrWhiteSpace(srcEcode) ? null : srcEcode.Trim();
+                // Bid فقط وقتی فرستاده می‌شود که شماره اقتصادی نداریم و باید از مسیر
+                // جایگزین «شماره ملی + کد پستی» استفاده کنیم. تا امروز این فیلد هرگز
+                // ارسال نشده و ۱۴۳۹۹ صورتحساب با آن خالی پذیرفته شده‌اند؛ پس روی مسیری
+                // که کار می‌کند فیلد جدید اضافه نمی‌کنیم.
+                CODEMELI_M = string.IsNullOrWhiteSpace(ECODE_M)
+                    ? MoadianRules.SanitizeBid(tobValue, lines.First().MCODEM)
+                    : null;
+
+                // کنترل مشترک طبق جدول ۱۱ ص۳۳-۳۴. سامانه این فیلد را با regex دقیق
+                // کنترل می‌کند (^\d{14}$ برای حقیقی/اتباع و ^\d{11}$ برای حقوقی/مشارکت)،
+                // پس کنترل «فقط بیشتر نباشد» کافی نبود و همان علت خطای 0101204 بود.
+                // با همان الگویی اعتبارسنجی می‌کنیم که واقعا ارسال می‌شود (پایین‌تر Inp = 1 ثابت است).
+                // اگر با headExt.inp اعتبارسنجی کنیم، یک فاکتور صادراتی از کنترل خریدار معاف
+                // می‌شود ولی به سامانه به عنوان الگوی ۱ اعلام می‌گردد که خریدار می‌خواهد.
+                if (!MoadianRules.ValidateBuyer(headExt.inty ?? 1, 1, tobValue, ECODE_M, CODEMELI_M, headExt.bpc, out var buyerError))
                 {
-                    if (srcEcode.Length == 11)
+                    string errMsg = $"فاکتور {number}: {buyerError}";
+
+                    if (OnValidationWarning != null && OnValidationWarning($"{errMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
                     {
-                        if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({srcEcode}) ۱۱ رقمی است که مربوط به اشخاص حقوقی است، اما در فاکتور {number} نوع شخص 'حقیقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
-                        {
-                            // continue
-                        }
-                        else
-                        {
-                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.";
-                            RecordFailedInvoiceLocal(number, tag, errMsg);
-                            throw new InvoiceValidationException(number, errMsg);
-                        }
+                        // کاربر آگاهانه ادامه داد
                     }
-                    if (srcEcode.Length > 14) throw new InvoiceValidationException(number, "Over Length 14 Ecode for tob=1");
-                    ECODE_M = srcEcode;
-                }
-                else // حقوقی
-                {
-                    if (srcEcode.Length == 10)
+                    else
                     {
-                        if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({srcEcode}) ۱۰ رقمی است که مربوط به اشخاص حقیقی است، اما در فاکتور {number} نوع شخص 'حقوقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
-                        {
-                            // continue
-                        }
-                        else
-                        {
-                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.";
-                            RecordFailedInvoiceLocal(number, tag, errMsg);
-                            throw new InvoiceValidationException(number, errMsg);
-                        }
+                        RecordFailedInvoiceLocal(number, tag, errMsg);
+                        throw new InvoiceValidationException(number, errMsg);
                     }
-                    if (srcEcode.Length > 11) throw new InvoiceValidationException(number, "Over Length 11 Ecode for tob=2");
-                    ECODE_M = srcEcode;
                 }
             }
 
@@ -369,32 +381,18 @@ namespace Prg_Moadian.Bulk
             bool isReturn = headExt.ins == 4;
             foreach (var ln in lines)
             {
+                // توجه: گردکردن مبلغ واحد و تعداد عمداً *دست‌نخورده* باقی مانده است.
+                // تغییر آن مبالغ ارسالی حدود ۳۰٪ ردیف‌ها را جابه‌جا می‌کند و تصمیم
+                // کسب‌وکاری است، نه فنی. جزئیات در گزارش بررسی آمده است.
                 ln.MABL = Math.Truncate(ln.MABL ?? 0);
                 ln.N_MOIN = Math.Truncate(ln.N_MOIN ?? 0);
 
-                // جایزه
-                if (ln.N_KOL == 100 || ln.JAY > 0)
+                // جایزه / تخفیف ۱۰۰٪ : فی باید مثبت بماند (جدول ۳۴ ص۵۳) و کل مبلغ
+                // به صورت تخفیف ثبت شود (جدول ۴۱ ص۵۹ اجازه dis = prdis می‌دهد).
+                bool isGift = (ln.N_KOL == 100 || ln.JAY > 0);
+                if (isGift)
                 {
                     ln.MABL = 1;
-                }
-
-                if (ln.MABL <= 0 || ln.MABL_K <= 0)
-                {
-                    if (OnValidationWarning != null)
-                    {
-                        if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
-                        {
-                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
-                            RecordFailedInvoiceLocal(number, tag, errMsg);
-                            throw new InvoiceValidationException(number, errMsg);
-                        }
-                    }
-                    else
-                    {
-                        string errMsg = $"قیمت یا مبلغ کل برای کالا/خدمت '{ln.KALA}' نمی‌تواند صفر یا منفی باشد.";
-                        RecordFailedInvoiceLocal(number, tag, errMsg);
-                        throw new InvoiceValidationException(number, errMsg);
-                    }
                 }
 
                 ln.MEGHk = Math.Round(ln.MEGHk ?? 0, 4);
@@ -403,18 +401,75 @@ namespace Prg_Moadian.Bulk
                     ln.MEGH_MAR = Math.Round(ln.MEGH_MAR ?? 0, 4);
                     ln.MEGHk -= ln.MEGH_MAR;
                 }
+
                 ln.MABL_K = Math.Truncate((ln.MABL ?? 0) * (ln.MEGHk ?? 0));
 
-                // جایزه
-                if (ln.N_KOL == 100 || ln.JAY > 0)
+                if (isGift)
                 {
-                    ln.MABL_K = Math.Truncate((ln.MABL ?? 0) * (ln.MEGHk ?? 0));
                     ln.N_MOIN = ln.MABL_K;
+                }
+
+                // کنترل مقادیر صفر — *بعد* از بازمحاسبه MABL_K انجام می‌شود.
+                // قبلاً این کنترل بالاتر بود و مقدار کهنهٔ دیتابیس را می‌خواند.
+                //   جدول ۳۱ ص۵۱ : am    > 0   (خطای 0103605)
+                //   جدول ۳۴ ص۵۳ : fee   > 0   (خطای 0103705)
+                //   جدول ۴۰ ص۵۸ : prdis > 0
+                // در برگشت از فروش، ردیفی که کامل مرجوع شده مقدارش صفر می‌شود؛ چنین
+                // ردیفی خطا نیست و پایین‌تر از فهرست حذف می‌گردد.
+                string zeroProblem = null;
+                if (isReturn && (ln.MEGHk ?? 0) <= 0)
+                    zeroProblem = null;
+                else if ((ln.MEGHk ?? 0) <= 0)
+                    zeroProblem = $"تعداد/مقدار کالا/خدمت '{ln.KALA}' ({ln.MEGHk}) باید بزرگتر از صفر باشد";
+                else if ((ln.MABL ?? 0) <= 0)
+                    zeroProblem = $"مبلغ واحد کالا/خدمت '{ln.KALA}' ({ln.MABL}) باید بزرگتر از صفر باشد";
+                else if ((ln.MABL_K ?? 0) <= 0)
+                    zeroProblem = $"مبلغ قبل از تخفیف کالا/خدمت '{ln.KALA}' ({ln.MABL_K}) باید بزرگتر از صفر باشد";
+
+                if (zeroProblem != null)
+                {
+                    if (OnValidationWarning != null)
+                    {
+                        if (!OnValidationWarning($"{zeroProblem}. آیا مایل به ادامه ارسال هستید؟"))
+                        {
+                            string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
+                            RecordFailedInvoiceLocal(number, tag, errMsg);
+                            throw new InvoiceValidationException(number, errMsg);
+                        }
+                    }
+                    else
+                    {
+                        string errMsg = $"فاکتور {number}: {zeroProblem}.";
+                        RecordFailedInvoiceLocal(number, tag, errMsg);
+                        throw new InvoiceValidationException(number, errMsg);
+                    }
+                }
+
+                // جدول ۴۱ ص۵۹: تخفیف نباید از مبلغ قبل از تخفیف بیشتر باشد.
+                // مبلغ را بی‌صدا تغییر نمی‌دهیم — فقط اطلاع می‌دهیم و تصمیم با کاربر است.
+                //
+                // در برگشت از فروش، ردیفِ کامل‌مرجوع مقدارش صفر می‌شود و پایین‌تر حذف
+                // می‌گردد؛ تخفیف کهنه‌اش نباید هشدار بی‌مورد بسازد.
+                if (!(isReturn) && (ln.N_MOIN ?? 0) > (ln.MABL_K ?? 0))
+                {
+                    var disMsg = $"فاکتور {number}: تخفیف کالا/خدمت '{ln.KALA}' ({ln.N_MOIN}) از مبلغ قبل از تخفیف ({ln.MABL_K}) بیشتر است.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{disMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(number, tag, disMsg);
+                        throw new InvoiceValidationException(number, disMsg);
+                    }
                 }
 
                 ln.mabkbt = (ln.MABL_K ?? 0) - (ln.N_MOIN ?? 0);
                 if ((ln.mabkbt ?? 0) > 0 && (ln.vra ?? 0) > 0 && (ln.IMBAA ?? 0) <= 0)
-                    throw new InvoiceValidationException(number, "NO IMBAA BUT HAS VRA");
+                {
+                    var vatMsg = $"فاکتور {number}: کالا/خدمت '{ln.KALA}' نرخ مالیات {ln.vra}٪ دارد ولی مبلغ مالیاتش صفر است.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{vatMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(number, tag, vatMsg);
+                        throw new InvoiceValidationException(number, vatMsg);
+                    }
+                }
                 if ((ln.IMBAA ?? 0) > 0)
                 {
                     ln.IMBAA = Math.Truncate((decimal)(ln.mabkbt * (ln.vra ?? 0) / 100));
@@ -424,6 +479,24 @@ namespace Prg_Moadian.Bulk
                     ln.IMBAA = 0;
                 }
                 ln.mabkn = (ln.mabkbt ?? 0) + (ln.IMBAA ?? 0);
+            }
+
+            // در برگشت از فروش، ردیف‌هایی که کامل مرجوع شده‌اند (مقدار صفر) نباید در
+            // بدنه بمانند — جدول ۳۱ ص۵۱ تعداد را بزرگتر از صفر می‌خواهد.
+            // مسیر ارسال تکی این کار را انجام می‌داد ولی مسیر گروهی نه.
+            if (isReturn)
+            {
+                lines = lines.Where(l => (l.MEGHk ?? 0) > 0).ToList();
+
+                if (!lines.Any())
+                {
+                    string errMsg = $"فاکتور {number}: پس از کسر اقلام مرجوعی هیچ ردیفی باقی نمانده است؛ معمولا برای برگشت کامل باید صورتحساب ابطالی صادر شود.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{errMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(number, tag, errMsg);
+                        throw new InvoiceValidationException(number, errMsg);
+                    }
+                }
             }
 
             if (Setm_Value != null) //اگر کاربر انتخاب کرده , مقدار انتخابی اون رو اعمال کن و کاری به مقدار داخل دیتابیس برای فقط همین فیلد نداشته باش
@@ -450,24 +523,54 @@ namespace Prg_Moadian.Bulk
                     capForCalculation = null; // اجازه بده CalculateCapInsp تصمیم بگیرد
                 }
 
-                (headExt.cap, headExt.insp, string? capInspError) = CalculateCapInsp((int)headExt.setm, Tbill_sum, capForCalculation, (int)Inty_Value);
+                decimal Todam_sum = headExt.todam ?? 0;
+
+                // مقادیر دیتابیس را قبل از فراخوانی نگه دار: در صورت خطا، تخصیص تاپل
+                // آن‌ها را با null بازنویسی می‌کند و دیگر قابل بازیابی نیستند.
+                var capBefore = headExt.cap;
+                var inspBefore = headExt.insp;
+
+                (headExt.cap, headExt.insp, string? capInspError) = CalculateCapInsp(
+                    (int)headExt.setm, Tbill_sum, capForCalculation, (int)Inty_Value, Tvam_sum, Todam_sum);
+
                 if (capInspError != null)
                 {
-                    var buildResult = capInspError + $"#capInspError# (صورتحساب شماره {number})";
-                    throw new NullyExceptiony(buildResult);
+                    // هشدار، نه سد. قواعد تسویه ممکن است تغییر کنند یا سامانه رفتار
+                    // دیگری داشته باشد؛ تصمیم با کاربر است.
+                    var capMsg = $"فاکتور {number}: {capInspError}";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{capMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(number, tag, capMsg);
+                        throw new InvoiceValidationException(number, capMsg);
+                    }
+
+                    // کاربر ادامه داد: مقادیر اصلی دیتابیس برگردانده می‌شوند، نه صفر.
+                    headExt.cap = capBefore;
+                    headExt.insp = inspBefore;
                 }
 
-                // بررسی نهایی مجموع cap و insp با Tbill
-                if (Math.Abs((headExt.cap ?? 0) + (headExt.insp ?? 0) - Tbill_sum) > 0.01m) // تلرانس برای مقایسه decimal
+                // بررسی نهایی: مبنای مقایسه بسته به روش تسویه فرق می‌کند.
+                //   setm=3 → cap + insp = tbill − tvam − todam   (جدول ۲۵ ص۴۶ و FAQ ص۳۱)
+                //   setm=1/2 → سند قاعده‌ای ندارد و سامانه مبلغ کل را می‌پذیرد.
+                decimal expectedSum = ((int)headExt.setm == 3)
+                    ? MoadianRules.SettlementBase(Tbill_sum, Tvam_sum, Todam_sum)
+                    : Tbill_sum;
+
+                if (Math.Abs((headExt.cap ?? 0) + (headExt.insp ?? 0) - expectedSum) > 0.01m) // تلرانس برای مقایسه decimal
                 {
-                    var buildResult = $"#Tbill_insp_cap# مجموع مبلغ نقدی ({headExt.cap ?? 0}) و نسیه ({headExt.insp ?? 0}) با مبلغ کل صورتحساب ({Tbill_sum}) برای فاکتور {number} پس از محاسبات همخوانی ندارد. لطفا تنظیمات روش تسویه را بررسی کنید.";
-                    throw new NullyExceptiony(buildResult);
+                    var buildResult = $"مجموع مبلغ نقدی ({headExt.cap ?? 0}) و نسیه ({headExt.insp ?? 0}) با مبنای تسویه ({expectedSum}) برای فاکتور {number} همخوانی ندارد.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{buildResult}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(number, tag, buildResult);
+                        throw new InvoiceValidationException(number, buildResult);
+                    }
                 }
             }
 
-            // 7. خالی‌سازی شعبه‌ها در صورت <=0
-            if (long.TryParse(headExt.bbc, out var bb) && bb <= 0) headExt.bbc = null;
-            if (long.TryParse(headExt.sbc, out var sb) && sb <= 0) headExt.sbc = null;
+            // 7. کد شعبه: سامانه با ^\d{4}$ کنترل می‌کند (ص۳۳) و همین علت خطای 0101504 بود.
+            //    مقدار نامعتبر به جای ارسالِ ناقص، حذف می‌شود (این فیلد اختیاری است).
+            headExt.bbc = MoadianRules.NormalizeBranchCode(headExt.bbc);
+            headExt.sbc = MoadianRules.NormalizeBranchCode(headExt.sbc);
 
             // 8. صادرات (الگوی 7)
             bool isExport = headExt.inp == 7;
@@ -547,9 +650,16 @@ namespace Prg_Moadian.Bulk
             // 2. زمان صدور معامله (برای گذشته یا امروز)
             var indatim_Timestamp = TaxService.ConvertDateToLong(issueDate);
 
-            // 3. زمان ایجاد فایل (همیشه زمان الانِ سینک‌شده با سرور)
+            // 3. قاعده ارسال (ماده ۹) — جدول ۸۶ ص۹۳
+            int? insr = MoadianRules.ResolveInsr(issueDate, serverNow);
+
+            // 4. تاریخ و زمان ثبت صورتحساب (Indati2m)
+            //
+            // ص۲۸ ردیف ۷: فاصله «تاریخ ثبت صورتحساب» تا ارسال نباید از مهلت مجاز بیشتر
+            // باشد. اگر سند موضوع ماده ۹ باشد و Indati2m هم روی تاریخ صدورِ گذشته
+            // بماند، همین قاعده نقض می‌شود و Insr به‌تنهایی سند را معتبر نمی‌کند.
             long indati2m_Timestamp = TaxService.ConvertDateToLong(serverNow); //default
-            if (useCustomDate)
+            if (useCustomDate && insr != 1)
             {
                 indati2m_Timestamp = TaxService.ConvertDateToLong(issueDate);
             }
@@ -571,6 +681,9 @@ namespace Prg_Moadian.Bulk
                 Irtaxid = null,
                 Inp = /*headExt.inp ??*/ 1,
                 Ins = /*headExt.ins ??*/ 1,
+                // قاعده ارسال (ماده ۹) — جدول ۸۶ ص۹۳.
+                // داخل مهلت مجاز null می‌ماند (خارج از الگو)، خارج از مهلت مقدار ۱ می‌گیرد.
+                Insr = insr,
                 Tins = _sazman.ECODE,
                 Tob = lines.First().tob ?? 2,
                 Bid = CODEMELI_M,
@@ -782,11 +895,13 @@ namespace Prg_Moadian.Bulk
                 var inno = _fn.GenerateFixedLengthInno(_sazman.YEA.ToString(), number);
                 byte apiType = (byte)(_isSandbox ? 0 : 1);
 
+                // LOCAL_ERROR : اصلاً به سامانه نرفته (اعتبارسنجی محلی یا انصراف کاربر).
+                // با FAILED واقعیِ سامانه یکی نیست و نباید در گزارش‌ها با آن قاطی شود.
                 string sql = @"
                     INSERT INTO dbo.TAXDTL
                     (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent)
                     VALUES
-                    (@Inno, @Number, @Tag, 'FAILED', @Error, @IDD, GETDATE(), @Api)";
+                    (@Inno, @Number, @Tag, 'LOCAL_ERROR', @Error, @IDD, GETDATE(), @Api)";
                 _db.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType });
             }
             catch (Exception ex)
@@ -795,101 +910,143 @@ namespace Prg_Moadian.Bulk
             }
         }
 
-        private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag)
+        private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag, bool outcomeUnknown = false)
         {
             // مرتب‌سازی مطابق با ایندکس
             var pairs = sent.Select((dto, idx) => new { dto, records = recordsSets[idx], resp = responses.ElementAt(idx) });
+            Exception firstDbException = null;
 
             foreach (var pair in pairs)
             {
                 var header = pair.dto.Header;
                 var uid = pair.resp.Uid;
                 var refNum = pair.resp.ReferenceNumber;
-                var status = uid != null ? "PENDING" : "FAILED";
 
-                for (int i = 0; i < pair.dto.Body.Count; i++)
+                // تفکیک سه حالت — قبلاً هر چیزی که UID نداشت FAILED ثبت می‌شد،
+                // از جمله قطعی شبکه که در آن اصلاً نمی‌دانیم سامانه سند را گرفته یا نه.
+                //   PENDING : سامانه UID داده، در صف پردازش است.
+                //   UNKNOWN : پاسخ نرسیده؛ قبل از هر تلاش مجدد باید استعلام شود.
+                //   FAILED  : سامانه صریحاً رد کرده.
+                var status = uid != null
+                    ? "PENDING"
+                    : (outcomeUnknown ? "UNKNOWN" : "FAILED");
+
+                try
                 {
-                    var body = pair.dto.Body[i];
-                    var record = pair.records[i];   // اینجا ردیف TAXDTL متناظر
-                    var idd = _fn.GetNewIDD();
-
-                    var sql = @"
-                     INSERT INTO dbo.TAXDTL
-                     (
-                         Taxid, Indatim_Sec, Indati2m_Sec, Inty, Inno, Inp, Ins, Tins, Tob,
-                         Bid, Tinb, Sbc, Bpc, Ft, Crn, Billid, Tprdis, Tdis, Tadis, Tvam,
-                         Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd,
-                         DATE_N,
-                         NUMBER, TAG, Sstid, Sstt, Mu, Am, Fee, Prdis, Dis, Adis, Vra, Vam, Tsstam,
-                         UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, IDD, REMARKS
-                     )
-                     VALUES
-                     (
-                         @Taxid, @Ind1, @Ind2, @Inty, @Inno, @Inp, @Ins, @Tins, @Tob,
-                         @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam,
-                         @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd,
-                         @Date_N,
-                         @Number, @Tag, @Sstid, @Sstt, @Mu, @Am, @Fee, @Prdis, @Dis, @Adis, @Vra, @Vam, @Tsstam,
-                         @UID, @Ref, @Status, @Api, @Mem, @IDD, N'Bulk'
-                     )";
-                    var p = new Dictionary<string, object>
+                    for (int i = 0; i < pair.dto.Body.Count; i++)
                     {
-                        ["Taxid"] = header.Taxid,
-                        ["Ind1"] = header.Indatim,
-                        ["Ind2"] = header.Indati2m,
-                        ["Inty"] = header.Inty,
-                        ["Inno"] = header.Inno,
-                        ["Inp"] = header.Inp,
-                        ["Ins"] = header.Ins,
-                        ["Tins"] = header.Tins,
-                        ["Tob"] = header.Tob,
-                        ["Bid"] = header.Bid,
-                        ["Tinb"] = header.Tinb ?? string.Empty,
-                        ["Sbc"] = header.Sbc,
-                        ["Bpc"] = header.Bpc,
-                        ["Ft"] = header.Ft,
-                        ["Crn"] = header.Crn,
-                        ["Billid"] = header.Billid,
-                        ["Tprdis"] = header.Tprdis,
-                        ["Tdis"] = header.Tdis,
-                        ["Tadis"] = header.Tadis,
-                        ["Tvam"] = header.Tvam,
-                        ["Todam"] = header.Todam,
-                        ["Tbill"] = header.Tbill,
-                        ["Setm"] = header.Setm,
-                        ["Cap"] = header.Cap,
-                        ["Insp"] = header.Insp,
-                        ["Tvop"] = header.Tvop,
-                        ["Tax17"] = header.Tax17,
-                        ["Cdcd"] = header.Cdcd,
-                        ["Date_N"] = record.DATE_N ?? 0,
-                        ["Number"] = record?.NUMBER > 0 ? record.NUMBER : _fn.SafeRemoveFirstFour(header.Inno),
-                        ["Tag"] = tag,
-                        ["Sstid"] = body.Sstid,
-                        ["Sstt"] = body.Sstt,
-                        ["Mu"] = body.Mu,
-                        ["Am"] = body.Am,
-                        ["Fee"] = body.Fee,
-                        ["Prdis"] = body.Prdis,
-                        ["Dis"] = body.Dis,
-                        ["Adis"] = body.Adis,
-                        ["Vra"] = body.Vra,
-                        ["Vam"] = body.Vam,
-                        ["Tsstam"] = body.Tsstam,
-                        ["UID"] = uid,
-                        ["Ref"] = refNum,
-                        ["Status"] = status,
-                        ["Api"] = _isSandbox ? 0 : 1,
-                        ["Mem"] = _memoryId,
-                        ["IDD"] = idd
-                    };
-                    _db.DoExecuteSQL(sql, p);
+                        var body = pair.dto.Body[i];
+                        var record = pair.records[i];   // اینجا ردیف TAXDTL متناظر
+                        var idd = _fn.GetNewIDD();
+
+                        var sql = @"
+                         INSERT INTO dbo.TAXDTL
+                         (
+                             Taxid, Indatim_Sec, Indati2m_Sec, Inty, Inno, Inp, Ins, Tins, Tob,
+                             Bid, Tinb, Sbc, Bpc, Ft, Crn, Billid, Tprdis, Tdis, Tadis, Tvam,
+                             Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd,
+                             DATE_N,
+                             NUMBER, TAG, Sstid, Sstt, Mu, Am, Fee, Prdis, Dis, Adis, Vra, Vam, Tsstam,
+                             UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, IDD, REMARKS
+                         )
+                         VALUES
+                         (
+                             @Taxid, @Ind1, @Ind2, @Inty, @Inno, @Inp, @Ins, @Tins, @Tob,
+                             @Bid, @Tinb, @Sbc, @Bpc, @Ft, @Crn, @Billid, @Tprdis, @Tdis, @Tadis, @Tvam,
+                             @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd,
+                             @Date_N,
+                             @Number, @Tag, @Sstid, @Sstt, @Mu, @Am, @Fee, @Prdis, @Dis, @Adis, @Vra, @Vam, @Tsstam,
+                             @UID, @Ref, @Status, @Api, @Mem, @IDD, N'Bulk'
+                         )";
+                        var p = new Dictionary<string, object>
+                        {
+                            ["Taxid"] = header.Taxid,
+                            ["Ind1"] = header.Indatim,
+                            ["Ind2"] = header.Indati2m,
+                            ["Inty"] = header.Inty,
+                            ["Inno"] = header.Inno,
+                            ["Inp"] = header.Inp,
+                            ["Ins"] = header.Ins,
+                            ["Tins"] = header.Tins,
+                            ["Tob"] = header.Tob,
+                            ["Bid"] = header.Bid,
+                            ["Tinb"] = header.Tinb ?? string.Empty,
+                            ["Sbc"] = header.Sbc,
+                            ["Bpc"] = header.Bpc,
+                            ["Ft"] = header.Ft,
+                            ["Crn"] = header.Crn,
+                            ["Billid"] = header.Billid,
+                            ["Tprdis"] = header.Tprdis,
+                            ["Tdis"] = header.Tdis,
+                            ["Tadis"] = header.Tadis,
+                            ["Tvam"] = header.Tvam,
+                            ["Todam"] = header.Todam,
+                            ["Tbill"] = header.Tbill,
+                            ["Setm"] = header.Setm,
+                            ["Cap"] = header.Cap,
+                            ["Insp"] = header.Insp,
+                            ["Tvop"] = header.Tvop,
+                            ["Tax17"] = header.Tax17,
+                            ["Cdcd"] = header.Cdcd,
+                            ["Date_N"] = record.DATE_N ?? 0,
+                            // Inno دیگر «سال + شماره فاکتور» نیست، پس نمی‌توان شماره فاکتور را از آن
+                            // استخراج کرد. اگر NUMBER نداشتیم، null می‌نویسیم نه یک عدد ساختگی.
+                            ["Number"] = (record?.NUMBER > 0 ? (object)record.NUMBER : DBNull.Value),
+                            ["Tag"] = tag,
+                            ["Sstid"] = body.Sstid,
+                            ["Sstt"] = body.Sstt,
+                            ["Mu"] = body.Mu,
+                            ["Am"] = body.Am,
+                            ["Fee"] = body.Fee,
+                            ["Prdis"] = body.Prdis,
+                            ["Dis"] = body.Dis,
+                            ["Adis"] = body.Adis,
+                            ["Vra"] = body.Vra,
+                            ["Vam"] = body.Vam,
+                            ["Tsstam"] = body.Tsstam,
+                            ["UID"] = uid,
+                            ["Ref"] = refNum,
+                            ["Status"] = status,
+                            ["Api"] = _isSandbox ? 0 : 1,
+                            ["Mem"] = _memoryId,
+                            ["IDD"] = idd
+                        };
+                        _db.DoExecuteSQL(sql, p);
+                    }
+                }
+                catch (Exception dbEx)
+                {
+                    // این صورتحساب به سامانه رفته ولی در دیتابیس ثبت نشد.
+                    MoadianRules.WriteRecoveryFile(new
+                    {
+                        SavedAt = DateTime.Now,
+                        Reason = "ارسال گروهی: ارسال به سامانه انجام شد اما ثبت در دیتابیس ناموفق بود",
+                        Taxid = header.Taxid,
+                        Inno = header.Inno,
+                        Irtaxid = header.Irtaxid,
+                        Ins = header.Ins,
+                        ReferenceNumber = refNum,
+                        Uid = uid,
+                        Status = status,
+                        Tag = tag,
+                        ApiTypeSent = _isSandbox ? 0 : 1,
+                        DbError = dbEx.Message
+                    });
+
+                    // ثبت بقیه صورتحساب‌های همین بسته را ادامه بده تا اگر دیتابیس برای
+                    // آن‌ها هم خطا داد، هر کدام فایل بازیابی مستقل خود را داشته باشند.
+                    // بعد از بررسی تمام بسته، اولین استثنا با stack trace اصلی بازپرتاب می‌شود.
+                    if (firstDbException == null)
+                        firstDbException = dbEx;
                 }
             }
+
+            if (firstDbException != null)
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(firstDbException).Throw();
         }
 
         #region MyRegion
-        private (decimal? Cap, decimal? Insp, string? ErrorMessage) CalculateCapInsp(int setm, decimal tbill, decimal? capInput, int inty)
+        private (decimal? Cap, decimal? Insp, string? ErrorMessage) CalculateCapInsp(int setm, decimal tbill, decimal? capInput, int inty, decimal tvam = 0, decimal todam = 0)
         {
             decimal capResult = 0;
             decimal inspResult = 0;
@@ -917,68 +1074,61 @@ namespace Prg_Moadian.Bulk
             // مقادیر نمی‌توانند منفی باشند
             if (tbill < 0) tbill = 0;
 
+            // جدول ۲۴ ص۴۵ ردیف ۱: روش تسویه فقط ۱ نقدی، ۲ نسیه، ۳ نقدی/نسیه است.
+            // مقادیر ۴ تا ۷ (چک، ساتنا، کارتخوان، سایر) در سند وجود ندارند و اگر به
+            // سامانه برسند رد می‌شوند؛ پس اینجا هم پذیرفته نمی‌شوند.
             switch (setm)
             {
                 case 1: // نقدی
-                case 5: // ساتنا/پایا
-                case 6: // کارتخوان
+                    // سند برای این حالت قاعده‌ای برای مقدار cap تعیین نکرده و سامانه هم
+                    // در عمل مبلغ کل را می‌پذیرد. رفتار موجود حفظ می‌شود.
                     capResult = tbill;
                     inspResult = 0;
                     break;
+
                 case 2: // نسیه
-                case 4: // چک (در سامانه مودیان چک معمولا نوعی نسیه با سررسید است)
                     capResult = 0;
                     inspResult = tbill;
                     break;
+
                 case 3: // نقدی/نسیه
-                    if (capInput.HasValue)
                     {
-                        capResult = Math.Truncate(capInput.Value);
-                        if (capResult < 0)
+                        // جدول ۲۵ ص۴۶ :  C  = Xs − W2 − W − Cr
+                        // جدول ۲۶ ص۴۷ :  Cr = Xs − W2 − W − C
+                        // FAQ ص۳۱ س۱۰-۵ : «دلیل اصلی این اشتباه کم نکردن مقادیر مالیات
+                        //                   از مجموع صورتحساب می‌باشد».
+                        decimal basis = MoadianRules.SettlementBase(tbill, tvam, todam);
+
+                        if (basis <= 0)
+                            return (null, null, "برای تسویه نقدی/نسیه، مبلغ صورتحساب پس از کسر مالیات و عوارض صفر است.");
+
+                        if (capInput.HasValue && capInput.Value > 0)
                         {
-                            errorMessage = $"مبلغ نقدی ({capResult}) نمی‌تواند منفی باشد.";
-                            capResult = 0; // اصلاح به حداقل مجاز
+                            capResult = Math.Truncate(capInput.Value);
+
+                            if (capResult >= basis)
+                            {
+                                // جدول ۲۵ ردیف ۱ و ۳: cap باید از مجموع کوچکتر و از صفر بزرگتر باشد،
+                                // و insp هم باید بزرگتر از صفر بماند.
+                                return (null, null,
+                                    $"مبلغ نقدی ({capResult:N0}) باید از مبنای تقسیم ({basis:N0} = مبلغ کل منهای مالیات و عوارض) کوچکتر باشد " +
+                                    "تا مبلغ نسیه بزرگتر از صفر بماند. در غیر این صورت روش تسویه باید «نقدی» انتخاب شود.");
+                            }
                         }
-                        if (capResult > tbill)
+                        else
                         {
-                            // اگر مبلغ نقدی بیش از کل است، کل را نقدی و نسیه را صفر در نظر می‌گیریم
-                            // یا می‌توان خطا داد. اینجا اصلاح می‌کنیم:
-                            // errorMessage = $"مبلغ نقدی ({capResult}) بیشتر از مبلغ کل صورتحSAP ({tbill}) است.";
-                            capResult = tbill;
+                            return (null, null, "برای روش تسویه «نقدی/نسیه»، مبلغ پرداخت نقدی باید مشخص شود.");
                         }
-                        inspResult = tbill - capResult;
-                    }
-                    else
-                    {
-                        // اگر برای نقدی/نسیه، مبلغ نقدی ورودی (capInput) داده نشده باشد.
-                        // این حالت باید توسط منطق برنامه مدیریت شود.
-                        // ۱. خطا برگردانده شود.
-                        // ۲. یک مقدار پیش‌فرض در نظر گرفته شود (مثلا کل مبلغ نقدی).
-                        errorMessage = "برای روش تسویه 'نقدی/نسیه'، مبلغ پرداخت نقدی اولیه مشخص نشده است. کل مبلغ، نقدی در نظر گرفته شد.";
-                        capResult = tbill; // پیش‌فرض: کل مبلغ نقدی
-                        inspResult = 0;
+
+                        inspResult = basis - capResult;
+
+                        if (inspResult <= 0)
+                            return (null, null, "در تسویه نقدی/نسیه، مبلغ نسیه باید بزرگتر از صفر باشد.");
                     }
                     break;
-                case 7: // سایر
-                        // برای روش "سایر"، معمولا به مقادیر cap و insp که از قبل (مثلا از دیتابیس) آمده‌اند اتکا می‌شود.
-                        // capInput در این حالت می‌تواند cap خوانده شده از دیتابیس باشد.
-                    if (capInput.HasValue)
-                    {
-                        capResult = Math.Truncate(capInput.Value);
-                        if (capResult < 0) capResult = 0;
-                        if (capResult > tbill) capResult = tbill; // اصلاح اگر بیش از حد باشد
-                        inspResult = tbill - capResult;
-                    }
-                    else // اگر هیچ ورودی برای cap نیست، پیش‌فرض نقدی
-                    {
-                        capResult = tbill;
-                        inspResult = 0;
-                    }
-                    break;
+
                 default:
-                    errorMessage = $"روش تسویه با کد {setm} تعریف نشده یا نامعتبر است.";
-                    // در صورت خطای روش تسویه، می‌توان مقادیر را صفر یا tbill را به صورت نقدی برگرداند.
-                    // فعلا خطا برمی‌گردانیم تا در UI مشخص شود.
+                    errorMessage = $"روش تسویه با کد {setm} نامعتبر است. جدول ۲۴ ص۴۵ فقط ۱ (نقدی)، ۲ (نسیه) و ۳ (نقدی/نسیه) را می‌پذیرد.";
                     return (null, null, errorMessage);
             }
 
