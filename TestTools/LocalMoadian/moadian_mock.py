@@ -324,8 +324,19 @@ def validate_invoice(fiscal_id: str, inv: dict):
         if abs(vam - expected_vam) > 1:
             err("0104805", f"(قلم {i}: {vam:.0f} در برابر {expected_vam})")
             break
-        if abs(tsstam - (adis + vam)) > 1:
-            err("0105305", f"(قلم {i}: مبلغ کل {tsstam:.0f} در برابر {adis + vam:.0f})")
+        # ص۷۳ جدول ۵۳ ردیف ۱ :  Os = Ks + Is + Ks2 + Ks3
+        #   Ks = مالیات بر ارزش افزوده (vam)
+        #   Is = مبلغ بعد از تخفیف (adis)
+        #   Ks2 = سایر مالیات و عوارض (odam)
+        #   Ks3 = سایر وجوه قانونی (olam)
+        odam = _num(b.get("odam"))
+        olam = _num(b.get("olam"))
+        expected_tsstam = adis + vam + odam + olam
+        if abs(tsstam - expected_tsstam) > 1:
+            err("0105305",
+                f"(قلم {i}: مبلغ کل {tsstam:.0f} در برابر {expected_tsstam:.0f}"
+                + (f" — عوارض {odam:.0f} و وجوه قانونی {olam:.0f} جا افتاده" if odam or olam else "")
+                + ")")
             break
 
     # --- صورتحساب ارجاعی: اصلاحی / ابطالی / برگشتی ----------------------

@@ -122,6 +122,30 @@ internal static class ResendPath
           src.Contains("h.Indati2m = (long)row.Indati2m_Sec"),
           "معنای «عینا تکراری»");
 
+        // مهم‌ترین قفل این گروه.
+        //
+        // در گروه پرسش‌وپاسخ سامانه، همین سناریو بارها گزارش شده و نتیجه‌اش
+        // روشن است:
+        //
+        //   «وقتی مجددا با همون TaxID می‌فرستین یا خطا میده میگه تکراریه که
+        //    نشسته در کارپوشه، و یا اینکه خطا نمیده و Success میده.»
+        //
+        //   «اگه با شماره مالیاتی قبلی ارسال شده باشه خطای شماره مالیاتی
+        //    معتبر نیست رو میده. *اگه با شماره مالیاتی جدید بفرستی دوبار ثبت
+        //    میشه و باید یکی رو ابطال کنی.*»
+        //
+        // یعنی شماره مالیاتیِ یکسان همان چیزی است که این دکمه را بی‌خطر می‌کند:
+        // بدترین حالتش «تکراری» است. اگر روزی کسی اینجا شماره مالیاتی تازه
+        // بسازد، همان فاکتور دو بار در کارپوشه می‌نشیند و باید یکی‌اش ابطال شود.
+        var block = ResendBlock(src);
+        C("مسیر ارسال مجدد شماره مالیاتی تازه نمی‌سازد (وگرنه فاکتور دوبار ثبت می‌شود)",
+          block != null && !block.Contains("RequestTaxId") &&
+                           !block.Contains("GenerateFixedLengthInno"),
+          block == null
+              ? "مرز بلوک ارسال مجدد پیدا نشد — احتمالا RESEND_BTN_Click یا " +
+                "InsertNewTaxDtlRecord تغییر نام داده؛ این شکستِ تست است نه شکستِ کد"
+              : "نه RequestTaxId نه تولید سریال تازه");
+
         // ---------------- رفت‌وبرگشت واقعی با دیتابیس ----------------
 
         if (!withDb)
@@ -206,6 +230,20 @@ internal static class ResendPath
             d[c] = p?.GetValue(row);
         }
         return d;
+    }
+
+    /// <summary>
+    /// فقط بدنهٔ متد ارسال مجدد، تا شرط بالا به بقیهٔ فایل سرایت نکند.
+    ///
+    /// اگر مرزها پیدا نشوند null برمی‌گرداند، نه کل فایل. برگرداندن کل فایل
+    /// باعث می‌شد تست با پیامی شکست بخورد که علت واقعی (تغییر نام متد) را
+    /// پنهان می‌کرد.
+    /// </summary>
+    private static string ResendBlock(string src)
+    {
+        var a = src.IndexOf("RESEND_BTN_Click", StringComparison.Ordinal);
+        var b = src.IndexOf("InsertNewTaxDtlRecord(FULL_TAXDTL", StringComparison.Ordinal);
+        return (a >= 0 && b > a) ? src.Substring(a, b - a) : null;
     }
 
     private static string ResendSource()

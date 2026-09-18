@@ -45,10 +45,12 @@ internal static class Program
         CorrectionPath.Run(Check, Console.WriteLine);
 
         Banner("گروه ۲۴ — دکمه ارسال مجدد فاکتور");
-        ResendPath.Run(Check, Console.WriteLine, args.Contains("--bulk"));
+        try { ResendPath.Run(Check, Console.WriteLine, args.Contains("--bulk")); }
+        catch (Exception ex) { Check("۲۴ اجرای گروه ارسال مجدد", false, ex.Message); }
 
         Banner("گروه ۲۵ — یافته‌های پژوهش سند، سنجیده با داده واقعی");
-        SpecFindings.Run(Check, Console.WriteLine, args.Contains("--bulk"));
+        try { SpecFindings.Run(Check, Console.WriteLine, args.Contains("--bulk")); }
+        catch (Exception ex) { Check("۲۵ اجرای گروه یافته‌های سند", false, ex.Message); }
 
         if (!ServerAlive())
         {
@@ -110,6 +112,10 @@ internal static class Program
 
         Banner("گروه ۱۵ — ترکیب موضوع × نوع × روش تسویه");
         G15_Matrix();
+
+        Banner("گروه ۲۶ — شبیه‌سازی زنده روی سرور ساختگی");
+        try { G26_Simulation(); }
+        catch (Exception ex) { Check("۲۶ اجرای شبیه‌سازی", false, ex.Message); }
 
         Banner("گروه ۱۷ — سازگاری با SDK و قالب JSON روی سیم");
         WireFormat.Run(BaseUrl, Control, Check, Console.WriteLine);
@@ -824,6 +830,135 @@ internal static class Program
     }
 
     // ================================================================ کمکی‌ها
+
+
+    // ================================================================ گروه ۲۶
+
+    /// <summary>
+    /// شبیه‌سازی زنده — ادعاها را از «نظری» به «دیده‌شده» تبدیل می‌کند.
+    ///
+    /// از همان مسیر واقعیِ رمزنگاری‌شده می‌رود که برنامه در عمل استفاده می‌کند،
+    /// نه از یک میان‌بر تستی.
+    /// </summary>
+    private static void G26_Simulation()
+    {
+        // ------------------------------------------------ عوارض غیرصفر
+        //
+        // ص۷۳ جدول ۵۳ ردیف ۱ :  Os = Ks + Is + Ks2 + Ks3
+        //   Ks = مالیات، Is = بعد از تخفیف، Ks2 = عوارض، Ks3 = وجوه قانونی
+        //
+        // فرمول برنامه Tsstam = Adis + Vam است، یعنی Ks2 و Ks3 را ندارد. امروز
+        // بی‌اثر است چون هر دو همیشه صفرند. اینجا عمدا صفر نیستند تا معلوم شود
+        // اگر روزی پر شوند دقیقا چه می‌شود.
+
+        const decimal Adis = 1_000_000m, Vam = 90_000m, Odam = 50_000m, Olam = 25_000m;
+
+        var h1 = NewInvoice(1);
+        h1.Todam = Odam + Olam;
+        h1.Tbill = Adis + Vam + Odam + Olam;
+        h1.Cap = h1.Tbill;
+        var rWrong = Send(h1, "عوارض غیرصفر با فرمول فعلی", b =>
+        {
+            b.Odam = Odam; b.Olam = Olam;
+            b.Tsstam = Adis + Vam;               // فرمول فعلی برنامه
+        });
+        Check("۲۶-۱ سرور ساختگی: با عوارض غیرصفر فرمول فعلی مبلغ کل قلم را رد می‌کند",
+              !rWrong.Ok && rWrong.Codes.Contains("0105305"), rWrong.Codes);
+
+        var h2 = NewInvoice(1);
+        h2.Todam = Odam + Olam;
+        h2.Tbill = Adis + Vam + Odam + Olam;
+        h2.Cap = h2.Tbill;
+        var rRight = Send(h2, "عوارض غیرصفر با فرمول سند", b =>
+        {
+            b.Odam = Odam; b.Olam = Olam;
+            b.Tsstam = Adis + Vam + Odam + Olam; // فرمول ص۷۳
+        });
+        Check("۲۶-۲ سرور ساختگی: همان فاکتور با فرمول ص۷۳ را می‌پذیرد",
+              rRight.Ok, rRight.Codes);
+
+        Console.WriteLine("      · واگرایی واقعی است نه نظری: تا وقتی عوارض صفر باشد " +
+                          "دو فرمول یک عدد می‌دهند، و به محض غیرصفر شدن سند رد می‌کند.");
+
+        // ------------------------------------------------ نقدی/نسیه (setm=3)
+        //
+        // ص۴۶ جدول ۲۵ ردیف ۲ :  C  = Xs − W2 − W − Cr
+        // ص۴۷ جدول ۲۶ ردیف ۲ :  Cr = Xs − W2 − W − C
+        //
+        // یعنی مبنای تسویه «مجموع صورتحساب منهای مالیات و عوارض» است.
+        // در دیتابیس صفر فاکتور setm=3 هست، پس این تنها جای آزمودنش است.
+
+        // مبنا باید از خودِ سرصفحه بیاید، نه از ثابت‌های بالا — وگرنه اگر روزی
+        // پیش‌فرض‌های NewInvoice عوض شود، این تست بی‌آنکه معلوم باشد چرا می‌شکند.
+        var h3 = NewInvoice(1);
+        decimal tbill = h3.Tbill;
+        decimal basis = MoadianRules.SettlementBase(h3.Tbill, h3.Tvam, h3.Todam);
+        h3.Setm = 3; h3.Cap = 400_000; h3.Insp = basis - 400_000;
+        var rMix = Send(h3, "نقدی/نسیه با فرمول ص۴۶/۴۷");
+        Check("۲۶-۳ سرور ساختگی: نقدی/نسیه با فرمول ص۴۶/۴۷ را می‌پذیرد",
+              rMix.Ok, $"cap {h3.Cap} + insp {h3.Insp} = {basis} در برابر مجموع {tbill} — {rMix.Codes}");
+
+        var h4 = NewInvoice(1);
+        h4.Setm = 3; h4.Cap = 400_000; h4.Insp = h4.Tbill - 400_000;   // مالیات کم نشده
+        var rMixBad = Send(h4, "نقدی/نسیه بدون کسر مالیات");
+        Check("۲۶-۴ سرور ساختگی: نقدی/نسیه‌ای که مالیات را کم نکرده رد می‌کند",
+              !rMixBad.Ok, rMixBad.Codes);
+
+        // ------------------------------------------------ ارسال مجدد
+        //
+        // همان کاری که دکمهٔ RESEND_BTN می‌کند: عینا همان بسته، همان شماره
+        // مالیاتی، همان سریال، همان تاریخ.
+
+        var orig = NewInvoice(1);
+        var rFirst = Send(orig, "ارسال اول");
+        Check("۲۶-۵ ارسال اول پذیرفته می‌شود", rFirst.Ok, rFirst.Codes);
+
+        var dup = NewInvoice(1, inno: orig.Inno);
+        dup.Taxid = orig.Taxid;                 // ← نکتهٔ اصلی: شماره مالیاتی یکسان
+        dup.Indatim = orig.Indatim;
+        dup.Indati2m = orig.Indati2m;
+        var rDup = Send(dup, "ارسال مجدد عینا");
+        Check("۲۶-۶ ارسال مجدد با همان شماره مالیاتی «تکراری» می‌گیرد، ثبت دوم نمی‌شود",
+              !rDup.Ok && rDup.Codes.Contains("0300101"), rDup.Codes);
+
+        // حالا همان معامله با شماره مالیاتی تازه — تله‌ای که در گروه کاربران
+        // گزارش شده: «اگه با شماره مالیاتی جدید بفرستی دوبار ثبت میشه و باید
+        // یکی رو ابطال کنی».
+        //
+        // تنها کلید یکتایی، شماره مالیاتی است؛ نه سامانه و نه سرور ساختگی
+        // «همان معامله» را تشخیص نمی‌دهند. پس صرفِ پذیرفته‌شدن چیزی را ثابت
+        // نمی‌کند — باید نشان داد *دو* سند پذیرفته‌شده کنار هم باقی می‌مانند.
+        var renum = NewInvoice(1);
+        renum.Indatim = orig.Indatim;          // همان تاریخ
+        renum.Indati2m = orig.Indati2m;
+        renum.Tbill = orig.Tbill;              // همان مبالغ
+        renum.Tadis = orig.Tadis; renum.Tvam = orig.Tvam;
+        renum.Tprdis = orig.Tprdis; renum.Cap = orig.Cap;
+        renum.Tinb = orig.Tinb;                // همان خریدار
+        var rRenum = Send(renum, "همان معامله با شماره مالیاتی تازه");
+
+        int accepted = CountAccepted(orig.Taxid, renum.Taxid);
+        Check("۲۶-۷ همان معامله با شماره مالیاتی تازه، دو سند پذیرفته‌شده باقی می‌گذارد",
+              rRenum.Ok && renum.Taxid != orig.Taxid && accepted == 2,
+              $"{accepted} سند پذیرفته‌شده برای یک معامله — {rRenum.Codes}");
+
+        Console.WriteLine("      · یعنی شماره مالیاتی یکسان همان چیزی است که ارسال مجدد را بی‌خطر می‌کند؛ " +
+                          "تازه‌کردنش دو سند می‌سازد.");
+    }
+
+    /// <summary>چند تا از این شماره‌های مالیاتی در سرور ساختگی پذیرفته‌شده نشسته‌اند.</summary>
+    private static int CountAccepted(params string[] taxids)
+    {
+        try
+        {
+            var json = Control.GetStringAsync(BaseUrl.TrimEnd('/') + "/__state").GetAwaiter().GetResult();
+            var node = System.Text.Json.Nodes.JsonNode.Parse(json);
+            var invoices = node?["invoices"]?.AsObject();
+            if (invoices is null) return -1;
+            return taxids.Count(t => invoices.ContainsKey(t));
+        }
+        catch { return -1; }
+    }
 
     private sealed record SendResult(bool Ok, string Codes, string Status);
 
