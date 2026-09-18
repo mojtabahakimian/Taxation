@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -10,6 +10,15 @@
     <PackageReference Include="Dapper" Version="2.0.143" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.1" />
     <PackageReference Include="TaxCollectData.Library" Version="0.0.34" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <!-- هارنس تست محلی (TestTools/LocalMoadian) به اعضای internal دسترسی دارد
+         تا بتواند رفتار داخلی را قفل کند بدون اینکه چیزی public شود. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>MoadianLocalTest</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
 </Project>

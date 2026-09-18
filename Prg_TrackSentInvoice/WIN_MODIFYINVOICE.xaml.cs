@@ -86,19 +86,16 @@ namespace Prg_TrackSentInvoice
         #endregion
 
         #region Tools
+        /// <summary>
+        /// نگهدارنده سازگاری. ریاضیات واقعی به Prg_Moadian.FUNCTIONS.CorrectionMath
+        /// منتقل شد تا بشود تستش کرد؛ اینجا فقط به همان‌جا واگذار می‌شود.
+        /// </summary>
         static class TaxMath
         {
-            // مبالغ ریالی: حذف اعشار با برش.
-            //
-            // مهم: این باید دقیقاً همان عملیاتی باشد که ReCalculateTotals انجام می‌دهد.
-            // قبلاً محاسبه با Math.Truncate و کنترل با Math.Round بود؛ هر جا کسر اعشار
-            // بالای ۰٫۵ می‌شد، برنامه پیام «اختلاف رندینگ VAT» می‌داد در حالی که هیچ
-            // اشکالی وجود نداشت — یعنی خودش خودش را رد می‌کرد.
-            public static decimal RoundIrr(decimal v) => Math.Truncate(v);
-
-            // رندینگ تعداد/مقدار (طبق فیلدها تا 4 اعشار در UI شما)
-            public static decimal RoundQty(decimal v) => Math.Round(v, 4);
+            public static decimal RoundIrr(decimal v) => CorrectionMath.RoundIrr(v);
+            public static decimal RoundQty(decimal v) => CorrectionMath.RoundQty(v);
         }
+
         private string TruncateString(string input, int maxLength)
         {
             if (string.IsNullOrEmpty(input) || maxLength <= 0)
@@ -655,22 +652,9 @@ VALUES
                 ////محاسبه مجدد مبالغ جهت رفع اعشار
                 // توجه: گردکردن تعداد و مبلغ واحد عمداً دست‌نخورده مانده است تا مبالغ
                 // ارسالی با رفتار فعلی و با دفاتر یکسان بماند.
-                item.Am = Math.Round((decimal)item.Am, 4); //تعداد/مقدار //MEGHk
-                item.Fee = Math.Truncate((decimal)item.Fee); //مبلغ واحد //MABL
-                item.Dis = Math.Truncate((decimal)item.Dis); //مبلغ تخفیف //N_MOIN
-
-                var MABL_K = Math.Truncate((decimal)(item.Am * item.Fee));
-                item.Prdis = MABL_K; //مبلغ قبل از تخفیف //MABL_K
-
-                item.Adis = item.Prdis - (item.Dis ?? 0); //مبلغ بعد از تخفیف //(item.MABL_K - item.N_MOIN), //مبلغ بعد از تخفیف
-
-                var IMBAA = Math.Truncate((decimal)(item.Adis * (item.Vra ?? 0) / 100)); //مبلغ مالیات بر ارزش افزوده //IMBAA
-                item.Vam = IMBAA; //مبلغ مالیات بر ارزش افزوده //IMBAA
-
-                // جدول ۵۳ ص۷۳:  Os = Ks + Is + Ks2 + Ks3
-                // یعنی مالیات + مبلغ بعد تخفیف + سایر مالیات و عوارض + سایر وجوه قانونی.
-                // قبلاً Odam و Olam جا می‌افتادند و جمع کل کمتر از واقعیت می‌شد.
-                item.Tsstam = item.Adis + item.Vam; //مبلغ کل کالا/خدمت
+                // فرمول‌ها به CorrectionMath منتقل شده‌اند تا هم تست‌پذیر باشند و
+                // هم یک منبع حقیقت داشته باشند. محتوایشان مو به مو همان است.
+                CorrectionMath.RecalculateRow(item);
                 #endregion
 
                 #region Cleaning_RestoreValiding

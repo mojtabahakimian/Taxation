@@ -99,9 +99,25 @@ namespace Prg_Moadian.FUNCTIONS
             }
         }
 
-        public static void DoSendInvoice(string[] args)
+        /// <summary>
+        /// حالت استاتیک این کلاس را پاک می‌کند.
+        ///
+        /// L_DRV_TBL_US و L_Baseknow_US استاتیک‌اند و با AddRange پر می‌شوند، نه
+        /// با انتساب. در برنامه واقعی هر ارسال یک پروسه جداست و مشکلی پیش نمی‌آید،
+        /// ولی اگر DoSendInvoice دو بار در یک پروسه صدا زده شود (مثلا از یک
+        /// هارنس تست یا اگر روزی این کد داخل خود برنامه فراخوانی شود)، ردیف‌های
+        /// فاکتور دوم روی اولی اضافه می‌شوند و همه جمع‌ها دو برابر می‌روند.
+        /// </summary>
+        internal static void ResetState()
         {
             L_TAXDTL_US = new List<TAXDTL>();
+            L_DRV_TBL_US.Clear();
+            L_Baseknow_US.Clear();
+        }
+
+        public static void DoSendInvoice(string[] args)
+        {
+            ResetState();
 
             var _newsaz = dbms.DoGetDataSQL<SAZMAN>("SELECT MOADINA_SCNUM , YEA , MEMORYID,MEMORYIDsand,PRIVIATEKEY,Dcertificate FROM dbo.SAZMAN").FirstOrDefault();
 
