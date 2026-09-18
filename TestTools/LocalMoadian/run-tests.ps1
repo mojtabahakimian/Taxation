@@ -42,7 +42,7 @@ SELECT CONVERT(VARCHAR(64), HASHBYTES('SHA2_256',
     (SELECT CONVERT(VARCHAR(64), HASHBYTES('SHA2_256',
                 CONVERT(NVARCHAR(MAX), (SELECT t.* FOR XML RAW, BINARY BASE64))), 2) AS [text()]
      FROM dbo.TAXDTL AS t
-     WHERE t.TAG NOT IN (77, 88)
+     WHERE ISNULL(t.TAG, -1) NOT IN (77, 88)   -- NULL NOT IN (...) => NULL => ردیف نادیده می‌ماند
      ORDER BY t.IDD
      FOR XML PATH(''))), 2) AS FP;
 "@

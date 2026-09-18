@@ -113,6 +113,10 @@ internal static class Program
         Banner("گروه ۱۵ — ترکیب موضوع × نوع × روش تسویه");
         G15_Matrix();
 
+        Banner("گروه ۲۷ — احکام واقعی سامانه از نصب «مروارید»");
+        try { RealWorldRejections.Run(Check, Console.WriteLine); }
+        catch (Exception ex) { Check("۲۷ اجرای گروه احکام واقعی", false, ex.Message); }
+
         Banner("گروه ۲۶ — شبیه‌سازی زنده روی سرور ساختگی");
         try { G26_Simulation(); }
         catch (Exception ex) { Check("۲۶ اجرای شبیه‌سازی", false, ex.Message); }
