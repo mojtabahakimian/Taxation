@@ -146,6 +146,38 @@ internal static class ResendPath
                 "InsertNewTaxDtlRecord تغییر نام داده؛ این شکستِ تست است نه شکستِ کد"
               : "نه RequestTaxId نه تولید سریال تازه");
 
+        // ---------------- هشدار ارجاعیِ موازی در فرم اصلاحی ----------------
+        //
+        // مشاهدهٔ واقعی (دیتابیس DaDenaF1405، فاکتور ۲۲): روی یک صورتحساب اصلی
+        // یک اصلاحی موفق نشسته بود. کاربر می‌خواست اصلاحی دوم بزند و برنامه هیچ
+        // هشداری نمی‌داد، چون جست‌وجوی «ارجاعیِ زندهٔ دیگر» داخل شرطِ «مرجع خودش
+        // اصلاحی/برگشتی باشد» بود و برای مرجعِ اصلی اجرا نمی‌شد.
+        //
+        // شبیه‌سازی روی سرور ساختگی نشان داد سامانه در این حالت 0300601 می‌دهد.
+        // پس این جست‌وجو باید بیرون از آن شرط بماند.
+        var modSrc = ModifySource();
+        if (modSrc == null)
+        {
+            C("سورس فرم اصلاحی پیدا شد", false, "WIN_MODIFYINVOICE.xaml.cs نبود");
+        }
+        else
+        {
+            var warnIdx = modSrc.IndexOf("liveSibling", StringComparison.Ordinal);
+            var chainIdx = modSrc.IndexOf("refInfo.Ins == 2 || refInfo.Ins == 4", StringComparison.Ordinal);
+
+            C("هشدار «ارجاعیِ زنده روی این مرجع» برای هر نوع مرجعی داده می‌شود",
+              warnIdx > 0 && chainIdx > 0 && warnIdx < chainIdx,
+              warnIdx <= 0
+                  ? "کنترل liveSibling پیدا نشد — روی مرجعِ اصلی هیچ هشداری داده نمی‌شود"
+                  : (warnIdx > chainIdx
+                        ? "کنترل دوباره داخل شرط «مرجع ارجاعی باشد» رفته — برای مرجع اصلی اجرا نمی‌شود"
+                        : "بیرون از شرط، پیش از کنترل زنجیره"));
+
+            C("این کنترل هشدار است نه سد (طبق قانون مخزن)",
+              !Regex.IsMatch(modSrc, @"liveSibling != null[\s\S]{0,400}?return"),
+              "بعد از هشدار، ارسال متوقف نمی‌شود");
+        }
+
         // ---------------- رفت‌وبرگشت واقعی با دیتابیس ----------------
 
         if (!withDb)
@@ -244,6 +276,16 @@ internal static class ResendPath
         var a = src.IndexOf("RESEND_BTN_Click", StringComparison.Ordinal);
         var b = src.IndexOf("InsertNewTaxDtlRecord(FULL_TAXDTL", StringComparison.Ordinal);
         return (a >= 0 && b > a) ? src.Substring(a, b - a) : null;
+    }
+
+    /// <summary>سورس فرم اصلاحی، برای قفل‌کردن شکل هشدارهایش.</summary>
+    private static string ModifySource()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d != null && !Directory.Exists(Path.Combine(d.FullName, ".git"))) d = d.Parent;
+        var root = d?.FullName ?? Directory.GetCurrentDirectory();
+        var file = Path.Combine(root, "Prg_TrackSentInvoice", "WIN_MODIFYINVOICE.xaml.cs");
+        return File.Exists(file) ? File.ReadAllText(file) : null;
     }
 
     private static string ResendSource()

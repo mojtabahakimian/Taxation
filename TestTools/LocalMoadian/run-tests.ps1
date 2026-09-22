@@ -62,9 +62,40 @@ $seeded   = $false
 $code     = 0        # هر شکستی این را غیرصفر می‌کند و هیچ‌جا بازنویسی نمی‌شود
 
 try {
-    # ---------- ۰. اثر انگشت داده واقعی، قبل از هر کاری ----------
-    $fpBefore = $null
+    # ---------- ۰-الف. تست‌ها به کدام دیتابیس وصل می‌شوند؟ ----------
+    #
+    # هارنس تست از CL_CCNNMANAGER استفاده می‌کند و آن، رشتهٔ اتصال را از
+    # C:\correct\CNR.udl می‌خواند — نه از پارامتر -Database این اسکریپت.
+    #
+    # اگر این دو یکی نباشند دو فاجعه ممکن است:
+    #   • اثر انگشت یک دیتابیس را می‌سنجد و تست‌ها دیتابیس دیگری را می‌نویسند،
+    #     یعنی کنترل «داده دست‌نخورده ماند» تضمین کاذب می‌دهد؛
+    #   • داده تستی داخل دیتابیس واقعی یک مشتری نوشته می‌شود.
+    # پس پیش از هر کاری این دو باید بخوانند.
     if ($Full) {
+        $udl = "C:\correct\CNR.udl"
+        if (-not (Test-Path $udl)) {
+            Write-Host "  فایل اتصال $udl پیدا نشد — تست‌ها نمی‌دانند به کجا وصل شوند." -ForegroundColor Red
+            $code = 1
+        } else {
+            $udlText = (Get-Content $udl -Raw) -replace "`0", ""
+            $udlDb = ([regex]::Match($udlText, '(?i)Initial Catalog\s*=\s*([^;]+)')).Groups[1].Value.Trim()
+            if ($udlDb -ne $Database) {
+                Write-Host "  ناسازگاری دیتابیس:" -ForegroundColor Red
+                Write-Host "      تست‌ها به  : $udlDb   (از $udl)" -ForegroundColor Red
+                Write-Host "      اثر انگشت  : $Database   (پارامتر -Database)" -ForegroundColor Red
+                Write-Host "  این یعنی کنترل «داده دست‌نخورده ماند» دیتابیسی را می‌سنجد که تست‌ها" -ForegroundColor Red
+                Write-Host "  اصلا به آن دست نمی‌زنند. یا CNR.udl را درست کنید یا -Database را." -ForegroundColor Red
+                $code = 1
+            } else {
+                Say "دیتابیس تست‌ها و اثر انگشت یکی است: $Database"
+            }
+        }
+    }
+
+    # ---------- ۰-ب. اثر انگشت داده واقعی، قبل از هر کاری ----------
+    $fpBefore = $null
+    if ($Full -and $code -eq 0) {
         try {
             $fpBefore = Get-TaxdtlFingerprint $Server $Database
             Say "اثر انگشت داده واقعی: $($fpBefore.Substring(0,16))..."
@@ -103,7 +134,7 @@ try {
         # پیش از اجرا علامت می‌زنیم، نه بعدش: اگر seed وسط کار بترکد، باز هم
         # باید پاک‌سازی اجرا شود. خود seed هم داخل یک تراکنش است.
         $seeded = $true
-        sqlcmd -S $Server -E -C -I -b -h -1 -i $seed | Out-Null
+        sqlcmd -S $Server -d $Database -E -C -I -b -h -1 -i $seed | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  ساخت داده تست شکست خورد" -ForegroundColor Red
             $code = 1
@@ -130,7 +161,7 @@ try {
 finally {
     if ($seeded) {
         Say "پاک کردن داده تست ..."
-        sqlcmd -S $Server -E -C -I -b -h -1 -i $clean | Out-Null
+        sqlcmd -S $Server -d $Database -E -C -I -b -h -1 -i $clean | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  پاک‌سازی داده تست شکست خورد — دستی اجرا کنید: $clean" -ForegroundColor Red
             $code = 1

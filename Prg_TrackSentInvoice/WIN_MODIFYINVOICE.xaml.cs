@@ -799,6 +799,35 @@ VALUES
                 var refInfo = dbms.DoGetDataSQL<TAXDTL>(
                     "SELECT TOP 1 Ins, TheStatus FROM dbo.TAXDTL WHERE Taxid = @tx", new { tx = irtaxid }).FirstOrDefault();
 
+                // ارجاعیِ زندهٔ دیگر روی همین مرجع.
+                //
+                // دقت: سند **نگفته** که روی یک صورتحساب اصلی فقط یک اصلاحی مجاز است.
+                //   ص۱۵      : تنها قاعدهٔ «فقط یکی»، مخصوص ابطالی است.
+                //   ص۱۶ بند۳ : شرط «ارجاعی دیگری صادر نشده باشد» زیر جملهٔ
+                //              «اگر صورتحساب مرجع خود اصلاحی/برگشت از فروش باشد» است.
+                //   ص۳۰ ج۸ ر۴: ترکیب «اصلاحی *و* برگشت از فروش» روی یک مرجع را منع
+                //              می‌کند، نه دو اصلاحی را.
+                // پس این یک هشدار احتیاطی است، نه نقل یک قاعدهٔ قطعی. سامانه ممکن
+                // است بپذیرد و ممکن است با 0300601 رد کند؛ تصمیم با کاربر است.
+                if (!isEbtali)
+                {
+                    var liveSibling = dbms.DoGetDataSQL<TAXDTL>(
+                        "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
+                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                        new { @ref = irtaxid }).FirstOrDefault();
+
+                    if (liveSibling != null)
+                        new Msgwin(false,
+                            "توجه: روی این صورتحساب مرجع قبلا یک " +
+                            (liveSibling.Ins == 2 ? "اصلاحی" : "برگشت از فروش") +
+                            " با وضعیت «" + liveSibling.TheStatus + "» ثبت شده است (" + liveSibling.Taxid + ")." +
+                            "\n\nاین لزوما مانع نیست — دستورالعمل صریحا نگفته روی یک صورتحساب اصلی فقط یک" +
+                            " اصلاحی مجاز است. ولی سامانه ممکن است آن را با خطای 0300601 رد کند." +
+                            "\n\nاگر رد شد، اصلاحی را روی خودِ آن صورتحساب (" + liveSibling.Taxid + ") بزنید،" +
+                            " نه روی صورتحساب اصلی — به شرطی که در کارپوشه تایید شده/تایید سیستمی/عدم نیاز" +
+                            " به واکنش باشد.").ShowDialog();
+                }
+
                 if (!isEbtali && refInfo != null && (refInfo.Ins == 2 || refInfo.Ins == 4))
                 {
                     var siblings = dbms.DoGetDataSQL<TAXDTL>(
