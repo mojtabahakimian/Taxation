@@ -50,8 +50,8 @@ if exist "C:\Program Files\WinRAR\Rar.exe" (
 ) else if exist "%ProgramFiles(x86)%\WinRAR\Rar.exe" (
     set "RAR_EXE=%ProgramFiles(x86)%\WinRAR\Rar.exe"
 ) else (
-    for /f "tokens=2* delims=	 " %%a in ('reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\WinRAR.exe" /ve 2^>nul') do (
-        if exist "%%~dpb\Rar.exe" set "RAR_EXE=%%~dpb\Rar.exe"
+    for /f "usebackq tokens=*" %%p in (`powershell -NoProfile -NoLogo -Command "(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\WinRAR.exe' -ErrorAction SilentlyContinue).'(default)'"`) do (
+        if exist "%%~dpp\Rar.exe" set "RAR_EXE=%%~dpp\Rar.exe"
     )
 )
 
@@ -239,17 +239,12 @@ if not defined RAR_EXE (
 
 set "SFX_NAME=Moadian %VERSION%.exe"
 set "SFX_DESKTOP=%USERPROFILE%\Desktop\%SFX_NAME%"
-set "SFX_CMT=%TEMP_DIR%\sfx_comment.txt"
+set "SFX_CMT=%ROOT_DIR%MoadianSFX_Comment.txt"
 
-:: Export SFX script comments from WinRAR profile "MoadianSFX" (or fallback)
-powershell -NoProfile -Command ^
-    "$p = Get-ChildItem 'HKCU:\Software\WinRAR\Profiles' -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PSPath } | Where-Object { $_.Name -eq 'MoadianSFX' } | Select-Object -First 1; ^
-    if ($p -and $p.CmtDataWide) { ^
-        [System.IO.File]::WriteAllText('%SFX_CMT%', [System.Text.Encoding]::Unicode.GetString($p.CmtDataWide), [System.Text.Encoding]::UTF8); ^
-    } else { ^
-        $def = \";The comment below contains SFX script commands`r`n`r`nPath=C:\CORRECT\`r`nOverwrite=1`r`nTitle=استعلام مودیان`r`nText`r`n{`r`nMoadian`r`n}`r`n\"; ^
-        [System.IO.File]::WriteAllText('%SFX_CMT%', $def, [System.Text.Encoding]::UTF8); ^
-    }"
+if not exist "%SFX_CMT%" (
+    echo [ERROR] SFX comment file not found: "%SFX_CMT%"!
+    goto :FAILED
+)
 
 if exist "%SFX_DESKTOP%" del /f /q "%SFX_DESKTOP%" >nul
 
