@@ -1,0 +1,9 @@
+﻿;The comment below contains SFX script commands
+
+Path=C:\CORRECT\
+Overwrite=1
+Title=استعلام مودیان
+Text
+{
+Moadian
+}
