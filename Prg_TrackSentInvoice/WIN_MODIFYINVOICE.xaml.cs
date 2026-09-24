@@ -47,6 +47,19 @@ namespace Prg_TrackSentInvoice
 
         public bool IsSpecialF { get; set; } = false;
 
+        /// <summary>
+        /// تاریخ و زمان صدور صورتحساب مرجع، همان‌طور که از دیتابیس خوانده شد.
+        ///
+        /// این مقدار باید *قبل* از اینکه Indatim_Sec ردیف‌ها با زمان جدید بازنویسی شود
+        /// نگه داشته شود. قبلاً کنترل تاریخ روی First().Indatim_Sec انجام می‌شد که در آن
+        /// لحظه دیگر تاریخ مرجع نبود و مقایسه بی‌اثر می‌شد.
+        /// </summary>
+        private long _referenceIndatim;
+
+        /// <summary>شماره منحصر به فرد مالیاتی صورتحساب مرجع.</summary>
+        private string _referenceTaxid;
+
+
         public WIN_MODIFYINVOICE()
         {
             InitializeComponent();
@@ -73,14 +86,16 @@ namespace Prg_TrackSentInvoice
         #endregion
 
         #region Tools
+        /// <summary>
+        /// نگهدارنده سازگاری. ریاضیات واقعی به Prg_Moadian.FUNCTIONS.CorrectionMath
+        /// منتقل شد تا بشود تستش کرد؛ اینجا فقط به همان‌جا واگذار می‌شود.
+        /// </summary>
         static class TaxMath
         {
-            // رندینگ پولی به ریال: نیمه‌بالا (استاندارد مالی)
-            public static decimal RoundIrr(decimal v) => Math.Round(v, 0); ////MidpointRounding.AwayFromZero
-
-            // رندینگ تعداد/مقدار (طبق فیلدها تا 4 اعشار در UI شما)
-            public static decimal RoundQty(decimal v) => Math.Round(v, 4);
+            public static decimal RoundIrr(decimal v) => CorrectionMath.RoundIrr(v);
+            public static decimal RoundQty(decimal v) => CorrectionMath.RoundQty(v);
         }
+
         private string TruncateString(string input, int maxLength)
         {
             if (string.IsNullOrEmpty(input) || maxLength <= 0)
@@ -427,6 +442,10 @@ VALUES
             var RST = dbms.DoGetDataSQL<TAXDTL>(SQLTEXT).ToList();
             TAXID_LABEL.Text = " شماره مالیاتی صورت حساب اولیه ارسال شده " + RST.FirstOrDefault()?.Taxid;
 
+            // تاریخ و شناسه مرجع را همین‌جا نگه دار — بعداً هر دو روی ردیف‌ها بازنویسی می‌شوند.
+            _referenceTaxid = RST.FirstOrDefault()?.Taxid;
+            _referenceIndatim = RST.FirstOrDefault()?.Indatim_Sec ?? 0;
+
             foreach (var item in RST)
             {
                 TAXDTL_DATA?.Add(item);
@@ -445,6 +464,7 @@ VALUES
             }
 
             GetHeaderSum();
+
         }
 
         //Head
@@ -630,19 +650,11 @@ VALUES
 
                 #region Goods
                 ////محاسبه مجدد مبالغ جهت رفع اعشار
-                item.Am = Math.Round((decimal)item.Am, 4); //تعداد/مقدار //MEGHk
-                item.Fee = Math.Truncate((decimal)item.Fee); //مبلغ واحد //MABL
-                item.Dis = Math.Truncate((decimal)item.Dis); //مبلغ تخفیف //N_MOIN
-
-                var MABL_K = Math.Truncate((decimal)(item.Am * item.Fee));
-                item.Prdis = MABL_K; //مبلغ قبل از تخفیف //MABL_K
-
-                item.Adis = item.Prdis - (item.Dis ?? 0); //مبلغ بعد از تخفیف //(item.MABL_K - item.N_MOIN), //مبلغ بعد از تخفیف
-
-                var IMBAA = Math.Truncate((decimal)(item.Adis * (item.Vra ?? 0) / 100)); //مبلغ مالیات بر ارزش افزوده //IMBAA	
-                item.Vam = IMBAA; //مبلغ مالیات بر ارزش افزوده //IMBAA	
-
-                item.Tsstam = item.Adis + item.Vam; //مبلغ کل کالا/خدمت
+                // توجه: گردکردن تعداد و مبلغ واحد عمداً دست‌نخورده مانده است تا مبالغ
+                // ارسالی با رفتار فعلی و با دفاتر یکسان بماند.
+                // فرمول‌ها به CorrectionMath منتقل شده‌اند تا هم تست‌پذیر باشند و
+                // هم یک منبع حقیقت داشته باشند. محتوایشان مو به مو همان است.
+                CorrectionMath.RecalculateRow(item);
                 #endregion
 
                 #region Cleaning_RestoreValiding
@@ -766,6 +778,104 @@ VALUES
             //GetSumHead
             GetHeaderSum();
         }
+        /// <summary>
+        /// هشدار (نه سد) درباره وضعیت زنجیره مرجع.
+        ///
+        /// ص۱۵ V7.9 : «هر صورتحساب فقط می‌تواند به عنوان مرجع یک صورتحساب با موضوع ابطالی قرار گیرد.»
+        /// ص۱۷ بند ۲: «امکان استفاده از صورتحساب الکترونیکی ابطالی به عنوان صورتحساب مرجع وجود ندارد.»
+        ///
+        /// این قواعد ممکن است تغییر کنند یا سامانه رفتار دیگری نشان دهد، پس فقط
+        /// اطلاع‌رسانی می‌شود و جلوی ارسال گرفته نمی‌شود.
+        /// </summary>
+        private void WarnOnReferenceChain(string irtaxid, bool isEbtali)
+        {
+            try
+            {
+                // ص۱۶ بند ۳ V7.9: اگر صورتحساب مرجع خودش اصلاحی/برگشت از فروش باشد،
+                // صدور صورتحساب ارجاعی روی آن مجاز است (زنجیره پلکانی) به شرط اینکه:
+                //   ۱) مرجع در وضعیت تایید شده/تایید سیستمی/عدم نیاز به واکنش باشد
+                //   ۲) روی همان مرجع، اصلاحی/برگشتی دیگری با وضعیتی غیر از ابطال‌شده نباشد
+                // برنامه به وضعیت تایید خریدار دسترسی ندارد، پس فقط یادآوری می‌کند.
+                var refInfo = dbms.DoGetDataSQL<TAXDTL>(
+                    "SELECT TOP 1 Ins, TheStatus FROM dbo.TAXDTL WHERE Taxid = @tx", new { tx = irtaxid }).FirstOrDefault();
+
+                // ارجاعیِ زندهٔ دیگر روی همین مرجع.
+                //
+                // دقت: سند **نگفته** که روی یک صورتحساب اصلی فقط یک اصلاحی مجاز است.
+                //   ص۱۵      : تنها قاعدهٔ «فقط یکی»، مخصوص ابطالی است.
+                //   ص۱۶ بند۳ : شرط «ارجاعی دیگری صادر نشده باشد» زیر جملهٔ
+                //              «اگر صورتحساب مرجع خود اصلاحی/برگشت از فروش باشد» است.
+                //   ص۳۰ ج۸ ر۴: ترکیب «اصلاحی *و* برگشت از فروش» روی یک مرجع را منع
+                //              می‌کند، نه دو اصلاحی را.
+                // پس این یک هشدار احتیاطی است، نه نقل یک قاعدهٔ قطعی. سامانه ممکن
+                // است بپذیرد و ممکن است با 0300601 رد کند؛ تصمیم با کاربر است.
+                if (!isEbtali)
+                {
+                    var liveSibling = dbms.DoGetDataSQL<TAXDTL>(
+                        "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
+                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                        new { @ref = irtaxid }).FirstOrDefault();
+
+                    if (liveSibling != null)
+                        new Msgwin(false,
+                            "توجه: روی این صورتحساب مرجع قبلا یک " +
+                            (liveSibling.Ins == 2 ? "اصلاحی" : "برگشت از فروش") +
+                            " با وضعیت «" + liveSibling.TheStatus + "» ثبت شده است (" + liveSibling.Taxid + ")." +
+                            "\n\nاین لزوما مانع نیست — دستورالعمل صریحا نگفته روی یک صورتحساب اصلی فقط یک" +
+                            " اصلاحی مجاز است. ولی سامانه ممکن است آن را با خطای 0300601 رد کند." +
+                            "\n\nاگر رد شد، اصلاحی را روی خودِ آن صورتحساب (" + liveSibling.Taxid + ") بزنید،" +
+                            " نه روی صورتحساب اصلی — به شرطی که در کارپوشه تایید شده/تایید سیستمی/عدم نیاز" +
+                            " به واکنش باشد.").ShowDialog();
+                }
+
+                if (!isEbtali && refInfo != null && (refInfo.Ins == 2 || refInfo.Ins == 4))
+                {
+                    var siblings = dbms.DoGetDataSQL<TAXDTL>(
+                        "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
+                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                        new { @ref = irtaxid }).FirstOrDefault();
+
+                    var chainMsg = "توجه: صورتحساب مرجع خودش یک " + (refInfo.Ins == 2 ? "اصلاحی" : "برگشت از فروش") +
+                        " است (زنجیره پلکانی). طبق ص۱۶ بند ۳ این کار مجاز است به شرط اینکه مرجع در وضعیت" +
+                        " تایید شده/تایید سیستمی/عدم نیاز به واکنش باشد.";
+
+                    if (siblings != null)
+                        chainMsg += "\n\nضمنا روی همین مرجع قبلا یک " + (siblings.Ins == 2 ? "اصلاحی" : "برگشتی") +
+                            " با وضعیت «" + siblings.TheStatus + "» ثبت شده (" + siblings.Taxid + ")؛ زنجیره باید خطی بماند.";
+
+                    new Msgwin(false, chainMsg).ShowDialog();
+                }
+
+                if (!isEbtali) return;
+
+                var previous = dbms.DoGetDataSQL<TAXDTL>(
+                    "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
+                    "WHERE Irtaxid = @ref AND Ins = 3 AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                    new { @ref = irtaxid }).FirstOrDefault();
+
+                if (previous != null)
+                {
+                    new Msgwin(false,
+                        "توجه: روی این صورتحساب مرجع قبلا یک ابطالی با وضعیت «" + previous.TheStatus + "» ثبت شده است" +
+                        " (شماره مالیاتی " + previous.Taxid + ")." +
+                        "\n\nطبق ص۱۵ دستورالعمل، هر صورتحساب فقط می‌تواند مرجع یک ابطالی باشد.").ShowDialog();
+                }
+
+                var refRow = dbms.DoGetDataSQL<TAXDTL>(
+                    "SELECT TOP 1 Ins FROM dbo.TAXDTL WHERE Taxid = @tx", new { tx = irtaxid }).FirstOrDefault();
+
+                if (refRow != null && refRow.Ins == 3)
+                {
+                    new Msgwin(false,
+                        "توجه: صورتحساب مرجع انتخاب‌شده خودش یک ابطالی است و طبق ص۱۷ بند ۲ معمولا نمی‌تواند مرجع قرار گیرد.").ShowDialog();
+                }
+            }
+            catch (Exception ex)
+            {
+                CL_Generaly.DoWritePRGLOG("WarnOnReferenceChain failed", ex);
+            }
+        }
+
         private void GetHeaderSum()
         {
             foreach (var row in TAXDTL_DATA)
@@ -779,6 +889,7 @@ VALUES
 
             // به‌روزرسانی نمایشگرهای جمع کل
             TotalAmountText.Text = $"جمع کل: {TAXDTL_DATA.First().Tprdis:N0}" + " ریال "; //totalAmount
+
             TotalDiscountText.Text = $"جمع تخفیف: {TAXDTL_DATA.First().Tdis:N0}" + " ریال "; //totalDiscount
             TotalVatText.Text = $"جمع مالیات: {TAXDTL_DATA.First().Tvam:N0}" + " ریال "; //totalVat
             GrandTotalText.Text = $"مبلغ نهایی: {TAXDTL_DATA.First().Tbill:N0}" + " ریال "; //grandTotal
@@ -806,7 +917,19 @@ VALUES
                     new Msgwin(false, "لطفاً یک صورتحساب و نوع عملیات را انتخاب کنید.").Show();
                     return;
                 }
+
                 IsEbtali = SelectedHeadItem.Ins == 3;
+
+                // موضوع صورتحساب فقط روی ردیفی که کاربر انتخاب کرده عوض می‌شود،
+                // ولی هدر از TAXDTL_DATA.First() خوانده می‌شود و ذخیره هم Ins هر
+                // ردیف را جدا می‌نویسد. نتیجه: رکورد محلیِ ناسازگار — مثلا ارسال
+                // 22:46 که یک ردیفش Ins=2 و چهار ردیفش Ins=1 ثبت شد.
+                //
+                // این فقط ثبت محلی را یکدست می‌کند؛ مقدار ارسالی به سامانه همان
+                // انتخاب کاربر است و عوض نمی‌شود.
+                foreach (var row in TAXDTL_DATA)
+                    row.Ins = SelectedHeadItem.Ins;
+
                 if (TAXDTL_DATA.Count == 0 && !IsEbtali)
                 {
                     new Msgwin(false, "برای صورتحساب اصلاحی یا برگشتی باید حداقل یک قلم کالا وجود داشته باشد.").Show();
@@ -822,6 +945,37 @@ VALUES
                     new Msgwin(false, "شماره صورت حساب مرجع (Irtaxid) را وارد کنید.").Show();
                     return;
                 }
+
+                // شناسه مرجع معمولا ۲۲ کاراکتر است؛ هشدار می‌دهیم ولی سد نمی‌کنیم.
+                var badRef = TAXDTL_DATA.FirstOrDefault(x => (x.Irtaxid ?? string.Empty).Trim().Length != 22);
+                if (badRef != null)
+                {
+                    var wRef = new Msgwin(true,
+                        "هشدار: شماره صورت حساب مرجع (Irtaxid) معمولا باید دقیقا ۲۲ کاراکتر باشد. مقدار فعلی «" +
+                        badRef.Irtaxid + "» طول " + (badRef.Irtaxid ?? string.Empty).Trim().Length + " دارد." +
+                        "\n\nآیا با این وجود ادامه می‌دهید؟");
+                    wRef.ShowDialog();
+                    if (wRef.DialogResult != true) return;
+                }
+
+                // فیلد Irtaxid در گرید قابل ویرایش است. اگر کاربر آن را به شناسه‌ای غیر
+                // از صورتحسابی که این فرم با آن باز شده تغییر داده باشد، بدنه از یک
+                // صورتحساب و مرجع از صورتحساب دیگری خواهد بود.
+                var typedRef = (TAXDTL_DATA.First().Irtaxid ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(_referenceTaxid) &&
+                    !string.Equals(typedRef, _referenceTaxid.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    var refMsg = new Msgwin(true,
+                        $"شماره مرجع وارد شده ({typedRef}) با صورتحسابی که این فرم از روی آن باز شده " +
+                        $"({_referenceTaxid}) یکسان نیست.\n\nاقلام این صورتحساب از سند اول خوانده شده‌اند. " +
+                        "آیا مطمئنید می‌خواهید به شناسه دیگری ارجاع دهید؟");
+                    refMsg.ShowDialog();
+                    if (refMsg.DialogResult != true) return;
+                }
+
+                // ص۱۵ V7.9: «هر صورتحساب فقط می‌تواند به عنوان مرجع یک صورتحساب با موضوع
+                // ابطالی قرار گیرد» — پس ابطالی تکراری روی یک مرجع مجاز نیست.
+                WarnOnReferenceChain(TAXDTL_DATA.First().Irtaxid, IsEbtali);
             }
 
             if (!TryGetCustomIssueDate(out var customIssueDate, out var normalizedCustomDate))
@@ -830,6 +984,26 @@ VALUES
             }
 
             bool useCustomDate = CHK_CUSTOM_DATE?.IsChecked ?? false;
+
+            // ص۲۵ ردیف ۳ V7.9: تاریخ صدور صورتحساب ارجاعی باید از مرجع بزرگتر یا مساوی
+            // باشد. هشدار می‌دهیم، ولی سد نمی‌کنیم — قواعد ممکن است تغییر کنند.
+            if (useCustomDate && _referenceIndatim > 0)
+            {
+                var customIndatim = TaxService.ConvertDateToLong(customIssueDate);
+                if (customIndatim < _referenceIndatim)
+                {
+                    var refDate = DateTimeOffset.FromUnixTimeMilliseconds(_referenceIndatim).ToOffset(new TimeSpan(3, 30, 0));
+                    var wDate = new Msgwin(true,
+                        "هشدار: تاریخ سفارشی (" + normalizedCustomDate + ") از تاریخ صدور صورتحساب مرجع (" +
+                        refDate.ToString("yyyy/MM/dd HH:mm") + ") کوچکتر است." +
+                        "\n\nطبق ص۲۵ دستورالعمل، تاریخ صورتحساب ارجاعی نباید از مرجع زودتر باشد." +
+                        "\n\nآیا با این وجود ادامه می‌دهید؟");
+                    wDate.ShowDialog();
+                    if (wDate.DialogResult != true) return;
+                }
+            }
+
+
             string dateStatus = useCustomDate ? $"تاریخ سفارشی ({normalizedCustomDate})" : "تاریخ لحظه ارسال";
 
             Msgwin msgwin1 = new Msgwin(true, $"آیا از ارسال صورت حساب از نوع [{GetMessageBasedOnId((int)TAXDTL_DATA.FirstOrDefault().Ins)}] با مقادیر انتخاب شده و مبنای تاریخ [{dateStatus}] مطمئن هستید ؟ ");
@@ -885,6 +1059,8 @@ VALUES
                 long indatim = useCustomDate
                     ? TaxService.ConvertDateToLong(customIssueDate)
                     : nowUtcOffset.ToUnixTimeMilliseconds();
+
+                // قاعده ارسال (ماده ۹) — جدول ۸۶ ص۹۳.
                 long indatim2 = indatim;
 
                 var taxidNew = taxService.RequestTaxId(_memoryId, issueDateForTaxId);
@@ -910,9 +1086,15 @@ VALUES
                 header.Irtaxid = HeadFirst.Irtaxid; //شماره منحصر به فرد مالیاتی صورتحساب مرجع
                 header.Inp = Convert.ToInt32(HeadFirst.Inp); //الگوی صورتحساب
                 header.Ins = Convert.ToInt32(HeadFirst.Ins); //موضوع صورتحساب
+
+                // قاعده ارسال صورتحساب (ماده ۹) — جدول ۸۶ ص۹۳.
+                // ملاک، فاصله صدور تا ارسالِ همین صورتحساب است، نه سن صورتحساب مرجع.
+                header.Insr = MoadianRules.ResolveInsr(issueDateForTaxId, now);
                 header.Tins = HeadFirst.Tins; //شماره اقتصادی فروشنده //ECODE SAZMAN
                 header.Tob = Convert.ToInt32(HeadFirst.Tob); //نوع شخص خریدار
-                header.Bid = HeadFirst.Bid; //شماره/شناسه ملی/شناسه مشارکت مدنی/کد فراگیر خریدار //MCODEM	SAZMAN
+                // Bid را خام از TAXDTL پخش نمی‌کنیم: ردیف‌های قدیمی ممکن است مقداری
+                // با طول نامعتبر داشته باشند که سامانه با 0101104 ردش می‌کند.
+                header.Bid = MoadianRules.SanitizeBid(Convert.ToInt32(HeadFirst.Tob), HeadFirst.Bid); //شماره/شناسه ملی/شناسه مشارکت مدنی/کد فراگیر خریدار
                 header.Tinb = HeadFirst.Tinb; //شماره اقتصادی خریدار //ECODE CUST_HESAB
                 header.Sbc = HeadFirst.Sbc; //کد شعبه فروشنده //MCODEM	CUST_HESAB
                 header.Bbc = HeadFirst.Bbc; //کد شعبه خریدار
@@ -1169,7 +1351,40 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                 catch (Exception ex)
                 {
                     CL_Generaly.DoGetwriteAppenLog($"Message : {ex.Message} \n\n {ex}");
-                    throw new NullyExceptiony("Invoice Sent but could not save it to db");
+
+                    // صورتحساب به سامانه رفته ولی در دیتابیس ثبت نشده. اگر اینجا فقط
+                    // استثنا پرتاب شود، شماره مالیاتی و کد رهگیری از دست می‌روند و بعداً
+                    // معلوم نیست چه چیزی ارسال شده. پس یک فایل بازیابی نوشته می‌شود.
+                    try
+                    {
+                        string recoveryDir = @"C:\CORRECT\RECOVERY";
+                        if (!Directory.Exists(recoveryDir)) Directory.CreateDirectory(recoveryDir);
+
+                        var recovery = new
+                        {
+                            SavedAt = DateTime.Now,
+                            Reason = "ارسال به سامانه انجام شد اما ثبت در دیتابیس ناموفق بود",
+                            Taxid = taxidNew,
+                            Inno = HeadFirst?.Inno,
+                            Irtaxid = HeadFirst?.Irtaxid,
+                            Ins = HeadFirst?.Ins,
+                            NUMBER = HeadFirst?.NUMBER,
+                            TAG = HeadFirst?.TAG,
+                            sendInvoicesModel.ReferenceNumber,
+                            sendInvoicesModel.Uid,
+                            DbError = ex.Message
+                        };
+
+                        File.WriteAllText(
+                            System.IO.Path.Combine(recoveryDir, $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff}-RECOVERY.json"),
+                            JsonSerializer.Serialize(recovery));
+                    }
+                    catch { /* بازیابی نباید خودش باعث خطای جدید شود */ }
+
+                    throw new NullyExceptiony(
+                        "صورتحساب به سامانه ارسال شد اما ثبت آن در دیتابیس ناموفق بود.\n\n" +
+                        $"شماره مالیاتی: {taxidNew}\nکد رهگیری: {sendInvoicesModel.ReferenceNumber}\n\n" +
+                        "اطلاعات در پوشه C:\\CORRECT\\RECOVERY ذخیره شد. لطفاً قبل از هر ارسال مجدد، وضعیت این کد رهگیری را استعلام کنید.");
                 }
             }
             catch (Exception er)

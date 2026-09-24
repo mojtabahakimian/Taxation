@@ -92,33 +92,36 @@ namespace Prg_Moadian.FUNCTIONS
                     result.AddError($"طول شناسه فروشنده ({header.Tins}) استاندارد نیست (باید ۱۰، ۱۱ یا ۱۴ رقم باشد).");
             }
 
-            // بررسی خریدار بر اساس نوع (Tob) طبق سند V7.8
-            if (header.Tob == 1) // 1 = شخص حقیقی
+            // بررسی خریدار طبق جدول ۱۱ صفحات ۳۳ و ۳۴ V7.9.
+            // دو مسیر مجاز وجود دارد: «شماره اقتصادی» یا «شماره ملی/کد فراگیر + کد پستی».
+            if (!MoadianRules.ValidateBuyer(header.Inty, header.Inp, header.Tob, header.Tinb, header.Bid, header.Bpc, out var buyerError))
+                result.AddError(buyerError);
+
+            // صحت‌سنجی الگوریتمی — فقط وقتی مقدار موجود است (جدا از الزام سند).
+            if (header.Tob == 1 && !string.IsNullOrWhiteSpace(header.Bid) && header.Bid.Trim().Length == 10
+                && !IsValidNationalCode(header.Bid.Trim()))
             {
-                if (string.IsNullOrWhiteSpace(header.Bid))
-                    result.AddError("برای خریدار حقیقی، وارد کردن کد ملی (Bid) الزامی است.");
-                else if (header.Bid.Length != 10 || !IsValidNationalCode(header.Bid))
-                    result.AddError($"کد ملی خریدار حقیقی (Bid: {header.Bid}) نامعتبر است.");
+                result.AddError($"کد ملی خریدار حقیقی (Bid: {header.Bid}) از نظر الگوریتم کنترلی نامعتبر است.");
             }
-            else if (header.Tob == 2 || header.Tob == 3) // 2 = حقوقی ، 3 = مشارکت مدنی
+
+            if ((header.Tob == 2 || header.Tob == 3) && !string.IsNullOrWhiteSpace(header.Bid)
+                && header.Bid.Trim().Length == 11 && !IsValidLegalNationalId(header.Bid.Trim()))
             {
-                string legalId = !string.IsNullOrWhiteSpace(header.Tinb) ? header.Tinb : header.Bid;
-                if (string.IsNullOrWhiteSpace(legalId))
-                    result.AddError("برای خریدار حقوقی/مشارکت مدنی، شناسه ملی (Tinb یا Bid) الزامی است.");
-                else if (legalId.Length != 11 || !IsValidLegalNationalId(legalId))
-                    result.AddError($"شناسه ملی حقوقی خریدار ({legalId}) نامعتبر است یا ۱۱ رقمی نیست.");
-            }
-            else if (header.Tob == 4) // 4 = اتباع غیر ایرانی
-            {
-                if (string.IsNullOrWhiteSpace(header.Bid))
-                    result.AddError("برای اتباع خارجی، وارد کردن کد فراگیر (Bid) الزامی است.");
+                result.AddError($"شناسه ملی حقوقی خریدار (Bid: {header.Bid}) از نظر الگوریتم کنترلی نامعتبر است.");
             }
 
             // بررسی کد پستی (Bpc) - اختیاری است اما اگر پر شد باید درست باشد
-            if (!string.IsNullOrWhiteSpace(header.Bpc) && !Regex.IsMatch(header.Bpc, @"^\d{10}$"))
+            if (!string.IsNullOrWhiteSpace(header.Bpc) && !Regex.IsMatch(header.Bpc.Trim(), @"^\d{10}$"))
             {
                 result.AddWarning($"کد پستی خریدار ({header.Bpc}) باید دقیقاً ۱۰ رقم باشد.");
             }
+
+            // کد شعبه خریدار/فروشنده: سامانه با ^\d{4}$ کنترل می‌کند (ص۳۳).
+            if (!string.IsNullOrWhiteSpace(header.Bbc) && !Regex.IsMatch(header.Bbc.Trim(), @"^\d{4}$"))
+                result.AddError($"کد شعبه خریدار ({header.Bbc}) باید دقیقاً ۴ رقم باشد.");
+
+            if (!string.IsNullOrWhiteSpace(header.Sbc) && !Regex.IsMatch(header.Sbc.Trim(), @"^\d{4}$"))
+                result.AddError($"کد شعبه فروشنده ({header.Sbc}) باید دقیقاً ۴ رقم باشد.");
         }
 
         private static void ValidateDates(InvoiceModel.Header header, ValidationResult result)
@@ -138,11 +141,54 @@ namespace Prg_Moadian.FUNCTIONS
                 result.AddError($"خطای مهم (02002): تاریخ صدور فاکتور ({indatim.ToLocalTime():yyyy/MM/dd HH:mm}) در آینده است!");
             }
 
-            // قانون ۱۲ روزه دارایی (طبق آخرین بخشنامه‌های اجرایی)
+            // مهلت ارسال — سند هیچ عدد ثابتی نمی‌دهد (ص۲۵ ردیف‌های ۵ تا ۷ و جدول ۸۶ ص۹۳
+            // می‌گویند «مهلت مجاز اعلام شده توسط سازمان»). پس عدد از تنظیمات می‌آید.
             var daysDiff = (serverNow - indatim).TotalDays;
-            if (daysDiff > 12)
+            if (daysDiff > MoadianRules.SendDeadlineDays)
             {
-                result.AddError($"تاریخ صدور ({indatim.ToLocalTime():yyyy/MM/dd}) بیش از ۱۲ روز ({daysDiff:F0} روز) با امروز فاصله دارد. سامانه مودیان قطعاً این فاکتور را به دلیل اتمام مهلت قانونی رد می‌کند.");
+                // گذشتن از مهلت به خودی خود رد نیست؛ مسیر ماده ۹ وجود دارد.
+                if (header.Insr == 1)
+                {
+                    // جدول ۸۶ ص۹۳ ردیف ۱: با insr=1 و تاریخ ثبت مطابق قواعد، صورتحساب
+                    // به عنوان «موضوع ماده ۹» پذیرفته می‌شود.
+                    if (header.Indati2m <= 0)
+                    {
+                        result.AddError("برای صورتحساب موضوع ماده ۹، فیلد تاریخ و زمان ثبت صورتحساب (Indati2m) باید مطابق قواعد پر شود.");
+                    }
+                    else
+                    {
+                        // ص۲۸ ردیف ۷: فاصله «تاریخ و زمان ثبت صورتحساب» تا ارسال آن هم
+                        // نباید از مهلت مجاز بیشتر باشد. اگر Indati2m روی تاریخ صدورِ
+                        // گذشته مانده باشد، پر کردن Insr به‌تنهایی سند را معتبر نمی‌کند.
+                        DateTime indati2m = DateTimeOffset.FromUnixTimeMilliseconds(header.Indati2m).DateTime;
+                        var regDays = (serverNow - indati2m).TotalDays;
+
+                        if (regDays > MoadianRules.SendDeadlineDays)
+                        {
+                            result.AddError(
+                                $"تاریخ ثبت صورتحساب ({indati2m.ToLocalTime():yyyy/MM/dd}) {regDays:F0} روز با امروز فاصله دارد و از مهلت " +
+                                $"{MoadianRules.SendDeadlineDays} روزه گذشته است (ص۲۸ ردیف ۷). برای مسیر ماده ۹، تاریخ ثبت باید لحظه واقعی ثبت باشد، " +
+                                "نه تاریخ صدور گذشته.");
+                        }
+                        else
+                        {
+                            result.AddWarning($"فاصله صدور تا ارسال {daysDiff:F0} روز است و صورتحساب به عنوان «موضوع ماده ۹» ارسال می‌شود (Insr=1).");
+                        }
+                    }
+                }
+                else
+                {
+                    result.AddError(
+                        $"تاریخ صدور ({indatim.ToLocalTime():yyyy/MM/dd}) {daysDiff:F0} روز با امروز فاصله دارد و از مهلت " +
+                        $"{MoadianRules.SendDeadlineDays} روزه گذشته است. برای ارسال باید قاعده ارسال (Insr) با مقدار ۱ " +
+                        $"پر شود تا صورتحساب موضوع ماده ۹ تلقی گردد، وگرنه نامعتبر می‌شود (ص۲۵ ردیف ۷).");
+                }
+            }
+            else if (header.Insr == 1)
+            {
+                // جدول ۸۶ ص۹۳ ردیف ۲: داخل مهلت، این فیلد خارج از الگوست. پر کردنش
+                // باعث رد نمی‌شود ولی بی‌مورد است.
+                result.AddWarning("فاصله صدور تا ارسال داخل مهلت مجاز است؛ در این حالت فیلد قاعده ارسال (Insr) خارج از الگو است و بهتر است خالی بماند.");
             }
         }
 
@@ -155,6 +201,28 @@ namespace Prg_Moadian.FUNCTIONS
 
                 if (string.IsNullOrWhiteSpace(item.Sstid) || item.Sstid.Length != 13)
                     result.AddError($"ردیف {rowNum}: شناسه کالا/خدمت ({item.Sstid}) نامعتبر است. (باید دقیقاً ۱۳ رقم باشد)");
+
+                // جدول ۳۱ ص۵۱: تعداد/مقدار > ۰  — خطای 0103605
+                if (item.Am <= 0)
+                    result.AddError($"ردیف {rowNum}: تعداد/مقدار ({item.Am}) باید بزرگتر از صفر باشد (جدول ۳۱ ص۵۱).");
+
+                // جدول ۳۴ ص۵۳: مبلغ واحد > ۰  — خطای 0103705
+                if (item.Fee <= 0)
+                    result.AddError($"ردیف {rowNum}: مبلغ واحد ({item.Fee:N0}) باید بزرگتر از صفر باشد (جدول ۳۴ ص۵۳).");
+
+                // جدول ۴۰ ص۵۸: مبلغ قبل از تخفیف > ۰
+                if (item.Prdis <= 0)
+                    result.AddError($"ردیف {rowNum}: مبلغ قبل از تخفیف ({item.Prdis:N0}) باید بزرگتر از صفر باشد (جدول ۴۰ ص۵۸).");
+
+                // جدول ۴۱ ص۵۹: ۰ <= تخفیف <= مبلغ قبل از تخفیف  (تخفیف ۱۰۰٪ مجاز است)
+                if (item.Dis < 0)
+                    result.AddError($"ردیف {rowNum}: مبلغ تخفیف ({item.Dis:N0}) نمی‌تواند منفی باشد.");
+                else if (item.Dis - item.Prdis > Tolerance)
+                    result.AddError($"ردیف {rowNum}: مبلغ تخفیف ({item.Dis:N0}) نباید از مبلغ قبل از تخفیف ({item.Prdis:N0}) بیشتر باشد (جدول ۴۱ ص۵۹).");
+
+                // جدول ۴۲ ص۶۰: مبلغ بعد از تخفیف >= ۰
+                if (item.Adis < -Tolerance)
+                    result.AddError($"ردیف {rowNum}: مبلغ بعد از تخفیف ({item.Adis:N0}) نمی‌تواند منفی باشد (جدول ۴۲ ص۶۰).");
 
                 decimal prdis = item.Am * item.Fee;
                 if (Math.Abs(prdis - item.Prdis) > Tolerance)
@@ -213,29 +281,49 @@ namespace Prg_Moadian.FUNCTIONS
             decimal cap = header.Cap;   // نقدی
             decimal insp = header.Insp; // نسیه
 
-            if (header.Setm == 1) // فقط نقدی
+            if (header.Setm < 1 || header.Setm > 3)
             {
-                if (Math.Abs(tbill - cap) > Tolerance)
-                    result.AddError($"در روش تسویه نقدی، مبلغ نقدی (Cap={cap:N0}) باید دقیقاً برابر کل فاکتور (Tbill={tbill:N0}) باشد.");
-                if (insp > 0)
-                    result.AddError("در روش تسویه نقدی، مبلغ نسیه (Insp) باید صفر باشد.");
+                result.AddError($"روش تسویه (Setm = {header.Setm}) نامعتبر است (جدول ۲۴ ص۴۵: فقط ۱ نقدی، ۲ نسیه، ۳ نقدی/نسیه).");
+                return;
             }
-            else if (header.Setm == 2) // فقط نسیه
+
+            // جدول ۲۴ ص۴۵ ردیف ۳: ثبت cap و insp فقط در حالت «نقدی/نسیه» اجباری است.
+            //
+            // دقت: در جدول‌های ۲۵ و ۲۶ فقط ردیف ۱ صریحاً مشروط به setm=3 است؛ ردیف ۲
+            // (فرمول) و ردیف ۳ (بزرگتر از صفر) بدون قید آمده‌اند. پس ادعای «سند برای
+            // setm=1/2 قاعده‌ای ندارد» دقیق نیست. دلیل واقعیِ اعمال‌نکردن، رفتار خودِ
+            // سامانه است: در داده عملیاتی بیش از ۱۴ هزار صورتحساب با setm=1/2 و
+            // cap/insp برابر کل صورتحساب با موفقیت ثبت شده‌اند.
+            if (header.Setm != 3)
+                return;
+
+            // جدول ۲۵ ص۴۶ و جدول ۲۶ ص۴۷ و FAQ ص۳۱ (س۱۰-۵ و ۱۰-۶):
+            //     C  = Xs - W2 - W - Cr
+            //     Cr = Xs - W2 - W - C
+            // یعنی مبنای تقسیم، مبلغ کل منهای مالیات و سایر عوارض است.
+            decimal basis = MoadianRules.SettlementBase(tbill, header.Tvam, header.Todam);
+
+            if (Math.Abs(basis - (cap + insp)) > Tolerance)
             {
-                if (Math.Abs(tbill - insp) > Tolerance)
-                    result.AddError($"در روش تسویه نسیه، مبلغ نسیه (Insp={insp:N0}) باید دقیقاً برابر کل فاکتور (Tbill={tbill:N0}) باشد.");
-                if (cap > 0)
-                    result.AddError("در روش تسویه نسیه، مبلغ نقدی (Cap) باید صفر باشد.");
+                result.AddError(
+                    $"در تسویه نقد/نسیه، مجموع نقدی ({cap:N0}) و نسیه ({insp:N0}) باید برابر " +
+                    $"«مبلغ کل منهای مالیات و عوارض» یعنی {basis:N0} باشد " +
+                    $"(Tbill={tbill:N0} − Tvam={header.Tvam:N0} − Todam={header.Todam:N0})، نه خود Tbill.");
             }
-            else if (header.Setm == 3) // نقدی/نسیه
-            {
-                if (Math.Abs(tbill - (cap + insp)) > Tolerance)
-                    result.AddError($"در تسویه نقد/نسیه، مجموع نقدی ({cap:N0}) و نسیه ({insp:N0}) باید برابر کل فاکتور ({tbill:N0}) باشد.");
-            }
-            else
-            {
-                result.AddError($"روش تسویه (Setm = {header.Setm}) نامعتبر است (باید ۱، ۲ یا ۳ باشد).");
-            }
+
+            // جدول ۲۵ ردیف ۳ و جدول ۲۶ ردیف ۳: هر دو باید بزرگتر از صفر باشند.
+            if (cap <= 0)
+                result.AddError("در تسویه نقد/نسیه، مبلغ پرداختی نقدی (Cap) باید بزرگتر از صفر باشد.");
+
+            if (insp <= 0)
+                result.AddError("در تسویه نقد/نسیه، مبلغ نسیه (Insp) باید بزرگتر از صفر باشد.");
+
+            // جدول ۲۵ ردیف ۱ و جدول ۲۶ ردیف ۱: هر کدام باید از مجموع صورتحساب کوچکتر باشند.
+            if (cap >= tbill)
+                result.AddError($"مبلغ پرداختی نقدی ({cap:N0}) باید از مجموع صورتحساب ({tbill:N0}) کوچکتر باشد.");
+
+            if (insp >= tbill)
+                result.AddError($"مبلغ نسیه ({insp:N0}) باید از مجموع صورتحساب ({tbill:N0}) کوچکتر باشد.");
         }
 
         // ======================= Helper Methods =======================

@@ -84,11 +84,13 @@ namespace Prg_Moadian.FUNCTIONS
                 var inno = TheFunctions.GenerateFixedLengthInno(yea.ToString(), (long)number);
                 byte apiType = (byte)(TaxURL == "https://tp.tax.gov.ir/req/api/" ? 1 : 0);
 
+                // LOCAL_ERROR : اصلاً به سامانه نرفته (اعتبارسنجی محلی یا انصراف کاربر).
+                // با FAILED واقعیِ سامانه یکی نیست و نباید در گزارش‌ها با آن قاطی شود.
                 string sql = @"
                     INSERT INTO dbo.TAXDTL
                     (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent)
                     VALUES
-                    (@Inno, @Number, @Tag, 'FAILED', @Error, @IDD, GETDATE(), @Api)";
+                    (@Inno, @Number, @Tag, 'LOCAL_ERROR', @Error, @IDD, GETDATE(), @Api)";
                 dbms.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType });
             }
             catch (Exception ex)
@@ -97,9 +99,25 @@ namespace Prg_Moadian.FUNCTIONS
             }
         }
 
-        public static void DoSendInvoice(string[] args)
+        /// <summary>
+        /// حالت استاتیک این کلاس را پاک می‌کند.
+        ///
+        /// L_DRV_TBL_US و L_Baseknow_US استاتیک‌اند و با AddRange پر می‌شوند، نه
+        /// با انتساب. در برنامه واقعی هر ارسال یک پروسه جداست و مشکلی پیش نمی‌آید،
+        /// ولی اگر DoSendInvoice دو بار در یک پروسه صدا زده شود (مثلا از یک
+        /// هارنس تست یا اگر روزی این کد داخل خود برنامه فراخوانی شود)، ردیف‌های
+        /// فاکتور دوم روی اولی اضافه می‌شوند و همه جمع‌ها دو برابر می‌روند.
+        /// </summary>
+        internal static void ResetState()
         {
             L_TAXDTL_US = new List<TAXDTL>();
+            L_DRV_TBL_US.Clear();
+            L_Baseknow_US.Clear();
+        }
+
+        public static void DoSendInvoice(string[] args)
+        {
+            ResetState();
 
             var _newsaz = dbms.DoGetDataSQL<SAZMAN>("SELECT MOADINA_SCNUM , YEA , MEMORYID,MEMORYIDsand,PRIVIATEKEY,Dcertificate FROM dbo.SAZMAN").FirstOrDefault();
 
@@ -371,58 +389,31 @@ namespace Prg_Moadian.FUNCTIONS
             string CODEMELI_M = null; // کد ملی/ شناسه ملی : Bid
             if (_HEAD_EXTENDED?.inty is 1) // الگوی صورت حساب روی نوع اول است
             {
-                //حقیقی1  
-                if (L_DRV_TBL_US.FirstOrDefault()?.tob == 1)
-                {
-                    //کد اقتصادی : Tinb
-                    if (src_ECODE is not null) //Real Example : 10840014242 || 411375646679
-                    {
-                        if (src_ECODE.Length == 11)
-                        {
-                            if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({src_ECODE}) ۱۱ رقمی است که مربوط به اشخاص حقوقی است، اما نوع شخص 'حقیقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
-                            {
-                                // continue
-                            }
-                            else
-                            {
-                                string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقیقی) و کد اقتصادی لغو شد.";
-                                RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
-                                throw new NullyExceptiony(errMsg);
-                            }
-                        }
+                int tobValue = L_DRV_TBL_US.FirstOrDefault()?.tob ?? 2;
 
-                        if (src_ECODE.Length > 14)
-                        {
-                            throw new NullyExceptiony("Over Length 14 Ecode for tob 1");
-                        }
-                        else ECODE_M = src_ECODE;
+                ECODE_M = string.IsNullOrWhiteSpace(src_ECODE) ? null : src_ECODE.Trim();
+                // Bid فقط وقتی فرستاده می‌شود که شماره اقتصادی نداریم و باید از مسیر
+                // جایگزین «شماره ملی + کد پستی» استفاده کنیم. تا امروز این فیلد هرگز
+                // ارسال نشده و ۱۴۳۹۹ صورتحساب با آن خالی پذیرفته شده‌اند؛ پس روی مسیری
+                // که کار می‌کند فیلد جدید اضافه نمی‌کنیم.
+                CODEMELI_M = string.IsNullOrWhiteSpace(ECODE_M)
+                    ? MoadianRules.SanitizeBid(tobValue, L_DRV_TBL_US.FirstOrDefault()?.MCODEM)
+                    : null;
+
+                // کنترل مشترک طبق جدول ۱۱ ص۳۳-۳۴.
+                // نکته: شاخهٔ else قبلی «حقوقی» برچسب داشت ولی tob=3 (مشارکت مدنی) و
+                // tob=4 (اتباع غیرایرانی) را هم می‌گرفت؛ اتباع غیرایرانی با شماره
+                // اقتصادی ۱۴ رقمی به خطای «Over Length 11» می‌خورد و اصلاً ارسال نمی‌شد.
+                if (!MoadianRules.ValidateBuyer(1, _HEAD_EXTENDED?.inp ?? 1, tobValue, ECODE_M, CODEMELI_M, _HEAD_EXTENDED?.bpc, out var buyerError))
+                {
+                    if (OnValidationWarning != null && OnValidationWarning($"{buyerError}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        // کاربر آگاهانه ادامه داد
                     }
-                }
-                //حقوقی2
-                else //L_DRV_TBL_US.FirstOrDefault()?.tob == 2
-                {
-                    //کد اقتصادی : Tinb
-                    if (src_ECODE is not null)
+                    else
                     {
-                        if (src_ECODE.Length == 10)
-                        {
-                            if (OnValidationWarning != null && OnValidationWarning($"کد اقتصادی وارد شده ({src_ECODE}) ۱۰ رقمی است که مربوط به اشخاص حقیقی است، اما نوع شخص 'حقوقی' انتخاب شده. آیا مایل به ادامه هستید؟"))
-                            {
-                                // continue
-                            }
-                            else
-                            {
-                                string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار مغایرت نوع شخص (حقوقی) و کد اقتصادی لغو شد.";
-                                RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
-                                throw new NullyExceptiony(errMsg);
-                            }
-                        }
-
-                        if (src_ECODE.Length > 11)
-                        {
-                            throw new NullyExceptiony("Over Length 11 Ecode for tob 2");
-                        }
-                        else ECODE_M = src_ECODE;
+                        RecordFailedInvoiceLocal(NUMBER, TAG, buyerError);
+                        throw new NullyExceptiony(buyerError);
                     }
                 }
             }
@@ -436,16 +427,10 @@ namespace Prg_Moadian.FUNCTIONS
             }
 
             //New Edit Update Fields:
-            var bbcStr = _HEAD_EXTENDED?.bbc;
-            if (!long.TryParse(bbcStr, out var bbcVal) || bbcVal <= 0)
-            {
-                _HEAD_EXTENDED.bbc = null;
-            }
-            var sbcStr = _HEAD_EXTENDED?.sbc;
-            if (!long.TryParse(sbcStr, out var sbcVal) || sbcVal <= 0)
-            {
-                _HEAD_EXTENDED.sbc = null;
-            }
+            // کد شعبه: سامانه با ^\d{4}$ کنترل می‌کند (ص۳۳) و همین علت خطای 0101504 بود.
+            // مقدار نامعتبر به جای ارسالِ ناقص حذف می‌شود (این فیلد اختیاری است).
+            _HEAD_EXTENDED.bbc = MoadianRules.NormalizeBranchCode(_HEAD_EXTENDED?.bbc);
+            _HEAD_EXTENDED.sbc = MoadianRules.NormalizeBranchCode(_HEAD_EXTENDED?.sbc);
 
 
             //صادرات
@@ -464,35 +449,21 @@ namespace Prg_Moadian.FUNCTIONS
             #region FLOATFIXER 
             foreach (var item in L_DRV_TBL_US)
             {
-                //1-MABL Cutter 
-                item.MABL = Math.Truncate((decimal)item.MABL); // مبلغ 
+                //1-MABL Cutter
+                // توجه: گردکردن مبلغ واحد عمداً دست‌نخورده مانده است. تغییر آن مبالغ
+                // ارسالی حدود ۳۰٪ ردیف‌ها را جابه‌جا می‌کند و تصمیم کسب‌وکاری است.
+                item.MABL = Math.Truncate((decimal)item.MABL); // مبلغ
                                                                //2- TAKHFIF Cutter
                 item.N_MOIN = Math.Truncate((decimal)item.N_MOIN); //مبلغ تخفیف
 
-                // جایزه
+                // جایزه — فی باید مثبت بماند و کل مبلغ به صورت تخفیف ثبت شود.
                 if (item.N_KOL == 100 || item.JAY > 0)
                 {
                     item.MABL = 1;
                 }
 
-                if (item.MABL <= 0 || item.MABL_K <= 0)
-                {
-                    if (OnValidationWarning != null)
-                    {
-                        if (!OnValidationWarning($"قیمت یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است. آیا مایل به ادامه ارسال هستید؟"))
-                        {
-                            string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
-                            RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
-                            throw new NullyExceptiony(errMsg);
-                        }
-                    }
-                    else
-                    {
-                        string errMsg = $"قیمت واحد یا مبلغ کل برای کالا/خدمت '{item.KALA}' صفر یا منفی است.";
-                        RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
-                        throw new NullyExceptiony(errMsg);
-                    }
-                }
+                // کنترل مقادیر صفر پایین‌تر و *بعد* از بازمحاسبه MABL_K انجام می‌شود؛
+                // اینجا مقدار MABL_K هنوز کهنه است.
 
                 if (_HEAD_EXTENDED.ins == 4)   //اگر از نوع برگشتی است
                 {
@@ -503,7 +474,14 @@ namespace Prg_Moadian.FUNCTIONS
 
                     if (remaining < 0)
                     {
-                        throw new NullyExceptiony($"مقدار مرجوعی برای کالا بیشتر از مقدار فروش است (کالا: {item.KALA}).");
+                        var retMsg = $"مقدار مرجوعی برای کالا بیشتر از مقدار فروش است (کالا: {item.KALA}).";
+                        if (OnValidationWarning == null || !OnValidationWarning($"{retMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                        {
+                            RecordFailedInvoiceLocal(NUMBER, TAG, retMsg);
+                            throw new NullyExceptiony(retMsg);
+                        }
+                        // کاربر آگاهانه ادامه داد: ردیف با مقدار منفی پایین‌تر توسط
+                        // فیلتر MEGHk > 0 از فهرست حذف می‌شود و ارسال نمی‌گردد.
                     }
 
                     item.MEGHk = remaining; // مقدار کالا پس از کسر مرجوعی
@@ -527,23 +505,78 @@ namespace Prg_Moadian.FUNCTIONS
                     item.N_MOIN = item.MABL_K;
                 }
 
-                item.mabkbt = item.MABL_K - item.N_MOIN;  //مجموع مبلغ پس از کسر تخفیف    //dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt
-
-                if (item?.vra > 0 && item.IMBAA <= 0) //نرخ درصد مالیات داره اما خود مبلغ مالیات نداره
+                // کنترل مقادیر صفر — حالا که MABL_K بازمحاسبه شده.
+                //   جدول ۳۱ ص۵۱ : am    > 0   (خطای 0103605)
+                //   جدول ۳۴ ص۵۳ : fee   > 0   (خطای 0103705)
+                //   جدول ۴۰ ص۵۸ : prdis > 0
+                // در برگشت از فروش، ردیفِ کامل‌مرجوع مقدارش صفر می‌شود و پایین‌تر حذف
+                // می‌گردد؛ پس فقط همان کنترلِ مقدار کنار گذاشته می‌شود، نه کنترل فی.
                 {
-                    throw new NullyExceptiony("NO IMBAA BUT HAS VRA");
+                    string zeroProblem = null;
+                    if (_HEAD_EXTENDED.ins != 4 && (item.MEGHk ?? 0) <= 0)
+                        zeroProblem = $"تعداد/مقدار کالا/خدمت '{item.KALA}' ({item.MEGHk}) باید بزرگتر از صفر باشد";
+                    else if ((item.MABL ?? 0) <= 0)
+                        zeroProblem = $"مبلغ واحد کالا/خدمت '{item.KALA}' ({item.MABL}) باید بزرگتر از صفر باشد";
+                    else if (_HEAD_EXTENDED.ins != 4 && (item.MABL_K ?? 0) <= 0)
+                        zeroProblem = $"مبلغ قبل از تخفیف کالا/خدمت '{item.KALA}' ({item.MABL_K}) باید بزرگتر از صفر باشد";
+
+                    if (zeroProblem != null)
+                    {
+                        if (OnValidationWarning != null)
+                        {
+                            if (!OnValidationWarning($"{zeroProblem}. آیا مایل به ادامه ارسال هستید؟"))
+                            {
+                                string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
+                                RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
+                                throw new NullyExceptiony(errMsg);
+                            }
+                        }
+                        else
+                        {
+                            RecordFailedInvoiceLocal(NUMBER, TAG, zeroProblem);
+                            throw new NullyExceptiony(zeroProblem + ".");
+                        }
+                    }
+                }
+
+                // جدول ۴۱ ص۵۹: تخفیف نباید از مبلغ قبل از تخفیف بیشتر باشد.
+                // مبلغ را بی‌صدا تغییر نمی‌دهیم — فقط اطلاع می‌دهیم و تصمیم با کاربر است.
+                //
+                // در برگشت از فروش، ردیفِ کامل‌مرجوع مقدارش صفر می‌شود و پایین‌تر حذف
+                // می‌گردد؛ تخفیف کهنه‌اش نباید هشدار بی‌مورد بسازد.
+                if (!(_HEAD_EXTENDED.ins == 4) && (item.N_MOIN ?? 0) > (item.MABL_K ?? 0))
+                {
+                    var disMsg = $"تخفیف کالا/خدمت '{item.KALA}' ({item.N_MOIN}) از مبلغ قبل از تخفیف ({item.MABL_K}) بیشتر است.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{disMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(NUMBER, TAG, disMsg);
+                        throw new NullyExceptiony(disMsg);
+                    }
+                }
+
+                item.mabkbt = (item.MABL_K ?? 0) - (item.N_MOIN ?? 0);  //مجموع مبلغ پس از کسر تخفیف    //dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN AS mabkbt
+
+                if ((item.mabkbt ?? 0) > 0 && (item?.vra ?? 0) > 0 && (item.IMBAA ?? 0) <= 0) //نرخ درصد مالیات داره اما خود مبلغ مالیات نداره
+                {
+                    var vatMsg2 = $"کالا/خدمت '{item.KALA}' نرخ مالیات {item.vra}٪ دارد ولی مبلغ مالیاتش صفر است.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{vatMsg2}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(NUMBER, TAG, vatMsg2);
+                        throw new NullyExceptiony(vatMsg2);
+                    }
                 }
 
                 //حاصلضرب مبلغ کالا پس از کسر تخفیفات و سایر مبالغ که در قانون اشاره شده در نرخ مالیات بر ارزش افزوده.
-                if (item.IMBAA > 0)
+                if ((item.IMBAA ?? 0) > 0)
                 {
-                    item.IMBAA = item.mabkbt * item.vra / 100;
-
-                    //4-IMBAA Cutter
-                    item.IMBAA = Math.Truncate((decimal)item.IMBAA);
+                    item.IMBAA = Math.Truncate((decimal)((item.mabkbt ?? 0) * (item.vra ?? 0) / 100));
+                }
+                else if ((item.mabkbt ?? 0) <= 0)
+                {
+                    item.IMBAA = 0;
                 }
 
-                item.mabkn = item.mabkbt + item.IMBAA; //مبلغ کل کالا /خدمت  // dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn
+                item.mabkn = (item.mabkbt ?? 0) + (item.IMBAA ?? 0); //مبلغ کل کالا /خدمت  // dbo.INVO_LST.MABL_K - dbo.INVO_LST.N_MOIN + dbo.INVO_LST.IMBAA AS mabkn
 
             }
             #endregion
@@ -555,7 +588,12 @@ namespace Prg_Moadian.FUNCTIONS
 
                 if (!L_DRV_TBL_US.Any())
                 {
-                    throw new NullyExceptiony($"صورت حساب برگشتی با شماره {NUMBER} پس از کسر اقلام مرجوعی کالای باقی‌مانده‌ای ندارد؛ در صورت برگشت کامل باید ابطالی ثبت شود.");
+                    var emptyMsg = $"صورت حساب برگشتی با شماره {NUMBER} پس از کسر اقلام مرجوعی کالای باقی‌مانده‌ای ندارد؛ معمولا برای برگشت کامل باید ابطالی ثبت شود.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{emptyMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(NUMBER, TAG, emptyMsg);
+                        throw new NullyExceptiony(emptyMsg);
+                    }
                 }
             }
 
@@ -615,7 +653,7 @@ namespace Prg_Moadian.FUNCTIONS
                     Inno = StarterInnoNumber, // سریال صورت حساب
                     Irtaxid = "", //شماره منحصر به فرد مالیاتی صورتحساب مرجع - برای اصلاح , ابطال , برگشت
                     Inp = _HEAD_EXTENDED.inp, //الگوی صورتحساب // الگوی:1 فروشالگوی:2 فروش ارزی الگوی:3 صورتحساب طال، جواهر و پالتین
-                    Ins = _HEAD_EXTENDED.ins, //موضوع صورتحساب //ابطالی , اصلاحی 
+                    Ins = _HEAD_EXTENDED.ins, //موضوع صورتحساب //ابطالی , اصلاحی
                     Tins = L_Baseknow_US.First().ECODE,/*"10840014242"*/ //WAS "MCODE" BEFORE //شماره اقتصادی فروشنده //توی نرم افزار شماره ثبت هم در درباره تهیه کنندگان زده
                     Tob = (item.tob is null ? 2 : item.tob), //نوع شخص خریدار
                     Bid = CODEMELI_M/*item.MCODEM*/, //شناسه ملی/ شماره ملی/ شناسه مشارکت مدنی/ کد فراگیر اتباع غیر ایرانی خریدار
@@ -722,7 +760,18 @@ namespace Prg_Moadian.FUNCTIONS
             TaxModel.InvoiceModel.Header header = new TaxModel.InvoiceModel.Header();
             header.Taxid = L_TAXDTL_US.First().Taxid; //شماره منحصر به فرد مالیاتی
             header.Indatim = (long)L_TAXDTL_US.First().Indatim_Sec; //تاریخ و زمان صدور صورتحساب (میلادی)
-            header.Indati2m = (long)L_TAXDTL_US.First().Indati2m_Sec; //تاریخ و زمان ایجاد صورتحساب (میلادی)
+
+            // قاعده ارسال (ماده ۹) — جدول ۸۶ ص۹۳. ملاک، فاصله صدور تا ارسالِ همین
+            // صورتحساب است، نه سن صورتحساب مرجع.
+            int? insrValue = MoadianRules.ResolveInsr(DtNowBase, serverNow);
+
+            // تاریخ و زمان ثبت صورتحساب (Indati2m).
+            // ص۲۸ ردیف ۷: فاصله «تاریخ ثبت صورتحساب» تا ارسال نباید از مهلت مجاز بیشتر
+            // باشد. اگر سند موضوع ماده ۹ باشد و Indati2m روی تاریخ صدورِ گذشته بماند،
+            // همین قاعده نقض می‌شود و پر کردن Insr به‌تنهایی سند را معتبر نمی‌کند.
+            header.Indati2m = (insrValue == 1)
+                ? TaxService.ConvertDateToLong(serverNow)
+                : (long)L_TAXDTL_US.First().Indati2m_Sec; //تاریخ و زمان ایجاد صورتحساب (میلادی)
 
             header.Inty = Convert.ToInt32(L_TAXDTL_US.First().Inty); //(انواع صورتحساب الکترونیکی 1و2و3) نوع صورتحساب
             header.Inno = L_TAXDTL_US.First().Inno; //سریال صورتحساب  //NUMBER	 HEAD_LST
@@ -730,6 +779,7 @@ namespace Prg_Moadian.FUNCTIONS
             header.Irtaxid = irtaxid_RefNum_cancel; //شماره منحصر به فرد مالیاتی صورتحساب مرجع
             header.Inp = Convert.ToInt32(L_TAXDTL_US.First().Inp); //الگوی صورتحساب
             header.Ins = Convert.ToInt32(L_TAXDTL_US.First().Ins); //موضوع صورتحساب
+            header.Insr = insrValue;
             header.Tins = L_TAXDTL_US.First().Tins; //شماره اقتصادی فروشنده //ECODE SAZMAN ******************************************************************************************
             header.Tob = Convert.ToInt32(L_TAXDTL_US.First().Tob); //نوع شخص خریدار
             header.Bid = L_TAXDTL_US.First().Bid; //شماره/شناسه ملی/شناسه مشارکت مدنی/کد فراگیر خریدار //MCODEM	SAZMAN
@@ -960,7 +1010,27 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
             catch (Exception ex)
             {
                 CL_Generaly.DoGetwriteAppenLog($"Message : {ex.Message} \n\n {ex}");
-                throw new NullyExceptiony("Invoice Sent but could not save it to db");
+
+                // صورتحساب به سامانه رفته ولی در دیتابیس ثبت نشد. بدون فایل بازیابی،
+                // شماره مالیاتی و کد رهگیری گم می‌شوند.
+                MoadianRules.WriteRecoveryFile(new
+                {
+                    SavedAt = DateTime.Now,
+                    Reason = "ارسال تکی: ارسال به سامانه انجام شد اما ثبت در دیتابیس ناموفق بود",
+                    Taxid = sendInvoicesModel.TaxId,
+                    sendInvoicesModel.ReferenceNumber,
+                    sendInvoicesModel.Uid,
+                    NUMBER,
+                    TAG,
+                    ApiTypeSent = _apitypesent,
+                    DbError = ex.Message
+                });
+
+                throw new NullyExceptiony(
+                    "صورتحساب به سامانه ارسال شد اما ثبت آن در دیتابیس ناموفق بود.\n\n" +
+                    $"شماره مالیاتی: {sendInvoicesModel.TaxId}\nکد رهگیری: {sendInvoicesModel.ReferenceNumber}\n\n" +
+                    "اطلاعات در پوشه " + MoadianRules.RecoveryDirectory + " ذخیره شد. " +
+                    "لطفاً قبل از هر ارسال مجدد، وضعیت این کد رهگیری را استعلام کنید.");
             }
 
 

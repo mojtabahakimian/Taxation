@@ -94,6 +94,10 @@ namespace Prg_Moadian.Service
         public string RequestTaxId(string memoryId, DateTime date)
         {
             // بازه [1, 999_999_999] — serial=0 نامعتبر است، 999_999_999 حداکثر مجاز مودیان
+            //
+            // این رفتار عمدی است: کامیت d968e70 آن را برای رفع خطای 0300101 پس از ابطالی
+            // گذاشت («Taxid قبلاً از Inno ثابت ساخته می‌شد … سامانه همان Taxid را رد می‌کرد»).
+            // تلاش برای ساختن سریال از روی Inno قبلاً چند بار امتحان و برگردانده شده است.
             long serial = Random.Shared.Next(1, 1_000_000_000);
             return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
         }
@@ -130,6 +134,7 @@ namespace Prg_Moadian.Service
                 Inno = ((header.Inno == string.Empty) ? null : header.Inno),
                 Inp = header.Inp,
                 Ins = header.Ins,
+                Insr = header.Insr, // قاعده ارسال (ماده ۹) — جدول ۸۶ ص۹۳ V7.9
                 Insp = header.Insp,
                 Inty = header.Inty,
                 Irtaxid = ((header.Irtaxid == string.Empty) ? null : header.Irtaxid),

@@ -291,6 +291,14 @@ namespace Prg_Moadian.SQLMODELS
         public long? DATE_N { get; set; }
         public string REMARKS { get; set; }
 
+        // شماره فاکتور داخلی و تگ انبار. اینها ستون‌های خودِ TAXDTL هستند و در هر
+        // ارسال عادی پر می‌شوند؛ گرید پیگیری با همینها به HEAD_LST وصل می‌شود و
+        // جستجوی کاربر هم روی NUMBER است. اگر در ارسال مجدد خالی بمانند، ردیف
+        // تازه بدون شماره فاکتور و بدون نام مشتری نمایش داده می‌شود و کاربر
+        // نمی‌تواند پیدایش کند.
+        public double? NUMBER { get; set; }
+        public double? TAG { get; set; }
+
         public event PropertyChangedEventHandler PropertyChanged;
         public void OnPropertyChanged(string strCaller = null)
         {
