@@ -43,22 +43,14 @@ echo [INFO] MSBuild: "%MSBUILD%"
 
 :: 2B. Find Rar.exe (WinRAR) for SFX packaging
 set "RAR_EXE="
-if exist "C:\Program Files\WinRAR\Rar.exe" (
-    set "RAR_EXE=C:\Program Files\WinRAR\Rar.exe"
-) else if exist "%ProgramFiles%\WinRAR\Rar.exe" (
-    set "RAR_EXE=%ProgramFiles%\WinRAR\Rar.exe"
-) else if exist "%ProgramFiles(x86)%\WinRAR\Rar.exe" (
-    set "RAR_EXE=%ProgramFiles(x86)%\WinRAR\Rar.exe"
-) else (
-    for /f "usebackq tokens=*" %%p in (`powershell -NoProfile -NoLogo -Command "(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\WinRAR.exe' -ErrorAction SilentlyContinue).'(default)'"`) do (
-        if exist "%%~dpp\Rar.exe" set "RAR_EXE=%%~dpp\Rar.exe"
-    )
-)
+if exist "C:\Program Files\WinRAR\Rar.exe" set "RAR_EXE=C:\Program Files\WinRAR\Rar.exe"
+if not defined RAR_EXE if exist "%ProgramFiles%\WinRAR\Rar.exe" set "RAR_EXE=%ProgramFiles%\WinRAR\Rar.exe"
+if not defined RAR_EXE if exist "%ProgramFiles(x86)%\WinRAR\Rar.exe" set "RAR_EXE=%ProgramFiles(x86)%\WinRAR\Rar.exe"
 
 if defined RAR_EXE (
     echo [INFO] WinRAR : "%RAR_EXE%"
 ) else (
-    echo [WARN] WinRAR (Rar.exe) not found. SFX archive will be skipped.
+    echo [WARN] WinRAR not found. SFX archive will be skipped.
 )
 
 :: 3. Detect Version from Prg_Graphicy\Prg_Graphicy.csproj
@@ -239,11 +231,23 @@ if not defined RAR_EXE (
 
 set "SFX_NAME=Moadian %VERSION%.exe"
 set "SFX_DESKTOP=%USERPROFILE%\Desktop\%SFX_NAME%"
-set "SFX_CMT=%ROOT_DIR%MoadianSFX_Comment.txt"
+set "SFX_CMT=%TEMP_DIR%\sfx_comment.txt"
 
-if not exist "%SFX_CMT%" (
-    echo [ERROR] SFX comment file not found: "%SFX_CMT%"!
-    goto :FAILED
+:: Prepare SFX script comments
+if exist "%ROOT_DIR%MoadianSFX_Comment.txt" (
+    copy /y "%ROOT_DIR%MoadianSFX_Comment.txt" "%SFX_CMT%" >nul
+) else (
+    (
+        echo ;The comment below contains SFX script commands
+        echo.
+        echo Path=C:\CORRECT\
+        echo Overwrite=1
+        echo Title=استعلام مودیان
+        echo Text
+        echo {
+        echo Moadian
+        echo }
+    ) > "%SFX_CMT%"
 )
 
 if exist "%SFX_DESKTOP%" del /f /q "%SFX_DESKTOP%" >nul
