@@ -233,11 +233,11 @@ namespace Prg_Moadian.Service
                     .Where(message => !string.IsNullOrWhiteSpace(message))
                     .ToList();
 
-                string detailMessage = (errorMessages != null && errorMessages.Count > 0)
-                    ? string.Join(" | ", errorMessages)
-                    : $"Status Code : {httpResponse.Status}";
+                if (errorMessages != null && errorMessages.Count > 0)
+                    throw new InvalidOperationException($"{serverSideErrorMessage} جزئیات: {string.Join(" | ", errorMessages)}");
 
-                throw new InvalidOperationException($"{serverSideErrorMessage} جزئیات: {detailMessage}");
+                // نه نتیجه‌ای آمد نه خطای مشخصی: نمی‌دانیم سامانه صورتحساب را گرفته یا نه.
+                throw new MoadianOutcomeUnknownException($"{serverSideErrorMessage} جزئیات: Status Code : {httpResponse.Status}");
             }
 
             PacketResponse? packetResponse = packetResponses.FirstOrDefault();
@@ -277,5 +277,14 @@ namespace Prg_Moadian.Service
         ////    return TaxApiService.Instance.TaxIdGenerator.GenerateTaxId(memoryId, serial, date);
         ////}
 
+    }
+
+    /// <summary>
+    /// سامانه پاسخ داد ولی نه نتیجه‌ای داشت نه خطای مشخصی. سرنوشت صورتحساب نامعلوم است.
+    /// از InvalidOperationException ارث می‌برد تا هیچ catch موجودی عوض نشود.
+    /// </summary>
+    public class MoadianOutcomeUnknownException : InvalidOperationException
+    {
+        public MoadianOutcomeUnknownException(string message) : base(message) { }
     }
 }

@@ -13,7 +13,10 @@ param(
     [switch]$Record,
     [int]$Port = 9090,
     [string]$Server = "MERCEDES\SQL2022",
-    [string]$Database = "YAZDSEPAR1405_06_25"
+    # خالی = همان دیتابیسی که تست‌ها از C:\correct\CNR.udl می‌خوانند.
+    # قبلاً اینجا نام ثابت YAZDSEPAR1405_06_25 بود که بعد از restore دیتابیس
+    # دیگر وجود نداشت و -Full بدون پارامتر همیشه شکست می‌خورد.
+    [string]$Database = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -80,7 +83,11 @@ try {
         } else {
             $udlText = (Get-Content $udl -Raw) -replace "`0", ""
             $udlDb = ([regex]::Match($udlText, '(?i)Initial Catalog\s*=\s*([^;]+)')).Groups[1].Value.Trim()
-            if ($udlDb -ne $Database) {
+            if ([string]::IsNullOrWhiteSpace($Database)) { $Database = $udlDb }
+            if ([string]::IsNullOrWhiteSpace($Database)) {
+                Write-Host "  نام دیتابیس در $udl پیدا نشد و -Database هم داده نشده." -ForegroundColor Red
+                $code = 1
+            } elseif ($udlDb -ne $Database) {
                 Write-Host "  ناسازگاری دیتابیس:" -ForegroundColor Red
                 Write-Host "      تست‌ها به  : $udlDb   (از $udl)" -ForegroundColor Red
                 Write-Host "      اثر انگشت  : $Database   (پارامتر -Database)" -ForegroundColor Red

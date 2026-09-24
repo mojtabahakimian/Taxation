@@ -125,6 +125,34 @@ internal static class SinglePath
             check("۲۱-۱۲ ارسال دوم در همان پروسه ردیف‌ها را دو برابر نمی‌کند",
                   SecondSendDoesNotDouble(db, http, mockBaseUrl, target, single, out var d2), d2);
 
+            // --- فاکتوری که ارسال زنده دارد: کاربر «لغو ارسال» می‌زند ---
+            {
+                long TaxidCount() => db.DoGetDataSQL<long>(
+                    $"SELECT COUNT(DISTINCT Taxid) FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER={target}").First();
+                long taxidsBefore = TaxidCount();
+                bool asked = false, blocked = false;
+                CL_MOADIAN.OnValidationWarning = msg =>
+                {
+                    bool dup = msg.Contains("قبلاً به سامانه ارسال شده");
+                    asked |= dup;
+                    return !dup;
+                };
+                Reset(http, mockBaseUrl);
+                try { CL_MOADIAN.DoSendInvoice(new[] { $"{target}_{SendTag}_m" }); }
+                catch (Exception) { blocked = true; }
+                finally { CL_MOADIAN.OnValidationWarning = _ => true; }
+
+                int sentAgain = Payloads(http, mockBaseUrl).Count;
+                check("۲۱-۱۳ ارسال تکیِ فاکتورِ ارسال‌شده، اول می‌پرسد و با «لغو» چیزی نمی‌فرستد",
+                      taxidsBefore > 0 && asked && blocked && sentAgain == 0 && TaxidCount() == taxidsBefore,
+                      $"پرسید {asked}، متوقف {blocked}، ارسال {sentAgain}، شماره‌ها {taxidsBefore}→{TaxidCount()}");
+            }
+
+            // --- جواب سامانه نمی‌رسد، ولی سامانه صورتحساب را گرفته است ---
+            foreach (var (mode, id) in new[] { ("empty", "۲۱-۱۴"), ("close", "۲۱-۱۵") })
+                check($"{id} جواب نرسید ({mode}): ردیف‌ها UNKNOWN و با همان شماره مالیاتی ثبت می‌شوند و ارسال بعدی هشدار می‌دهد",
+                      LostResponseIsRecorded(db, http, mockBaseUrl, target, mode, out var dl), dl);
+
             // ---------------- گروه ۲۲ : مقایسه دو مسیر ----------------
             Reset(http, mockBaseUrl);
             db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER BETWEEN 1000001 AND 1000120");
@@ -249,6 +277,54 @@ internal static class SinglePath
             return firstLines == secondLines;
         }
         catch (Exception e) { detail = One(e.Message); return false; }
+    }
+
+    /// <summary>
+    /// قبلاً اگر جواب نمی‌رسید، مسیر تکی هیچ ردی نمی‌گذاشت و ارسال بعدی بی‌هشدار
+    /// شماره مالیاتی تازه می‌ساخت؛ در حالی که سامانه شاید اولی را گرفته بود.
+    /// </summary>
+    private static bool LostResponseIsRecorded(CL_CCNNMANAGER db, HttpClient http, string url,
+                                               long target, string mode, out string detail)
+    {
+        var saved = CL_MOADIAN.OnValidationWarning;
+        try
+        {
+            Reset(http, url);
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER={target}");
+            http.PostAsync(Root(url) + "/__drop_next_send",
+                           new StringContent($"{{\"mode\":\"{mode}\"}}", System.Text.Encoding.UTF8, "application/json"))
+                .GetAwaiter().GetResult();
+
+            string err = "";
+            try { CL_MOADIAN.DoSendInvoice(new[] { $"{target}_{SendTag}_m" }); }
+            catch (Exception ex) { err = ex.Message; }
+
+            var sentTaxids = Payloads(http, url).Keys.ToList();
+            var rows = db.DoGetDataSQL<(string Taxid, string TheStatus)>(
+                $"SELECT Taxid, TheStatus FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER={target}").ToList();
+
+            bool told = err.Contains("نرسید");
+            bool recorded = rows.Count > 0 && rows.All(r => r.TheStatus == "UNKNOWN");
+            bool sameTaxid = sentTaxids.Count == 1 && rows.All(r => r.Taxid == sentTaxids[0]);
+
+            // ارسال بعدی باید بپرسد؛ کاربر «لغو» می‌زند
+            bool asked = false;
+            CL_MOADIAN.OnValidationWarning = msg =>
+            {
+                bool dup = msg.Contains("قبلاً به سامانه ارسال شده");
+                asked |= dup;
+                return !dup;
+            };
+            try { CL_MOADIAN.DoSendInvoice(new[] { $"{target}_{SendTag}_m" }); } catch { }
+            bool noNewSend = Payloads(http, url).Count == 1;
+
+            detail = $"پیام «نرسید» {told}، ردیف‌ها {rows.Count} ({string.Join(",", rows.Select(r => r.TheStatus).Distinct())})، " +
+                     $"شماره یکسان {sameTaxid}، پرسید {asked}، ارسال تازه نشد {noNewSend}" +
+                     (told ? "" : $" — خطا: {One(err)}");
+            return told && recorded && sameTaxid && asked && noNewSend;
+        }
+        catch (Exception e) { detail = One(e.Message); return false; }
+        finally { CL_MOADIAN.OnValidationWarning = saved; }
     }
 
     private static Dictionary<string, JsonNode> Payloads(HttpClient http, string baseUrl)

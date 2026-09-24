@@ -333,6 +333,20 @@ namespace Prg_Moadian.FUNCTIONS
                 throw new NullyExceptiony("HEAD_EXTENDED is null");
             }
 
+            // ارسال دوبارهٔ صورتحساب اصلی با شماره مالیاتی تازه، اگر ارسال قبلی زنده باشد،
+            // فاکتور را دو بار در کارپوشه می‌نشاند. هشدار است، نه بلاک (بخش ۱ CLAUDE.md).
+            if ((_HEAD_EXTENDED.ins ?? 1) == 1)
+            {
+                var prior = MoadianRules.FindLiveOriginals(dbms, new[] { NUMBER }, TAG,
+                    TaxURL == "https://tp.tax.gov.ir/req/api/");
+                if (prior.Count > 0 &&
+                    (OnValidationWarning == null ||
+                     !OnValidationWarning($"{MoadianRules.DescribePriorSends(prior)}\n\nآیا با این وجود ادامه می‌دهید؟")))
+                {
+                    throw new NullyExceptiony($"ارسال فاکتور {NUMBER} لغو شد: قبلاً ارسال شده است.");
+                }
+            }
+
             //به تفکیک آدرس و شعبه طبق4 واحد زیر مجموعه سازمان
             var ROWDPEART = dbms.DoGetDataSQL<DEPART>($"SELECT * FROM dbo.DEPART WHERE DEPATMAN = (SELECT DEPATMAN FROM dbo.HEAD_LST WHERE TAG = {TAG} AND NUMBER = {NUMBER})").FirstOrDefault();
             if (ROWDPEART != null && ROWDPEART?.DEPATMAN != null)
@@ -879,16 +893,6 @@ namespace Prg_Moadian.FUNCTIONS
             }
             #endregion
 
-            TaxModel.SendInvoicesModel sendInvoicesModel = taxService.SendInvoices(header, bodies, payments);
-            //CL_Generaly.DoGetwriteAppenLog("sendInvoicesModel Passed");
-
-            //بروز رسانی کد های رهگیری در لیست سی شارپ
-            for (int i = 0; i < L_TAXDTL_US.Count; i++)
-            {
-                L_TAXDTL_US[i].UID = sendInvoicesModel.Uid;
-                L_TAXDTL_US[i].RefrenceNumber = sendInvoicesModel.ReferenceNumber;
-            }
-
             //به کدام سامانه ارسال شده
             byte _apitypesent = 0;
             // [1 | True] = Main
@@ -897,6 +901,33 @@ namespace Prg_Moadian.FUNCTIONS
                 _apitypesent = 1;
             else
                 _apitypesent = 0;
+
+            TaxModel.SendInvoicesModel sendInvoicesModel;
+            try
+            {
+                sendInvoicesModel = taxService.SendInvoices(header, bodies, payments);
+            }
+            catch (Exception sendEx) when (MoadianRules.IsOutcomeUnknown(sendEx))
+            {
+                // جواب نرسید: شاید سامانه صورتحساب را گرفته باشد. قبلاً اینجا هیچ ردی
+                // نمی‌ماند و ارسال بعدی با شماره مالیاتی تازه می‌رفت. حالا همان ردیف‌ها با
+                // وضعیت UNKNOWN ثبت می‌شوند، مثل ارسال گروهی، تا ارسال بعدی هشدار بدهد.
+                RecordUnknownSend(_apitypesent, sendEx);
+                throw new NullyExceptiony(
+                    $"پاسخ سامانه برای فاکتور {NUMBER} نرسید و معلوم نیست صورتحساب ثبت شده یا نه.\n\n" +
+                    $"شماره مالیاتی: {header.Taxid}\n\n" +
+                    "پیش از ارسال دوباره، این شماره مالیاتی را در کارپوشه جستجو کنید. " +
+                    "اگر آنجا هست، دوباره نفرستید.\n\n" +
+                    $"جزئیات: {sendEx.Message}", sendEx);
+            }
+            //CL_Generaly.DoGetwriteAppenLog("sendInvoicesModel Passed");
+
+            //بروز رسانی کد های رهگیری در لیست سی شارپ
+            for (int i = 0; i < L_TAXDTL_US.Count; i++)
+            {
+                L_TAXDTL_US[i].UID = sendInvoicesModel.Uid;
+                L_TAXDTL_US[i].RefrenceNumber = sendInvoicesModel.ReferenceNumber;
+            }
 
 
             FactorInfoSent.NUMBER = CL_MOADIAN.NUMBER.ToString();
@@ -914,6 +945,48 @@ namespace Prg_Moadian.FUNCTIONS
             try
             {
                 //{ درج در جدول مالیات در دیتابیس 
+                InsertTaxRows("PENDING", _apitypesent);
+                //آماده سازی داده ها }
+            }
+            catch (Exception ex)
+            {
+                CL_Generaly.DoGetwriteAppenLog($"Message : {ex.Message} \n\n {ex}");
+
+                // صورتحساب به سامانه رفته ولی در دیتابیس ثبت نشد. بدون فایل بازیابی،
+                // شماره مالیاتی و کد رهگیری گم می‌شوند.
+                MoadianRules.WriteRecoveryFile(new
+                {
+                    SavedAt = DateTime.Now,
+                    Reason = "ارسال تکی: ارسال به سامانه انجام شد اما ثبت در دیتابیس ناموفق بود",
+                    Taxid = sendInvoicesModel.TaxId,
+                    sendInvoicesModel.ReferenceNumber,
+                    sendInvoicesModel.Uid,
+                    NUMBER,
+                    TAG,
+                    ApiTypeSent = _apitypesent,
+                    DbError = ex.Message
+                });
+
+                throw new NullyExceptiony(
+                    "صورتحساب به سامانه ارسال شد اما ثبت آن در دیتابیس ناموفق بود.\n\n" +
+                    $"شماره مالیاتی: {sendInvoicesModel.TaxId}\nکد رهگیری: {sendInvoicesModel.ReferenceNumber}\n\n" +
+                    "اطلاعات در پوشه " + MoadianRules.RecoveryDirectory + " ذخیره شد. " +
+                    "لطفاً قبل از هر ارسال مجدد، وضعیت این کد رهگیری را استعلام کنید.");
+            }
+
+
+            try
+            {
+                Thread.Sleep(10_000);
+                //پیگیری
+                TheFunctions.TrackingCodeInquiry(sendInvoicesModel.ReferenceNumber, MemoryID, privateKey, TaxURL, NUMBER, TAG, IDD_OF_TAXDTL);
+            }
+            catch (Exception) { /*OnErrorResumeNext*/ }
+
+            // درج ردیف‌های TAXDTL. هم مسیر موفق (PENDING) و هم جواب‌نرسیده (UNKNOWN) از همین
+            // استفاده می‌کنند تا ستون‌ها و نوع داده‌ها یکی بمانند.
+            void InsertTaxRows(string status, byte _apitypesent)
+            {
                 foreach (var src_item in L_TAXDTL_US)
                 {
                     IDD_OF_TAXDTL = TheFunctions.GetNewIDD();
@@ -994,7 +1067,7 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                         IDD = IDD_OF_TAXDTL,
                         UID = SafeString(src_item.UID, 100),
                         RefrenceNumber = SafeString(src_item.RefrenceNumber, 100),
-                        TheStatus = "PENDING",
+                        TheStatus = status,
                         ApiTypeSent = _apitypesent,
                         SentTaxMemory = SafeString(MemoryID, 12),
                         NUMBER,
@@ -1005,42 +1078,31 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
 
                     dbms.DoExecuteSQL(insertSql, p);
                 }
-                //آماده سازی داده ها }
             }
-            catch (Exception ex)
-            {
-                CL_Generaly.DoGetwriteAppenLog($"Message : {ex.Message} \n\n {ex}");
 
-                // صورتحساب به سامانه رفته ولی در دیتابیس ثبت نشد. بدون فایل بازیابی،
-                // شماره مالیاتی و کد رهگیری گم می‌شوند.
-                MoadianRules.WriteRecoveryFile(new
+            void RecordUnknownSend(byte apiType, Exception sendEx)
+            {
+                try
                 {
-                    SavedAt = DateTime.Now,
-                    Reason = "ارسال تکی: ارسال به سامانه انجام شد اما ثبت در دیتابیس ناموفق بود",
-                    Taxid = sendInvoicesModel.TaxId,
-                    sendInvoicesModel.ReferenceNumber,
-                    sendInvoicesModel.Uid,
-                    NUMBER,
-                    TAG,
-                    ApiTypeSent = _apitypesent,
-                    DbError = ex.Message
-                });
-
-                throw new NullyExceptiony(
-                    "صورتحساب به سامانه ارسال شد اما ثبت آن در دیتابیس ناموفق بود.\n\n" +
-                    $"شماره مالیاتی: {sendInvoicesModel.TaxId}\nکد رهگیری: {sendInvoicesModel.ReferenceNumber}\n\n" +
-                    "اطلاعات در پوشه " + MoadianRules.RecoveryDirectory + " ذخیره شد. " +
-                    "لطفاً قبل از هر ارسال مجدد، وضعیت این کد رهگیری را استعلام کنید.");
+                    InsertTaxRows("UNKNOWN", apiType);
+                }
+                catch (Exception dbEx)
+                {
+                    CL_Generaly.DoGetwriteAppenLog($"UNKNOWN rows not saved for invoice {NUMBER}: {dbEx}");
+                    MoadianRules.WriteRecoveryFile(new
+                    {
+                        SavedAt = DateTime.Now,
+                        Reason = "ارسال تکی: پاسخ سامانه نرسید و ثبت UNKNOWN در دیتابیس هم ناموفق بود",
+                        Taxid = L_TAXDTL_US.FirstOrDefault()?.Taxid,
+                        Inno = L_TAXDTL_US.FirstOrDefault()?.Inno,
+                        NUMBER,
+                        TAG,
+                        ApiTypeSent = apiType,
+                        SendError = sendEx.Message,
+                        DbError = dbEx.Message
+                    });
+                }
             }
-
-
-            try
-            {
-                Thread.Sleep(10_000);
-                //پیگیری
-                TheFunctions.TrackingCodeInquiry(sendInvoicesModel.ReferenceNumber, MemoryID, privateKey, TaxURL, NUMBER, TAG, IDD_OF_TAXDTL);
-            }
-            catch (Exception) { /*OnErrorResumeNext*/ }
         }
 
 

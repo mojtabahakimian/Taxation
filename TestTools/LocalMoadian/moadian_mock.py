@@ -571,8 +571,16 @@ class Handler(BaseHTTPRequestHandler):
             log("set_status ->", ok)
             self._send({"ok": ok})
             return
+        if route == "__drop_next_send":
+            # {"mode": "empty"} -> reply with no result and no error
+            # {"mode": "close"} -> close the connection without replying
+            with LOCK:
+                STATE["drop_next_send"] = body.get("mode", "empty")
+            self._send({"ok": True})
+            return
         if route == "__reset":
             with LOCK:
+                STATE.pop("drop_next_send", None)
                 STATE["invoices"].clear()
                 STATE["by_reference"].clear()
                 STATE["by_uid"].clear()
@@ -636,6 +644,18 @@ class Handler(BaseHTTPRequestHandler):
                     ("codes=" + ",".join(e["code"] for e in errors)) if errors else "")
                 results.append({"uid": uid, "referenceNumber": reference,
                                 "errorCode": None, "errorDetail": None})
+
+            # Lost-response simulation: the invoices above are registered (the real
+            # system may have accepted them) but the client never learns it.
+            with LOCK:
+                drop = STATE.pop("drop_next_send", None)
+            if drop == "empty":
+                self._send({"timestamp": now_ms(), "result": [], "errors": [],
+                            "signature": None, "signatureKeyId": None})
+                return
+            if drop == "close":
+                self.close_connection = True
+                return
 
             self._send({"timestamp": now_ms(), "result": results, "errors": [],
                         "signature": None, "signatureKeyId": None})
