@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ساخت لینوکسی هارنس تست (TestTools/LocalMoadian) بدون SDK رسمی مؤدیان.
+
+    TaxCollectData.Library 0.0.34 روی nuget.org نیست و فقط روی ماشین توسعه‌دهنده
+    موجود است. این پروژه هارنس + سورس Prg_Moadian + شیم SDK (TestTools/SdkShim)
+    را در «یک» اسمبلی به نام MoadianLocalTest می‌سازد. هیچ فایل اصلی تغییر نمی‌کند.
+
+    هرگز این خروجی را منتشر نکنید؛ فقط برای اجرای تست روی لینوکس است.
+    توضیح: TestTools/SdkShim/README.md
+
+    TargetFramework = net8.0 چون روی این ماشین فقط runtime 8 نصب است
+    (کد تولید net6.0 است؛ API های مصرفی در net8 یکسان‌اند).
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Prg_Moadian با Nullable=enable و هارنس با disable نوشته شده؛
+         nullable فقط روی هشدارها اثر دارد، پس enable می‌گذاریم و هشدارها را خاموش می‌کنیم. -->
+    <Nullable>enable</Nullable>
+    <AssemblyName>MoadianLocalTest</AssemblyName>
+    <RootNamespace>MoadianLocalTest</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS8632;CS8612;CS0472;CS8600;CS8601;CS8602;CS8603;CS8604;CS8605;CS8618;CS8619;CS8620;CS8622;CS8625;CS8629;CS8631;CS8634;CS8714;CS8765;CS8767;CS0168;CS0169;CS0219;CS0414;CS0162;CS0649;CS1998;CS4014;CS8321;SYSLIB0021;SYSLIB0022;SYSLIB0023;SYSLIB0014;CA1416;NU1701;NU1903;NU1902;NU1904</NoWarn>
+    <InformationalVersion>0.0.34-linux-shim</InformationalVersion>
+    <!-- گروه ۲۹ (EndToEnd.cs) فقط در این ساخت کامل است؛ ساخت ویندوزی آن را خالی می‌بیند. -->
+    <DefineConstants>$(DefineConstants);MOADIAN_LINUX_SHIM</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../LocalMoadian/*.cs" />
+    <Compile Include="../../Prg_Moadian/**/*.cs" Exclude="../../Prg_Moadian/obj/**;../../Prg_Moadian/bin/**" />
+    <Compile Include="../SdkShim/**/*.cs" Exclude="../SdkShim/obj/**;../SdkShim/bin/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.0.143" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.1" />
+    <!-- وابستگی‌های گذرای SDK واقعی که کد تولید مستقیماً از آن‌ها استفاده می‌کند -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+    <!-- فقط برای NoDbStub.cs (ر.ک. README) -->
+    <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <!-- فقط برای گروه ۲۹: پیوند زدن متدهای دکمهٔ ارسال مجدد از سورس WPF (ر.ک. EndToEnd.cs) -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../LocalMoadian/test_private_key.txt" Link="test_private_key.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../LocalMoadian/golden/**" Link="golden/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

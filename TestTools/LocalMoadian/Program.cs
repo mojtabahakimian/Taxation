@@ -124,6 +124,67 @@ internal static class Program
         Banner("گروه ۱۷ — سازگاری با SDK و قالب JSON روی سیم");
         WireFormat.Run(BaseUrl, Control, Check, Console.WriteLine);
 
+        // گروه ۲۸ به سرور دوم (moadian_mock_full.py) نیاز دارد و فقط با --full=URL اجرا
+        // می‌شود. TaxApiService تک‌نمونه است، پس این گروه باید *بعد* از همهٔ گروه‌هایی
+        // باشد که با سرور اول کار می‌کنند.
+        var fullArg = args.FirstOrDefault(a => a.StartsWith("--full=", StringComparison.Ordinal));
+        if (fullArg != null)
+        {
+            Banner("گروه ۲۸ — چرخهٔ کامل صورتحساب روی سرور کامل (کارپوشه + کدهای EC_V02)");
+            try
+            {
+                var fullUrl = fullArg.Substring("--full=".Length);
+                var fullTax = new TaxService(MemoryId, key, fullUrl);
+                fullTax.RequestToken();
+                Lifecycle.Run(fullTax, fullUrl, Control, Check, Console.WriteLine);
+            }
+            catch (Exception ex)
+            {
+                Check("۲۸ اجرای گروه چرخهٔ کامل", false, ex.Message);
+            }
+            finally
+            {
+                // بقیهٔ گروه‌ها (--bulk) دوباره روی سرور اول. اگر سرور اول دیگر بالا نباشد،
+                // نباید کل هارنس بی‌خلاصه از کار بیفتد — شکست ثبت می‌شود و Summary چاپ می‌شود.
+                try
+                {
+                    _tax = new TaxService(MemoryId, key, BaseUrl);
+                    _tax.RequestToken();
+                }
+                catch (Exception ex)
+                {
+                    Check("۲۸-۰ بازگشت به سرور اول پس از گروه ۲۸", false, ex.Message);
+                }
+            }
+        }
+
+        // گروه ۲۹ — مسیرهای واقعی ارسال روی دیتابیس ساختگی (FakeDb) و سرور کامل.
+        // فقط با --e2e و --full=URL؛ فقط ساخت لینوکسی (TestTools/ShimBuild) کامل است.
+        if (fullArg != null && args.Contains("--e2e"))
+        {
+            Banner("گروه ۲۹ — سر تا ته مسیرهای واقعی با دیتابیس ساختگی");
+            try
+            {
+                EndToEnd.Run(fullArg.Substring("--full=".Length), Control, key, Check, Console.WriteLine);
+            }
+            catch (Exception ex)
+            {
+                Check("۲۹ اجرای گروه سر تا ته", false, ex.Message);
+            }
+            finally
+            {
+                try
+                {
+                    _tax = new TaxService(MemoryId, key, BaseUrl);
+                    _tax.RequestToken();
+                }
+                catch (Exception ex)
+                {
+                    Check("۲۹-۰ بازگشت به سرور اول پس از گروه ۲۹", false, ex.Message);
+                }
+            }
+        }
+
         if (args.Contains("--bulk"))
         {
             Banner("گروه ۱۶ — ارسال گروهی سنگین روی دیتابیس واقعی");
