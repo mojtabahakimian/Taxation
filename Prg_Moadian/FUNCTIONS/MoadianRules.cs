@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Prg_Moadian.FUNCTIONS
@@ -287,6 +289,144 @@ namespace Prg_Moadian.FUNCTIONS
 
         /// <summary>پوشهٔ نگهداری فایل‌های بازیابی.</summary>
         public static string RecoveryDirectory { get; set; } = @"C:\CORRECT\RECOVERY";
+
+        #endregion
+
+        #region ارسال تکراری
+
+        /// <summary>
+        /// ارسال قبلیِ یک فاکتور که هنوز «زنده» است: رد نشده و ابطال هم نشده.
+        /// </summary>
+        public sealed class PriorSend
+        {
+            public double NUMBER { get; set; }
+            public string Taxid { get; set; }
+            public string TheStatus { get; set; }
+            public DateTime? CRT { get; set; }
+        }
+
+        /// <summary>
+        /// آیا ارسالی با این وضعیت ممکن است در کارپوشه نشسته باشد؟
+        /// فقط رد صریح سامانه (FAILED) و خطای پیش از ارسال (LOCAL_ERROR) قطعاً چیزی
+        /// در کارپوشه نگذاشته‌اند. PENDING و UNKNOWN و EXPIRED و وضعیت خالی
+        /// ممکن است هنوز پذیرفته شوند.
+        /// </summary>
+        public static bool IsLiveStatus(string status)
+        {
+            var s = (status ?? "").Trim().ToUpperInvariant();
+            return s != "FAILED" && s != "LOCAL_ERROR";
+        }
+
+        /// <summary>
+        /// ارسال‌های زندهٔ قبلیِ این فاکتورها به‌عنوان صورتحساب اصلی (Ins=1).
+        ///
+        /// چرا: در یزدسپار ۸۸ فاکتور یک بار از ارسال گروهی و بعد دوباره (بیشتر از
+        /// ارسال تکی) با شماره مالیاتی تازه رفتند و هر دو «موفق» شدند؛ یعنی دو بار
+        /// در کارپوشه نشستند. هیچ مسیری پیش از ارسال این را نمی‌پرسید.
+        ///
+        /// ارسال‌هایی که ابطالیِ موفق دارند زنده حساب نمی‌شوند: فرستادن دوبارهٔ
+        /// فاکتوری که ابطال شده، روال درست است.
+        ///
+        /// TAG می‌تواند NULL باشد (بخش ۴ CLAUDE.md)؛ آن ردیف‌ها هم دیده می‌شوند.
+        /// </summary>
+        public static List<PriorSend> FindLiveOriginals(
+            CNNMANAGER.CL_CCNNMANAGER db, IEnumerable<long> numbers, int tag, bool isMainApi)
+        {
+            var list = numbers.Select(n => (double)n).Distinct().ToList();
+            if (list.Count == 0) return new List<PriorSend>();
+
+            const string sql = @"
+                SELECT t.NUMBER, t.Taxid, MAX(t.TheStatus) AS TheStatus, MAX(t.CRT) AS CRT
+                FROM dbo.TAXDTL t
+                LEFT JOIN (SELECT DISTINCT Irtaxid FROM dbo.TAXDTL
+                           WHERE Ins = 3 AND TheStatus = 'SUCCESS' AND Irtaxid IS NOT NULL) c
+                       ON c.Irtaxid = t.Taxid
+                WHERE t.NUMBER IN @Numbers
+                  AND (t.TAG = @Tag OR t.TAG IS NULL)
+                  AND t.ApiTypeSent = @Api
+                  AND ISNULL(t.Ins, 1) = 1
+                  AND ISNULL(t.Taxid, '') <> ''
+                  AND c.Irtaxid IS NULL
+                GROUP BY t.NUMBER, t.Taxid";
+
+            var rows = new List<PriorSend>();
+            // سقف پارامترهای SQL Server حدود ۲۱۰۰ است؛ فهرست‌های بزرگ تکه‌تکه می‌روند.
+            foreach (var chunk in list.Chunk(1000))
+                rows.AddRange(db.DoGetDataSQL<PriorSend>(sql, new { Numbers = chunk, Tag = (double)tag, Api = isMainApi }));
+
+            return rows.Where(r => IsLiveStatus(r.TheStatus))
+                       .OrderBy(r => r.NUMBER).ThenBy(r => r.CRT)
+                       .ToList();
+        }
+
+        /// <summary>
+        /// آیا این خطای ارسال یعنی «نمی‌دانیم صورتحساب به سامانه رسید یا نه»؟
+        ///
+        /// قطع شبکه، تایم‌اوت، یا پاسخِ بی‌نتیجه و بی‌خطا: درخواست ممکن است رسیده و
+        /// ثبت شده باشد. در مقابل، رد صریح سامانه (با کد خطا) یا خطای پیش از ارسال
+        /// قطعاً چیزی در کارپوشه نگذاشته است.
+        /// </summary>
+        public static bool IsOutcomeUnknown(Exception ex)
+        {
+            var pending = new Stack<Exception>();
+            pending.Push(ex);
+            while (pending.Count > 0)
+            {
+                var e = pending.Pop();
+                if (e == null) continue;
+                if (e is Service.MoadianOutcomeUnknownException
+                      or System.Threading.Tasks.TaskCanceledException
+                      or TimeoutException
+                      or System.Net.Http.HttpRequestException
+                      or System.IO.IOException
+                      or System.Net.Sockets.SocketException
+                      or System.Net.WebException)
+                    return true;
+                if (e is AggregateException agg)
+                    foreach (var inner in agg.InnerExceptions) pending.Push(inner);
+                pending.Push(e.InnerException);
+            }
+            return false;
+        }
+
+        /// <summary>متن هشدار برای ارسال دوبارهٔ فاکتوری که ارسال زنده دارد.</summary>
+        public static string DescribePriorSends(IEnumerable<PriorSend> prior, int maxShown = 10)
+        {
+            var items = prior.ToList();
+            var byInvoice = items.GroupBy(p => (long)p.NUMBER).ToList();
+            var sb = new System.Text.StringBuilder();
+
+            sb.AppendLine(byInvoice.Count == 1
+                ? $"فاکتور {byInvoice[0].Key} قبلاً به سامانه ارسال شده و آن ارسال رد یا ابطال نشده است:"
+                : $"{byInvoice.Count} فاکتور قبلاً به سامانه ارسال شده‌اند و آن ارسال‌ها رد یا ابطال نشده‌اند:");
+
+            foreach (var g in byInvoice.Take(maxShown))
+            {
+                var last = g.Last();
+                sb.AppendLine($"  • فاکتور {g.Key}: شماره مالیاتی {last.Taxid}، وضعیت {StatusName(last.TheStatus)}" +
+                              (last.CRT.HasValue ? $"، زمان ارسال {last.CRT:yyyy/MM/dd HH:mm}" : ""));
+            }
+            if (byInvoice.Count > maxShown)
+                sb.AppendLine($"  • و {byInvoice.Count - maxShown} فاکتور دیگر");
+
+            sb.AppendLine();
+            sb.AppendLine("ارسال دوباره یک صورتحساب اصلیِ تازه با شماره مالیاتی جدید می‌سازد. اگر هر دو پذیرفته شوند، " +
+                          "فاکتور دو بار در کارپوشه ثبت می‌شود و یکی باید ابطال شود.");
+            sb.Append("اگر ارسال قبلی هنوز «در صف» است، به‌جای این کار در برنامهٔ پیگیری استعلام بگیرید " +
+                      "یا «ارسال مجدد» را بزنید که همان شماره مالیاتی را می‌فرستد.");
+            return sb.ToString();
+        }
+
+        private static string StatusName(string status) =>
+            (status ?? "").Trim().ToUpperInvariant() switch
+            {
+                "SUCCESS" => "موفق",
+                "PENDING" or "IN_PROGRESS" => "در صف سامانه",
+                "UNKNOWN" => "نامعلوم (پاسخ سامانه نرسید)",
+                "EXPIRED" => "بی‌پاسخ ماند (منقضی)",
+                "" or "NULL" => "نامشخص",
+                var s => s
+            };
 
         #endregion
 

@@ -93,6 +93,25 @@ namespace Prg_Moadian.Bulk
             var numbers = invoiceNumbers.Distinct().ToList();
             if (!numbers.Any()) return result;
 
+            // فاکتورهایی که ارسال زندهٔ قبلی دارند: یک هشدار برای همه، نه یکی‌یکی.
+            // در MrCorrect همهٔ فاکتورها در لیست می‌مانند (بخش ۴ CLAUDE.md)، پس انتخاب
+            // «همه» می‌تواند صدها فاکتور ارسال‌شده را دوباره بفرستد.
+            var prior = FindLivePriorOriginals(numbers, tag);
+            if (prior.Count > 0)
+            {
+                string msg = MoadianRules.DescribePriorSends(prior) +
+                             "\n\n«ادامه و ارسال»: این فاکتورها هم دوباره ارسال شوند." +
+                             "\n«لغو ارسال»: این فاکتورها کنار گذاشته شوند و بقیه ارسال شوند.";
+                if (OnValidationWarning == null || !OnValidationWarning(msg))
+                {
+                    var skip = prior.Select(p => (long)p.NUMBER).ToHashSet();
+                    foreach (var n in skip)
+                        result.Failures[n] = "قبلاً ارسال شده است؛ برای جلوگیری از ثبت تکراری در کارپوشه ارسال نشد.";
+                    numbers = numbers.Where(n => !skip.Contains(n)).ToList();
+                    if (!numbers.Any()) return result;
+                }
+            }
+
             progress?.Report(25);
 
             int totalNumbers = numbers.Count;
@@ -240,6 +259,25 @@ namespace Prg_Moadian.Bulk
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// ارسال‌های زندهٔ قبلی، فقط برای فاکتورهایی که این بار صورتحساب اصلی می‌روند.
+        /// فاکتوری که سربرگ مؤدیان ندارد، با ins=1 ساخته می‌شود (BuildDtoAndRecords).
+        /// </summary>
+        private List<MoadianRules.PriorSend> FindLivePriorOriginals(List<long> numbers, int tag)
+        {
+            var prior = MoadianRules.FindLiveOriginals(_db, numbers, tag, !_isSandbox);
+            if (prior.Count == 0) return prior;
+
+            var candidates = prior.Select(p => p.NUMBER).Distinct().ToList();
+            var nonOriginal = new HashSet<double>();
+            foreach (var chunk in candidates.Chunk(1000))
+                nonOriginal.UnionWith(_db.DoGetDataSQL<double>(
+                    "SELECT NUMBER FROM dbo.HEAD_LST_EXTENDED WHERE TGU = @Tag AND NUMBER IN @Numbers AND ISNULL(ins, 1) <> 1",
+                    new { Tag = tag, Numbers = chunk }));
+
+            return prior.Where(p => !nonOriginal.Contains(p.NUMBER)).ToList();
         }
 
         private (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
@@ -531,7 +569,7 @@ namespace Prg_Moadian.Bulk
                 var inspBefore = headExt.insp;
 
                 (headExt.cap, headExt.insp, string? capInspError) = CalculateCapInsp(
-                    (int)headExt.setm, Tbill_sum, capForCalculation, (int)Inty_Value, Tvam_sum, Todam_sum);
+                    (int)headExt.setm, Tbill_sum, capForCalculation, headExt.inty ?? 1, Tvam_sum, Todam_sum);
 
                 if (capInspError != null)
                 {

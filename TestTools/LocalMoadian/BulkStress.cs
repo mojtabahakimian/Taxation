@@ -201,6 +201,14 @@ internal static class BulkStress
         // عمدا ناسازگار است و نباید تست «همه پذیرفته شدند» را قرمز کند.
         CheckVatGate(db, mockBaseUrl, check, line);
 
+        // در UI می‌شود روش تسویه را انتخاب کرد و نوع صورتحساب را روی
+        // «خواندن از اطلاعات خود فاکتور» گذاشت. قبلاً این ترکیب با
+        // (int)Inty_Value روی null کرش می‌کرد و فاکتور ارسال نمی‌شد.
+        CheckSetmWithoutInty(db, mockBaseUrl, check, line);
+
+        // فاکتوری که ارسال زنده دارد، بی‌پرسش دوباره با شماره مالیاتی تازه نمی‌رود.
+        CheckDuplicateGuard(db, mockBaseUrl, check, line);
+
         // --- داده قبلی نباید دست خورده باشد ---
         long otherRowsAfter = db.DoGetDataSQL<long>(
             $"SELECT COUNT(*) FROM dbo.TAXDTL WHERE TAG<>{TestTag}").First();
@@ -288,6 +296,106 @@ internal static class BulkStress
         catch (Exception e)
         {
             check("۱۶-۱۹-ب دروازه مالیات", false, Flatten(e.Message));
+        }
+    }
+
+    /// <summary>
+    /// روش تسویه از UI، نوع صورتحساب از خود فاکتور (inty_value = null).
+    /// </summary>
+    private static void CheckSetmWithoutInty(CL_CCNNMANAGER db, string url,
+                                             Action<string, bool, string> check, Action<string> line)
+    {
+        const long number = 1_000_119;
+        try
+        {
+            db.DoExecuteSQL($@"DELETE FROM dbo.TAXDTL
+                               WHERE TAG={TestTag} AND NUMBER={number}");
+            // نوع ذخیره‌شده ۲ است، نه ۱ که مقدار پیش‌فرض هم هست؛ وگرنه تست نمی‌تواند
+            // «خواندن از خود فاکتور» را از «همیشه ۱» تشخیص دهد.
+            db.DoExecuteSQL($@"UPDATE dbo.HEAD_LST_EXTENDED SET inty = 2
+                               WHERE TGU={TestTag} AND NUMBER={number}");
+
+            var bulk = new SendInvoiceBulk(db, url) { OnValidationWarning = _ => true };
+            var result = bulk.SendAsync(new[] { number }, TestTag, inty_value: null, setm_value: 1)
+                             .GetAwaiter().GetResult();
+
+            long pending = db.DoGetDataSQL<long>($@"
+                SELECT COUNT(*) FROM dbo.TAXDTL
+                WHERE TAG={TestTag} AND NUMBER={number}
+                  AND TheStatus='PENDING' AND Inty=2 AND Setm=1").First();
+
+            line($"      · تسویه بدون نوع: موفق {result.Success}، ناموفق {result.Failures.Count}، {pending} ردیف PENDING");
+            check("۱۶-۲۲ روش تسویه بدون نوع صورتحساب ارسال می‌شود (نوع از خود فاکتور)",
+                  result.Success == 1 && result.Failures.Count == 0 && pending > 0,
+                  string.Join(" | ", result.Failures.Select(f => $"{f.Key}:{Flatten(f.Value)}")));
+        }
+        catch (Exception e)
+        {
+            check("۱۶-۲۲ روش تسویه بدون نوع صورتحساب", false, Flatten(e.Message));
+        }
+        finally
+        {
+            db.DoExecuteSQL($@"UPDATE dbo.HEAD_LST_EXTENDED SET inty = 1
+                               WHERE TGU={TestTag} AND NUMBER={number}");
+        }
+    }
+
+    /// <summary>
+    /// در یزدسپار ۸۸ فاکتور دو بار با شماره مالیاتی متفاوت «موفق» شدند، چون هیچ
+    /// مسیری نمی‌پرسید «این فاکتور قبلاً رفته». این تست روی 1000119 که
+    /// CheckSetmWithoutInty همین الان فرستاده (وضعیت PENDING) اجرا می‌شود.
+    /// </summary>
+    private static void CheckDuplicateGuard(CL_CCNNMANAGER db, string url,
+                                            Action<string, bool, string> check, Action<string> line)
+    {
+        const long number = 1_000_119;
+        string where = $"TAG={TestTag} AND NUMBER={number}";
+        long Taxids() => db.DoGetDataSQL<long>(
+            $"SELECT COUNT(DISTINCT Taxid) FROM dbo.TAXDTL WHERE {where}").First();
+
+        try
+        {
+            var prior = MoadianRules.FindLiveOriginals(db, new[] { number }, TestTag, isMainApi: false);
+            check("۱۶-۲۳ ارسال قبلیِ در صف، زنده شناخته می‌شود",
+                  prior.Count == 1 && prior[0].TheStatus == "PENDING",
+                  string.Join(",", prior.Select(p => p.TheStatus)));
+
+            check("۱۶-۲۴ ارسال روی سامانه اصلی با سندباکس قاطی نمی‌شود",
+                  MoadianRules.FindLiveOriginals(db, new[] { number }, TestTag, isMainApi: true).Count == 0, "");
+
+            // --- کاربر «لغو ارسال» می‌زند ---
+            long before = Taxids();
+            int asked = 0;
+            var bulk = new SendInvoiceBulk(db, url) { OnValidationWarning = msg => { if (msg.Contains("قبلاً")) asked++; return false; } };
+            var r = bulk.SendAsync(new[] { number }, TestTag, inty_value: 1, setm_value: 1).GetAwaiter().GetResult();
+            check("۱۶-۲۵ با «لغو ارسال» فاکتورِ ارسال‌شده دوباره نمی‌رود",
+                  asked == 1 && r.Success == 0 && r.Failures.ContainsKey(number) && Taxids() == before,
+                  $"پرسش {asked}، موفق {r.Success}، شماره‌ها {before}→{Taxids()}");
+
+            // --- کاربر «ادامه و ارسال» می‌زند: رفتار قبلی، شماره مالیاتی تازه ---
+            bulk = new SendInvoiceBulk(db, url) { OnValidationWarning = _ => true };
+            r = bulk.SendAsync(new[] { number }, TestTag, inty_value: 1, setm_value: 1).GetAwaiter().GetResult();
+            check("۱۶-۲۶ با «ادامه و ارسال» مثل قبل ارسال می‌شود",
+                  r.Success == 1 && Taxids() == before + 1, $"شماره‌ها {before}→{Taxids()}");
+
+            // --- ابطال‌شده دیگر زنده نیست ---
+            var live = db.DoGetDataSQL<string>($"SELECT DISTINCT Taxid FROM dbo.TAXDTL WHERE {where}").ToList();
+            foreach (var t in live)
+                db.DoExecuteSQL($@"INSERT INTO dbo.TAXDTL (Ins, Irtaxid, Tinb, TheStatus, NUMBER, TAG, IDD, CRT, ApiTypeSent)
+                                   VALUES (3, @T, N'', 'SUCCESS', {number}, {TestTag}, @IDD, GETDATE(), 0)",
+                                new { T = t, IDD = new CL_FUNTIONS().GetNewIDD() });
+            check("۱۶-۲۷ فاکتورِ ابطال‌شده دوباره قابل ارسال است (هشدار نمی‌دهد)",
+                  MoadianRules.FindLiveOriginals(db, new[] { number }, TestTag, false).Count == 0, "");
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where} AND Ins=3");
+
+            // --- ردشده هم زنده نیست ---
+            db.DoExecuteSQL($"UPDATE dbo.TAXDTL SET TheStatus='FAILED' WHERE {where}");
+            check("۱۶-۲۸ فاکتورِ ردشده دوباره قابل ارسال است (هشدار نمی‌دهد)",
+                  MoadianRules.FindLiveOriginals(db, new[] { number }, TestTag, false).Count == 0, "");
+        }
+        catch (Exception e)
+        {
+            check("۱۶-۲۳ نگهبان ارسال تکراری", false, Flatten(e.Message));
         }
     }
 
