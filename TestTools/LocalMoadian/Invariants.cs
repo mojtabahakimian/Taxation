@@ -206,17 +206,10 @@ internal static class Invariants
 
         // ============================================================ تگ‌ها
 
-        // رفتار فعلی و عمدیِ Prg_Grpsend:
-        //     گرید و فیلترها با تگ سرگروه کار می‌کنند (MrCorrect=13، DenaFaraz=2)
-        //     ارسال همیشه با تگ حواله ۲ انجام می‌شود
-        // این یعنی در MrCorrect فیلتر «قبلا ارسال شده» عملا چیزی پیدا نمی‌کند و
-        // همه فاکتورها در لیست می‌مانند. این وضعیت آگاهانه نگه داشته شده چون
-        // سال‌هاست روند کاری روی همین شکل بنا شده.
-        //
-        // اگر روزی خواستید عوضش کنید، جای درستش سه نقطه است و تست ۱۸ عدد دقیق
-        // اثرش را نشان می‌دهد.
-        C("رفتار تگ در ارسال گروهی همان چیزی است که بوده",
-          GrpsendTagShapeUnchanged(), GrpsendDetail);
+        // گرید: MrCorrect=13 و DenaFaraz=2؛ ارسال و جستجوی سابقه: همیشه ۲.
+        // تطبیق مستقیم تگ سرصفحه با TAXDTL باعث باقی‌ماندن ارسال‌شده‌ها می‌شد.
+        C("فیلتر و هشدار ارسال گروهی با تگ ذخیره‌شده در TAXDTL تطبیق دارند",
+          GrpsendTagsMatchSendHistory(), GrpsendDetail);
 
         // ============================================================ نگاشت واحد
 
@@ -246,35 +239,40 @@ internal static class Invariants
     private static string GrpsendDetail = "";
 
     /// <summary>
-    /// شکل فعلی تگ‌ها در Prg_Grpsend را از سورس می‌خواند و قفل می‌کند.
+    /// سازگاری تگ گرید، فیلتر، هشدار و ارسال در Prg_Grpsend را می‌سنجد.
     /// خواندن از سورس، چون اسمبلی Prg_Grpsend وابستگی WPF دارد و بارگذاری‌اش
     /// در یک هارنس کنسولی شکننده است.
     /// </summary>
-    private static bool GrpsendTagShapeUnchanged()
+    private static bool GrpsendTagsMatchSendHistory()
     {
         try
         {
             var file = Path.Combine(RepoRoot(), "Prg_Grpsend", "MainWindow.xaml.cs");
-            if (!File.Exists(file)) { GrpsendDetail = "سورس Prg_Grpsend پیدا نشد — رد شد"; return true; }
+            if (!File.Exists(file)) { GrpsendDetail = "سورس Prg_Grpsend پیدا نشد"; return false; }
             var src = File.ReadAllText(file);
 
             bool gridTag   = src.Contains("IsDenafaraz ? \"2\" : \"13\"");
-            bool joinShape = src.Contains("dbo.TAXDTL.TAG = dbo.HEAD_LST.TAG");
+            bool joinShape = src.Contains("dbo.TAXDTL.TAG = 2 AND") &&
+                             !src.Contains("dbo.TAXDTL.TAG = dbo.HEAD_LST.TAG");
+            bool warningTag = System.Text.RegularExpressions.Regex.IsMatch(
+                src, @"string checkSql = .*?AND TAG = 2\s+AND ApiTypeSent",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
             bool sendTag   = System.Text.RegularExpressions.Regex.IsMatch(
                                  src, @"SendAsync\(\s*?
 ?\s*selected,\s*2,");
 
             var missing = new List<string>();
             if (!gridTag)   missing.Add("تگ گرید (IsDenafaraz ? 2 : 13)");
-            if (!joinShape) missing.Add("اتصال TAXDTL.TAG = HEAD_LST.TAG");
+            if (!joinShape) missing.Add("فیلتر TAXDTL.TAG = 2");
+            if (!warningTag) missing.Add("هشدار ارسال قبلی با تگ ۲");
             if (!sendTag)   missing.Add("ارسال با تگ ۲");
 
             GrpsendDetail = missing.Count == 0
-                ? "هر سه نقطه دست‌نخورده"
+                ? "گرید، فیلتر، هشدار و ارسال سازگارند"
                 : "عوض شده: " + string.Join("، ", missing);
             return missing.Count == 0;
         }
-        catch (Exception e) { GrpsendDetail = e.Message; return true; }
+        catch (Exception e) { GrpsendDetail = e.Message; return false; }
     }
 
     private static string RepoRoot()
