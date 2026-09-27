@@ -290,12 +290,11 @@ namespace Prg_Grpsend
             if (!selected.Any())
                 return true;
 
-            string condition = IsDenafaraz ? "2" : "13";
-
-            // چک کردن تعداد فاکتورهایی که قبلاً ارسال شده‌اند
+            // سابقهٔ ارسال در هر دو محصول با تگ حوالهٔ فروش (۲) ثبت می‌شود؛
+            // تگ سرصفحهٔ گرید در MrCorrect برابر ۱۳ است.
             string checkSql = $@"SELECT COUNT(DISTINCT NUMBER) FROM dbo.TAXDTL
                                  WHERE NUMBER IN ({string.Join(",", selected)})
-                                 AND TAG = {condition}
+                                 AND TAG = 2
                                  AND ApiTypeSent = 1
                                  AND Ins = 1
                                  AND TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN')";
@@ -343,12 +342,14 @@ namespace Prg_Grpsend
 
             bool includeSentInvoices = RD_INCLUDE_SENT?.IsChecked ?? false;
 
+            // SendAsync در هر دو محصول تگ ۲ را در TAXDTL ذخیره می‌کند.
+            // تگ ۱۳ فقط برای خواندن سرصفحهٔ فروش در MrCorrect است.
             string notExistsCondition = includeSentInvoices ? "" : $@"AND NOT EXISTS (
                                                                           SELECT 1
                                                                           FROM dbo.TAXDTL
                                                                           WHERE
                                                                               dbo.TAXDTL.NUMBER = dbo.HEAD_LST.NUMBER AND
-                                                                              dbo.TAXDTL.TAG = dbo.HEAD_LST.TAG AND
+                                                                              dbo.TAXDTL.TAG = 2 AND
                                                                               dbo.TAXDTL.Ins = 1 AND
                                                                               dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN') AND
                                                                               {apiSqlCondition}

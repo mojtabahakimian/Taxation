@@ -178,15 +178,13 @@ internal static class TwoProducts
                   AND T.Ins = 1 AND T.TheStatus IN ('SUCCESS','PENDING','UNKNOWN'))").First();
 
         line($"      · MrCorrect: از {headRows:N0} فاکتور سرصفحه — " +
-             $"فیلتر فعلی {oldWay:N0} تا را «ارسال‌شده» می‌شناسد؛ با تگ حواله {newWay:N0} تا می‌شد");
+             $"فیلتر قدیمی {oldWay:N0} تا را «ارسال‌شده» می‌شناخت؛ با تگ حواله {newWay:N0} تا شناخته می‌شود");
 
-        // این تست چیزی را «درست» نمی‌خواند — فقط عدد را ثبت می‌کند.
-        // رفتار فعلی آگاهانه نگه داشته شده (لیست همه فاکتورها را نشان می‌دهد).
-        // اگر روزی تصمیم گرفتید فیلتر را فعال کنید، عدد دوم می‌گوید چند فاکتور
-        // از لیست کنار می‌روند.
-        check("۱۸-۱۰ رفتار فیلتر MrCorrect همان چیزی است که بوده",
+        // شاهد نگاشت تگ‌ها در دادهٔ واقعی؛ اجرای SQL خود فرم با دادهٔ مستقل
+        // در test-bulk-list-filter.ps1 برای هر دو محصول و محیط سنجیده می‌شود.
+        check("۱۸-۱۰ سابقهٔ ارسال MrCorrect با تگ حواله پیدا می‌شود، نه تگ سرصفحه",
               oldWay == 0 && newWay > 0,
-              $"فیلتر فعلی {oldWay} / با تگ حواله {newWay}");
+              $"فیلتر قدیمی {oldWay} / با تگ حواله {newWay}");
 
         check("۱۸-۱۱ فاکتورهای ناموفق در هر دو حالت در لیست می‌مانند",
               db.DoGetDataSQL<long>(@"
@@ -197,7 +195,10 @@ internal static class TwoProducts
                         AND T.TheStatus = 'FAILED'
                         AND NOT EXISTS (SELECT 1 FROM dbo.TAXDTL S
                                         WHERE S.NUMBER = T.NUMBER AND S.TAG = T.TAG
-                                          AND S.TheStatus IN ('SUCCESS','PENDING','UNKNOWN')))").First() > 0,
+                                          AND S.TheStatus IN ('SUCCESS','PENDING','UNKNOWN')))
+                  -- طرح موازی روی YAZDSEPAR1405 بیش از ۵۰ دقیقه در CXSYNC_PORT گیر کرد؛
+                  -- تک‌رشته‌ای ۰٫۱ ثانیه است.
+                  OPTION (MAXDOP 1)").First() > 0,
               "");
 
         // DenaFaraz: سرصفحه و TAXDTL هر دو TAG=2 → اصلاح چیزی را خراب نمی‌کند
