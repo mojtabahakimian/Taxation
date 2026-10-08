@@ -88,10 +88,12 @@ namespace Prg_Moadian.FUNCTIONS
                 // با FAILED واقعیِ سامانه یکی نیست و نباید در گزارش‌ها با آن قاطی شود.
                 string sql = @"
                     INSERT INTO dbo.TAXDTL
-                    (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent)
+                    (Inno, NUMBER, TAG, TheStatus, TheError, IDD, CRT, ApiTypeSent, Tinb)
                     VALUES
-                    (@Inno, @Number, @Tag, 'LOCAL_ERROR', @Error, @IDD, GETDATE(), @Api)";
-                dbms.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType });
+                    (@Inno, @Number, @Tag, 'LOCAL_ERROR', @Error, @IDD, GETDATE(), @Api, @Tinb)";
+                // No invoice was sent. Empty buyer data is stored locally, as in
+                // SaveTaxDtl; no buyer identity is invented for a validation error.
+                dbms.DoExecuteSQL(sql, new { Inno = inno, Number = number, Tag = tag, Error = errorMessage, IDD = idd, Api = apiType, Tinb = string.Empty });
             }
             catch (Exception ex)
             {
