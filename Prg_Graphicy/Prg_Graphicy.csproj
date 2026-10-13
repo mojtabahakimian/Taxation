@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
 	  
-	  <FileVersion>9.0.4</FileVersion>
+	  <FileVersion>9.0.5</FileVersion>
 	  <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 

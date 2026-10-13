@@ -209,6 +209,9 @@ internal static class BulkStress
         // فاکتوری که ارسال زنده دارد، بی‌پرسش دوباره با شماره مالیاتی تازه نمی‌رود.
         CheckDuplicateGuard(db, mockBaseUrl, check, line);
 
+        // تاریخ سفارشی نامعتبر: هیچ فاکتوری نرود (قبلاً بی‌صدا با تاریخ اصلی می‌رفت).
+        CheckInvalidCustomDate(db, mockBaseUrl, check);
+
         // --- داده قبلی نباید دست خورده باشد ---
         long otherRowsAfter = db.DoGetDataSQL<long>(
             $"SELECT COUNT(*) FROM dbo.TAXDTL WHERE TAG<>{TestTag}").First();
@@ -397,6 +400,32 @@ internal static class BulkStress
         {
             check("۱۶-۲۳ نگهبان ارسال تکراری", false, Flatten(e.Message));
         }
+    }
+
+    private static void CheckInvalidCustomDate(CL_CCNNMANAGER db, string url, Action<string, bool, string> check)
+    {
+        const long number = 1_000_118;
+        string where = $"TAG={TestTag} AND NUMBER={number}";
+        try
+        {
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}");
+            var bulk = new SendInvoiceBulk(db, url) { OnValidationWarning = _ => true };
+            var r = bulk.SendAsync(new[] { number }, TestTag, inty_value: 1, setm_value: 1,
+                                   useCustomDate: true, customDateText: "1405/7/9x").GetAwaiter().GetResult();
+            long rows = db.DoGetDataSQL<long>($"SELECT COUNT(*) FROM dbo.TAXDTL WHERE {where}").First();
+            check("۱۶-۲۹ تاریخ سفارشی نامعتبر: هیچ فاکتوری نمی‌رود و خطای روشن برمی‌گردد",
+                  r.Success == 0 && rows == 0 && r.Failures.TryGetValue(number, out var msg) && msg.Contains("تاریخ سفارشی"),
+                  $"موفق {r.Success}، ردیف {rows}، پیام {(r.Failures.TryGetValue(number, out var m2) ? Flatten(m2) : "-")}");
+
+            r = bulk.SendAsync(new[] { number }, TestTag, inty_value: 1, setm_value: 1,
+                               useCustomDate: true, customDateText: "1405/7/9").GetAwaiter().GetResult();
+            long ind = db.DoGetDataSQL<long>($"SELECT TOP 1 Indatim_Sec FROM dbo.TAXDTL WHERE {where}").FirstOrDefault();
+            long expected = Prg_Moadian.Service.TaxService.ConvertDateToLong(new CL_FUNTIONS().GetGregorianDateTime("14050709"));
+            check("۱۶-۳۰ تاریخ سفارشی 1405/7/9 به‌درستی ۹ مهر فرستاده می‌شود",
+                  r.Success == 1 && ind == expected, $"موفق {r.Success}، indatim {ind} / انتظار {expected}");
+        }
+        catch (Exception e) { check("۱۶-۲۹ تاریخ سفارشی", false, Flatten(e.Message)); }
+        finally { db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}"); }
     }
 
     private sealed class InnoRow

@@ -211,6 +211,11 @@ internal static class Invariants
         C("فیلتر و هشدار ارسال گروهی با تگ ذخیره‌شده در TAXDTL تطبیق دارند",
           GrpsendTagsMatchSendHistory(), GrpsendDetail);
 
+        // تشخیص محصول در ارسال گروهی فقط از کلیدی که با قفل جور شده.
+        // حلقه روی کل TheKeys هر مشتری MrCorrect را دناافراز می‌کرد (فاکتور ۹۱۵ آبادیس).
+        C("ارسال گروهی محصول را از کلیدِ جورشده با قفل تشخیص می‌دهد، نه از کل فهرست (فقط کلید دناافراز دناافراز می‌شود)",
+          LockDetectsMatchedKeyOnly(), LockDetail);
+
         // ============================================================ نگاشت واحد
 
         // نگاشت فازیِ واحد اندازه‌گیری. اگر آستانه شباهت پایین بیاید،
@@ -237,6 +242,38 @@ internal static class Invariants
 
     private static string RoundIrrDetail = "";
     private static string GrpsendDetail = "";
+    private static string LockDetail = "";
+
+    /// <summary>
+    /// از سورس می‌خواند (اسمبلی Prg_Grpsend وابستگی WPF/COM دارد).
+    /// </summary>
+    private static bool LockDetectsMatchedKeyOnly()
+    {
+        try
+        {
+            var file = Path.Combine(RepoRoot(), "Prg_Grpsend", "Utility", "CL_LOCKWATCH.cs");
+            if (!File.Exists(file)) { LockDetail = "سورس CL_LOCKWATCH پیدا نشد"; return false; }
+            var src = File.ReadAllText(file);
+
+            var m = System.Text.RegularExpressions.Regex.Match(
+                src, @"void CheckIsDenafaraz\(\)\s*\{(.*?)\n        \}",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (!m.Success) { LockDetail = "متد CheckIsDenafaraz پیدا نشد"; return false; }
+            string body = m.Groups[1].Value;
+
+            bool loopsAllKeys = body.Contains("TheKeys");
+            bool usesMatched  = body.Contains("IsDenaFarazKey(MatchedKey)");
+            bool storesMatched = System.Text.RegularExpressions.Regex.IsMatch(src, @"MatchedKey\s*=\s*foundKey");
+
+            var problems = new List<string>();
+            if (loopsAllKeys)   problems.Add("روی کل TheKeys حلقه می‌زند");
+            if (!usesMatched)   problems.Add("کلید جورشده را بررسی نمی‌کند");
+            if (!storesMatched) problems.Add("کلید جورشده نگه داشته نمی‌شود");
+            LockDetail = problems.Count == 0 ? "فقط کلید جورشده" : string.Join("، ", problems);
+            return problems.Count == 0;
+        }
+        catch (Exception e) { LockDetail = e.Message; return false; }
+    }
 
     /// <summary>
     /// سازگاری تگ گرید، فیلتر، هشدار و ارسال در Prg_Grpsend را می‌سنجد.
@@ -258,7 +295,8 @@ internal static class Invariants
                 src, @"string checkSql = .*?AND TAG = 2\s+AND ApiTypeSent",
                 System.Text.RegularExpressions.RegexOptions.Singleline);
             bool sendTag   = System.Text.RegularExpressions.Regex.IsMatch(
-                                 src, @"SendAsync\(\s*?
+                                 src, @"SendAsync\(\s*
+?
 ?\s*selected,\s*2,");
 
             var missing = new List<string>();

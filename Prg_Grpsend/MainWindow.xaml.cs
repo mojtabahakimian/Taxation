@@ -659,6 +659,27 @@ namespace Prg_Grpsend
 
             if (!IsValid()) return;
 
+            // تاریخ سفارشی را پیش از هر پرسش دیگری بسنج؛ قبلاً تاریخ نادرست بی‌صدا با تاریخ
+            // اصلی فاکتور می‌رفت. تاریخ آینده فقط هشدار است (سامانه با 0200201 رد می‌کند)،
+            // چون قواعد سامانه عوض می‌شوند و دست کاربر باید باز بماند.
+            if (CHK_CUSTOM_DATE?.IsChecked ?? false)
+            {
+                if (!MoadianRules.TryParseShamsiDate(TXT_CUSTOM_DATE.Text, out var ymd, out var dateErr))
+                {
+                    new Msgwin(false, dateErr).ShowDialog();
+                    return;
+                }
+                TXT_CUSTOM_DATE.Text = $"{ymd[..4]}/{ymd.Substring(4, 2)}/{ymd.Substring(6, 2)}";
+
+                var pc = new System.Globalization.PersianCalendar();
+                var today = DateTime.Today;
+                long todayYmd = pc.GetYear(today) * 10000L + pc.GetMonth(today) * 100 + pc.GetDayOfMonth(today);
+                if (long.Parse(ymd) > todayYmd &&
+                    !(new Msgwin(true, $"تاریخ سفارشی {TXT_CUSTOM_DATE.Text} از امروز جلوتر است و سامانه معمولاً صورتحساب با تاریخ آینده را رد می‌کند.\n\nآیا با این وجود ادامه می‌دهید؟",
+                                 YesBtnText: "ادامه", NoBtnText: "انصراف").ShowDialog() ?? false))
+                    return;
+            }
+
             if (!CheckAndWarnForAlreadySentInvoices())
                 return;
 

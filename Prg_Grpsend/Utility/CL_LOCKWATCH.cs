@@ -38,18 +38,25 @@ namespace Prg_Grpsend.Utility
 
         public bool IsDenaFarazKey(string key) => DenaFarazKeys.Contains(key);
 
+        /// <summary>کلیدی که واقعاً با قفل جور شد (TryMatchKeys).</summary>
+        public string? MatchedKey { get; private set; }
+
+        // فقط کلیدِ جورشده با قفل ملاک است. قبلاً روی کل TheKeys حلقه می‌زد و چون آن
+        // فهرست کلید دناافراز هم دارد، هر مشتری MrCorrect با بیلد Release دناافراز
+        // تشخیص داده می‌شد: ارسال گروهی تاریخ را از حواله (TAG 2) می‌خواند و ارسال تکی
+        // از سرگروه فاکتور (TAG 13) — فاکتور ۹۱۵ آبادیس، ۱۴۰۵/۰۷/۲۱.
+        //
+        // کلیدهای DenaFarazKeys مال دناافرازند؛ همهٔ کلیدهای دیگرِ TheKeys مال MrCorrect
+        // (تأیید کاربر، ۱۴۰۵/۰۷/۲۱).
         public void CheckIsDenafaraz()
         {
-            foreach (var key in TheKeys)
+            bool isDenafaraz = MatchedKey != null && IsDenaFarazKey(MatchedKey);
+            if (isDenafaraz)
             {
-                if (IsDenaFarazKey(key))
-                {
-                    MainWindow.IsDenafaraz = true;
-                    CL_Generaly.MrCorrect = "d";
-                    LockLogger.Write("[IsDenafaraz] = True");
-                    break;
-                }
+                MainWindow.IsDenafaraz = true;
+                CL_Generaly.MrCorrect = "d";
             }
+            LockLogger.Write($"[IsDenafaraz] = {isDenafaraz} | key {MatchedKey?[..8]}");
         }
 
         public bool IsSpecial = false;
@@ -70,6 +77,7 @@ namespace Prg_Grpsend.Utility
         {
             bool matched = false;
             string foundData = null;
+            string foundKey = null;
             bool serviceReachable = false;
 
             var thread = new System.Threading.Thread(() =>
@@ -106,6 +114,7 @@ namespace Prg_Grpsend.Utility
                         {
                             matched = true;
                             foundData = data;
+                            foundKey = pw;
                             LockLogger.Write($"[MATCHED] Key={pw[..8]}... | Serial={serial} | Data={data}");
                             break;
                         }
@@ -144,7 +153,7 @@ namespace Prg_Grpsend.Utility
             }
 
             _lockServiceWasUnreachable = !serviceReachable;
-            if (matched) Baseknow.tindata = foundData;
+            if (matched) { Baseknow.tindata = foundData; MatchedKey = foundKey; }
             return matched;
         }
 

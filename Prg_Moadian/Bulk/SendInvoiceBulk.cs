@@ -41,6 +41,18 @@ namespace Prg_Moadian.Bulk
         public string CALLER_NAME { get; set; } = "m";
         public Func<string, bool>? OnValidationWarning { get; set; }
 
+        /// <summary>
+        /// فقط برای ابزار تست (شبیه‌سازی روی دیتابیس واقعی): هیچ نوشتنی در دیتابیس انجام نشود.
+        /// جایی که ساختن فاکتور باید بنویسد، به‌جایش خطا می‌دهد. در برنامه هرگز روشن نمی‌شود.
+        /// </summary>
+        internal bool DryRun { get; init; }
+
+        private static string FormatYmd(long ymd)
+        {
+            var s = ymd.ToString();
+            return s.Length == 8 ? $"{s[..4]}/{s.Substring(4, 2)}/{s.Substring(6, 2)}" : s;
+        }
+
         private SendInvoiceBulk(CL_CCNNMANAGER db,
                           SAZMAN sazman,
                           TaxService taxService)
@@ -82,7 +94,7 @@ namespace Prg_Moadian.Bulk
         /// <param name="setm_value">روش تسویه</param>
         /// <param name="progress">گزارش پیشرفت</param>
         /// <param name="useCustomDate">استفاده از تاریخ سفارشی</param>
-        /// <param name="customDateText">متن تاریخ سفارشی (مثال: 1404/08/24)</param>
+        /// <param name="customDateText">متن تاریخ سفارشی (مثال: 1404/08/24). اگر useCustomDate روشن و این متن خالی یا نامعتبر باشد، هیچ فاکتوری نمی‌رود و همه در Failures با پیام خطا برمی‌گردند (دیگر بی‌صدا تاریخ اصلی فاکتور نمی‌رود).</param>
         /// <param name="sendOptionalItemName">ارسال نام اختیاری کالا/خدمت در فیلد sstt</param>
         public async Task<BulkSendResult> SendAsync(IEnumerable<long> invoiceNumbers, int tag, int? inty_value = default, int? setm_value = default,
     IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
@@ -92,6 +104,13 @@ namespace Prg_Moadian.Bulk
             var result = new BulkSendResult();
             var numbers = invoiceNumbers.Distinct().ToList();
             if (!numbers.Any()) return result;
+
+            // تاریخ سفارشی نامعتبر: هیچ فاکتوری نرود، نه اینکه بی‌صدا با تاریخ اصلی برود.
+            if (useCustomDate && !MoadianRules.TryParseShamsiDate(customDateText, out _, out var customDateError))
+            {
+                foreach (var n in numbers) result.Failures[n] = customDateError;
+                return result;
+            }
 
             // فاکتورهایی که ارسال زندهٔ قبلی دارند: یک هشدار برای همه، نه یکی‌یکی.
             // گزینهٔ «همه (شامل ارسال شده)» و تغییر وضعیت پس از بارگذاری لیست
@@ -280,7 +299,7 @@ namespace Prg_Moadian.Bulk
             return prior.Where(p => !nonOriginal.Contains(p.NUMBER)).ToList();
         }
 
-        private (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
+        internal (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
         {
             // 1. بارگذاری HEAD_LST_EXTENDED
             var headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
@@ -291,6 +310,9 @@ namespace Prg_Moadian.Bulk
                 // در غیر این صورت از مقادیر پیش‌فرض استفاده می‌شود
                 int defaultInty = Inty_Value ?? 1;  // پیش‌فرض: نوع اول
                 int defaultSetm = Setm_Value ?? 1;  // پیش‌فرض: نقدی
+
+                if (DryRun)
+                    throw new InvoiceValidationException(number, $"DryRun: HEAD_LST_EXTENDED for invoice {number} tag {tag} is missing");
 
                 try
                 {
@@ -336,6 +358,26 @@ namespace Prg_Moadian.Bulk
             var lines = FetchInvoiceLines(number, tag);
             if (!lines.Any())
                 throw new InvoiceValidationException(number, $"Invoice {number}/{tag} has no detail lines");
+
+            // MrCorrect: تاریخ صدور از فاکتور فروش (سرگروه) است. اگر کاربر فقط تاریخ حواله را عوض
+            // کرده باشد، تاریخ فاکتور کهنه می‌ماند و ممکن است از مهلت گذشته باشد (فاکتور ۹۱۵ آبادیس).
+            // فقط هشدار — دست کاربر باز است (مثلاً تاریخ سفارشی).
+            if (CALLER_NAME == CL_Generaly.MrCorrect && !useCustomDate)
+            {
+                long? havalehDate = _db.DoGetDataSQL<long?>(
+                    $"SELECT DATE_N FROM dbo.HEAD_LST WHERE NUMBER={number} AND TAG={tag}").FirstOrDefault();
+                long invoiceDate = (long)lines.First().DATE_N;
+                if (havalehDate.HasValue && havalehDate.Value != invoiceDate)
+                {
+                    string dMsg = $"فاکتور {number}: تاریخ حواله ({FormatYmd(havalehDate.Value)}) با تاریخ فاکتور فروش ({FormatYmd(invoiceDate)}) فرق دارد. " +
+                                  "تاریخ فاکتور فروش فرستاده می‌شود. اگر تاریخ درست تاریخ حواله است، تاریخ خود فاکتور فروش را اصلاح کنید یا از تاریخ سفارشی استفاده کنید.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{dMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(number, tag, dMsg);
+                        throw new InvoiceValidationException(number, dMsg);
+                    }
+                }
+            }
 
             // 3. اعتبارسنجی هر خط
             bool contin = true;
@@ -614,33 +656,6 @@ namespace Prg_Moadian.Bulk
             bool isExport = headExt.inp == 7;
             if (!isExport) { headExt.cut = null; headExt.exr = null; }
 
-            // محاسبه تاریخ و TaxId
-            //var dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
-            // اگر تاریخ سفارشی فعال شده باشد، از آن استفاده کن، در غیر این صورت از تاریخ فاکتور استفاده کن
-            DateTime dt;
-            if (useCustomDate && !string.IsNullOrWhiteSpace(customDateText))
-            {
-                try
-                {
-                    // تبدیل تاریخ شمسی سفارشی به میلادی
-                    // فرمت انتظاری: 1404/08/24
-                    var customDateInt = int.Parse(customDateText.Replace("/", ""));
-                    dt = _fn.GetGregorianDateTime(customDateInt.ToString());
-                }
-                catch
-                {
-                    // اگر تاریخ سفارشی نامعتبر بود، از تاریخ فاکتور استفاده کن
-                    dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
-                }
-            }
-            else
-            {
-                dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
-            }
-
-            // تاریخ فاکتور تاریخچه‌ای است و نباید اختلاف ساعت سرور به آن اعمال شود
-            // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
-            var ts = TaxService.ConvertDateToLong(dt);
 
             // =================================================================
             // ❶ محاسبه زمان "همین الان" بر اساس ساعت دقیق و سینک‌شده‌ی سرور دارایی
@@ -657,19 +672,13 @@ namespace Prg_Moadian.Bulk
             // ❷ محاسبه "تاریخ صدور" (Indatim) - بر اساس تاریخ سفارشی یا تاریخ واقعی
             // =================================================================
             DateTime issueDate;
-            if (useCustomDate && !string.IsNullOrWhiteSpace(customDateText))
+            if (useCustomDate)
             {
-                try
-                {
-                    // تبدیل تاریخ شمسی سفارشی به میلادی (کاربر می‌خواهد فاکتور قدیمی را جدید جا بزند)
-                    var customDateInt = int.Parse(customDateText.Replace("/", ""));
-                    issueDate = _fn.GetGregorianDateTime(customDateInt.ToString());
-                }
-                catch
-                {
-                    // در صورت خطای تایپی کاربر در تاریخ سفارشی، بازگشت به تاریخ اصلی فاکتور
-                    issueDate = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
-                }
+                // SendAsync پیش از ساخت هر فاکتور تاریخ را سنجیده است. اینجا دیگر بازگشت
+                // بی‌صدا به تاریخ اصلی فاکتور نداریم: کاربر فکر می‌کرد تاریخ سفارشی رفته.
+                if (!MoadianRules.TryParseShamsiDate(customDateText, out var customYmd, out var customErr))
+                    throw new NullyExceptiony(customErr);
+                issueDate = _fn.GetGregorianDateTime(customYmd);
             }
             else
             {
@@ -927,6 +936,7 @@ namespace Prg_Moadian.Bulk
 
         private void RecordFailedInvoiceLocal(long number, int tag, string errorMessage)
         {
+            if (DryRun) return;
             try
             {
                 var idd = _fn.GetNewIDD();
