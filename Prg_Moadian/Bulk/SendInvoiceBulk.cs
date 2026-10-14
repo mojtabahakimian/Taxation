@@ -179,6 +179,12 @@ namespace Prg_Moadian.Bulk
                 {
                     progress?.Report(0);
 
+                    // uid هر بسته را خودمان می‌سازیم تا پاسخ سامانه را با uid به فاکتورش
+                    // برگردانیم. SendTspInvoices با FiscalId خالی همان بستهٔ SendInvoices را
+                    // می‌سازد (همان آدرس، رمزنگاری و شناسهٔ حافظه)؛ فقط uid از ما است.
+                    var uids = batch.Select(_ => Guid.NewGuid().ToString()).ToList();
+                    var wrapped = batch.Select((dto, i) => new InvoiceDtoWrapper { Invoice = dto, Uid = uids[i] }).ToList();
+
                     // ۱. متغیرهایی برای نگهداری وضعیت پاسخ سرور
                     List<PacketResponse> responsesToSave = new List<PacketResponse>();
                     string batchErrorMessage = null;
@@ -193,7 +199,7 @@ namespace Prg_Moadian.Bulk
                     try
                     {
                         // ❷ فراخوانی وب‌سرویس
-                        var response = await Task.Run(() => TaxApiService.Instance.TaxApis.SendInvoices(batch, null)).ConfigureAwait(false);
+                        var response = await Task.Run(() => TaxApiService.Instance.TaxApis.SendTspInvoices(wrapped, null)).ConfigureAwait(false);
 
                         // بررسی قطعی بودن پاسخ سرور
                         if (response == null || response.Body == null)
@@ -243,7 +249,7 @@ namespace Prg_Moadian.Bulk
                     var batchRecords = batch.Select(dto => allRecords[dto]).ToList();
 
                     // ذخیره در دیتابیس!
-                    PersistChunk(batch, batchRecords, responsesToSave, tag, outcomeUnknown);
+                    var missing = PersistChunk(batch, batchRecords, uids, responsesToSave, tag, outcomeUnknown);
 
                     // ---------------------------------------------------------------------
                     // ❹ گزارش‌دهی به کاربر
@@ -251,9 +257,13 @@ namespace Prg_Moadian.Bulk
 
                     if (batchErrorMessage == null)
                     {
-                        // کاملاً موفق بود
-                        result.Success += responsesToSave.Count;
-                        progress?.Report(responsesToSave.Count);
+                        // فاکتوری که سامانه برایش پاسخی نداد UNKNOWN ثبت شده و از لیست
+                        // ارسال‌نشده‌ها بیرون می‌رود؛ اگر اینجا گزارش نشود، بی‌صدا گم می‌شود.
+                        foreach (var num in missing)
+                            result.Failures[num] = "سامانه برای این فاکتور پاسخی برنگرداند؛ معلوم نیست ثبت شده یا نه. " +
+                                                   "پیش از ارسال دوباره، کارپوشه را بررسی کنید.";
+                        result.Success += batch.Count - missing.Count;
+                        progress?.Report(batch.Count - missing.Count);
                     }
                     else
                     {
@@ -958,17 +968,35 @@ namespace Prg_Moadian.Bulk
             }
         }
 
-        private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag, bool outcomeUnknown = false)
+        /// <returns>شمارهٔ فاکتورهایی که سامانه پاسخ داد ولی uid آن‌ها در پاسخ نبود.</returns>
+        private List<long> PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, List<string> sentUids, IEnumerable<PacketResponse> responses, int tag, bool outcomeUnknown = false)
         {
-            // مرتب‌سازی مطابق با ایندکس
-            var pairs = sent.Select((dto, idx) => new { dto, records = recordsSets[idx], resp = responses.ElementAt(idx) });
+            var missingNumbers = new List<long>();
+            // پاسخ با uid به فاکتور برمی‌گردد، نه با ترتیب. Result در SDK یک HashSet است و
+            // سامانه به ترتیب ارسال جواب نمی‌دهد. قبلاً با ایندکس جفت می‌شد و کد رهگیریِ هر
+            // فاکتور مال فاکتور دیگری ثبت می‌شد: یزدسپار ۱۴۰۵/۰۷/۲۰، فاکتور ۸۵۷۸ «موفق» ولی
+            // در کارپوشه نبود و فاکتور یک‌قلمی ۸۴۴۹ خطای «قلم ۲» گرفت. تست ۱۶-۳۱.
+            var byUid = responses.Where(r => r?.Uid != null)
+                                 .GroupBy(r => r.Uid, StringComparer.OrdinalIgnoreCase)
+                                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            // پاسخ ساختگیِ خطای کل بسته uid ندارد و برای همهٔ فاکتورهای بسته یکی است.
+            // فقط وقتی هیچ پاسخی uid ندارد؛ وگرنه فاکتورِ بی‌جفت باید UNKNOWN و گزارش شود.
+            var batchWide = byUid.Count == 0 ? responses.FirstOrDefault(r => r != null && r.Uid == null) : null;
             Exception firstDbException = null;
 
-            foreach (var pair in pairs)
+            for (int idx = 0; idx < sent.Count; idx++)
             {
-                var header = pair.dto.Header;
-                var uid = pair.resp.Uid;
-                var refNum = pair.resp.ReferenceNumber;
+                var dto = sent[idx];
+                var records = recordsSets[idx];
+                var resp = byUid.TryGetValue(sentUids[idx], out var matched) ? matched : batchWide;
+                var header = dto.Header;
+                var uid = resp?.Uid;
+                var refNum = resp?.ReferenceNumber;
+
+                // سامانه پاسخ داده ولی نه برای این فاکتور: نمی‌دانیم گرفته یا نه.
+                bool missingFromResponse = resp == null;
+                if (missingFromResponse && records.FirstOrDefault()?.NUMBER is double n && n > 0)
+                    missingNumbers.Add((long)n);
 
                 // تفکیک سه حالت — قبلاً هر چیزی که UID نداشت FAILED ثبت می‌شد،
                 // از جمله قطعی شبکه که در آن اصلاً نمی‌دانیم سامانه سند را گرفته یا نه.
@@ -977,14 +1005,14 @@ namespace Prg_Moadian.Bulk
                 //   FAILED  : سامانه صریحاً رد کرده.
                 var status = uid != null
                     ? "PENDING"
-                    : (outcomeUnknown ? "UNKNOWN" : "FAILED");
+                    : (outcomeUnknown || missingFromResponse ? "UNKNOWN" : "FAILED");
 
                 try
                 {
-                    for (int i = 0; i < pair.dto.Body.Count; i++)
+                    for (int i = 0; i < dto.Body.Count; i++)
                     {
-                        var body = pair.dto.Body[i];
-                        var record = pair.records[i];   // اینجا ردیف TAXDTL متناظر
+                        var body = dto.Body[i];
+                        var record = records[i];   // اینجا ردیف TAXDTL متناظر
                         var idd = _fn.GetNewIDD();
 
                         var sql = @"
@@ -1091,6 +1119,8 @@ namespace Prg_Moadian.Bulk
 
             if (firstDbException != null)
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(firstDbException).Throw();
+
+            return missingNumbers;
         }
 
         #region MyRegion

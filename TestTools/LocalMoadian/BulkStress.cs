@@ -153,6 +153,17 @@ internal static class BulkStress
         check("۱۶-۱۵ هر فاکتور UID مستقل خودش را دارد",
               distinctUid == numbers.Count, $"{distinctUid}/{numbers.Count}");
 
+        // سرور ساختگی پاسخ‌ها را وارونه برمی‌گرداند. اگر کد رهگیری با ترتیب جفت شود،
+        // نتیجهٔ استعلام هر فاکتور مال فاکتور دیگری می‌شود (یزدسپار ۱۴۰۵/۰۷/۲۰).
+        var serverRefs = MockReferences(mockBaseUrl);
+        var storedRefs = db.DoGetDataSQL<RefRow>(
+            $"SELECT DISTINCT Taxid, RefrenceNumber FROM dbo.TAXDTL WHERE TAG={TestTag}").ToList();
+        int wrongRef = storedRefs.Count(r =>
+            !serverRefs.TryGetValue((r.Taxid ?? "").Trim(), out var sr) || sr != (r.RefrenceNumber ?? "").Trim());
+        check("۱۶-۳۱ کد رهگیری هر فاکتور مال خود همان فاکتور است (نه بر اساس ترتیب پاسخ)",
+              storedRefs.Count == numbers.Count && wrongRef == 0,
+              $"{wrongRef} از {storedRefs.Count} کد رهگیری مال فاکتور دیگری است");
+
         // --- ارسال دوباره همان فاکتورها: شماره مالیاتی نباید تکرار شود ---
         var taxidsRun1 = db.DoGetDataSQL<string>(
             $"SELECT DISTINCT Taxid FROM dbo.TAXDTL WHERE TAG={TestTag}").ToList();
@@ -212,6 +223,9 @@ internal static class BulkStress
         // تاریخ سفارشی نامعتبر: هیچ فاکتوری نرود (قبلاً بی‌صدا با تاریخ اصلی می‌رفت).
         CheckInvalidCustomDate(db, mockBaseUrl, check);
 
+        // سامانه پاسخ داد ولی برای یکی از فاکتورها نه: UNKNOWN و گزارش به کاربر.
+        CheckMissingResult(db, mockBaseUrl, check);
+
         // --- داده قبلی نباید دست خورده باشد ---
         long otherRowsAfter = db.DoGetDataSQL<long>(
             $"SELECT COUNT(*) FROM dbo.TAXDTL WHERE TAG<>{TestTag}").First();
@@ -252,6 +266,28 @@ internal static class BulkStress
             return (ok, rejected, string.Join(",", bad.Distinct().Take(4)));
         }
         catch (Exception e) { return (-1, -1, e.Message); }
+    }
+
+    /// <summary>شماره مالیاتی → کد رهگیری‌ای که سرور ساختگی واقعاً به آن داد.</summary>
+    private static Dictionary<string, string> MockReferences(string baseUrl)
+    {
+        var map = new Dictionary<string, string>();
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var json = http.GetStringAsync(baseUrl.TrimEnd('/').Replace("/sandbox", "") + "/__state")
+                       .GetAwaiter().GetResult();
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        foreach (var p in doc.RootElement.GetProperty("invoices").EnumerateObject())
+            map[p.Name] = p.Value.GetProperty("reference").GetString() ?? "";
+        if (doc.RootElement.TryGetProperty("rejected", out var rej))
+            foreach (var r in rej.EnumerateObject())
+                map[r.Value.GetProperty("taxid").GetString() ?? ""] = r.Name;
+        return map;
+    }
+
+    private sealed class RefRow
+    {
+        public string Taxid { get; set; }
+        public string RefrenceNumber { get; set; }
     }
 
     /// <summary>
@@ -426,6 +462,47 @@ internal static class BulkStress
         }
         catch (Exception e) { check("۱۶-۲۹ تاریخ سفارشی", false, Flatten(e.Message)); }
         finally { db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}"); }
+    }
+
+    /// <summary>
+    /// UNKNOWN از لیست ارسال‌نشده‌ها بیرون می‌رود؛ اگر در Failures نیاید، فاکتور بی‌صدا گم می‌شود
+    /// (نقد بازبین، ۱۴۰۵/۰۷/۲۲).
+    /// </summary>
+    private static void CheckMissingResult(CL_CCNNMANAGER db, string url, Action<string, bool, string> check)
+    {
+        long[] nums = { 1_000_116, 1_000_117 };
+        string where = $"TAG={TestTag} AND NUMBER IN ({nums[0]},{nums[1]})";
+        try
+        {
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}");
+            using (var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) })
+                http.PostAsync(url.TrimEnd('/').Replace("/sandbox", "") + "/__omit_next_result",
+                               new StringContent("{\"count\":1}", System.Text.Encoding.UTF8, "application/json"))
+                    .GetAwaiter().GetResult();
+
+            var bulk = new SendInvoiceBulk(db, url) { OnValidationWarning = _ => true };
+            var r = bulk.SendAsync(nums, TestTag, inty_value: 1, setm_value: 1).GetAwaiter().GetResult();
+
+            var st = db.DoGetDataSQL<StatusRow>(
+                $"SELECT DISTINCT NUMBER, TheStatus, RefrenceNumber FROM dbo.TAXDTL WHERE {where}").ToList();
+            var unknown = st.Where(s => s.TheStatus == "UNKNOWN").ToList();
+            var pending = st.Where(s => s.TheStatus == "PENDING").ToList();
+            bool reported = unknown.Count == 1 && r.Failures.ContainsKey((long)unknown[0].NUMBER)
+                            && r.Failures[(long)unknown[0].NUMBER].Contains("پاسخی برنگرداند");
+
+            check("۱۶-۳۲ فاکتوری که پاسخش نیامد UNKNOWN می‌شود و به کاربر گزارش می‌شود (نه «موفق»)",
+                  r.Success == 1 && pending.Count == 1 && reported && unknown[0].RefrenceNumber == null,
+                  $"موفق {r.Success}، ناموفق {r.Failures.Count}، وضعیت‌ها {string.Join(",", st.Select(s => $"{s.NUMBER}:{s.TheStatus}"))}");
+        }
+        catch (Exception e) { check("۱۶-۳۲ پاسخ ناقص سامانه", false, Flatten(e.Message)); }
+        finally { db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}"); }
+    }
+
+    private sealed class StatusRow
+    {
+        public double NUMBER { get; set; }
+        public string TheStatus { get; set; }
+        public string RefrenceNumber { get; set; }
     }
 
     private sealed class InnoRow

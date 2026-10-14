@@ -196,6 +196,13 @@ namespace TaxCollectData.Library.Dto.Content
         public decimal? SaleThreshold { get; set; }
         public string EconomicCode { get; set; }
     }
+
+    public class InvoiceDtoWrapper
+    {
+        public InvoiceDto Invoice { get; set; }
+        public string FiscalId { get; set; }
+        public string Uid { get; set; }
+    }
 }
 
 namespace TaxCollectData.Library.Dto.Transfer

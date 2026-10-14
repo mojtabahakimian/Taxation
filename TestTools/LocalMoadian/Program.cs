@@ -5,6 +5,7 @@ using Prg_Moadian.FUNCTIONS;
 using Prg_Moadian.Service;
 using TaxCollectData.Library.Business;
 using TaxCollectData.Library.Dto.Content;
+using TaxCollectData.Library.Dto.Transfer;
 
 namespace MoadianLocalTest;
 
@@ -1142,8 +1143,13 @@ internal static class Program
             Extension = new List<InvoiceExtension>(),
         }).ToList();
 
-        var resp = TaxApiService.Instance.TaxApis.SendInvoices(dtos, null);
-        return resp?.Body?.Result?.Select(x => x.ReferenceNumber).ToList() ?? new List<string>();
+        // پاسخ‌ها ترتیب ندارند (HashSet)؛ با uid خودمان به فاکتور برمی‌گردانیم.
+        var wrapped = dtos.Select(d => new InvoiceDtoWrapper { Invoice = d, Uid = Guid.NewGuid().ToString() }).ToList();
+        var resp = TaxApiService.Instance.TaxApis.SendTspInvoices(wrapped, null);
+        var byUid = (resp?.Body?.Result ?? new HashSet<PacketResponse>())
+            .Where(x => x.Uid != null).ToDictionary(x => x.Uid, x => x.ReferenceNumber);
+        return byUid.Count == 0 ? new List<string>()
+            : wrapped.Select(w => byUid.TryGetValue(w.Uid, out var r) ? r : null).ToList();
     }
 
     private static (bool ok, string status, List<string> codes)? Lookup(string reference)

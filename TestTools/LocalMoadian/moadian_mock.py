@@ -578,9 +578,16 @@ class Handler(BaseHTTPRequestHandler):
                 STATE["drop_next_send"] = body.get("mode", "empty")
             self._send({"ok": True})
             return
+        if route == "__omit_next_result":
+            # {"count": 1} -> next send's response lacks that many results
+            with LOCK:
+                STATE["omit_next_result"] = int(body.get("count", 1))
+            self._send({"ok": True})
+            return
         if route == "__reset":
             with LOCK:
                 STATE.pop("drop_next_send", None)
+                STATE.pop("omit_next_result", None)
                 STATE["invoices"].clear()
                 STATE["by_reference"].clear()
                 STATE["by_uid"].clear()
@@ -657,6 +664,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.close_connection = True
                 return
 
+            # ترتیب پاسخ‌ها تضمینی ندارد: SDK آن را HashSet<PacketResponse> می‌گیرد و
+            # سامانهٔ واقعی هم به ترتیب ارسال برنمی‌گرداند (یزدسپار ۱۴۰۵/۰۷/۲۰: فاکتور
+            # یک‌قلمی با خطای «قلم ۲» ثبت شد). ما عمداً وارونه می‌دهیم تا هر جفت‌کردن
+            # بر اساس ترتیب، در تست قرمز شود.
+            results.reverse()
+            # پاسخ یکی از صورتحساب‌ها گم می‌شود (ثبت شده ولی کلاینت نمی‌فهمد)
+            with LOCK:
+                omit = STATE.pop("omit_next_result", 0)
+            if omit and results:
+                results = results[omit:]
             self._send({"timestamp": now_ms(), "result": results, "errors": [],
                         "signature": None, "signatureKeyId": None})
             return
