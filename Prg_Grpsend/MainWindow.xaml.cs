@@ -758,6 +758,17 @@ namespace Prg_Grpsend
                         return res;
                     };
 
+                    // هشدارهای ساخت فاکتور یکجا در یک فهرست، نه یک پنجره برای هر هشدار.
+                    bulk.OnValidationWarningsBatch = (warnings) => {
+                        ISet<long>? excluded = null;
+                        Application.Current.Dispatcher.Invoke(() => {
+                            var win = new WIN_BULKWARNINGS(warnings, total);
+                            win.ShowDialog();
+                            excluded = win.Excluded;
+                        });
+                        return excluded;
+                    };
+
                     return await bulk.SendAsync(
                                  selected, 2,
                                  inty,

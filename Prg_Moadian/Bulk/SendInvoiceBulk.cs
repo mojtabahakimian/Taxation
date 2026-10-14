@@ -27,6 +27,10 @@ namespace Prg_Moadian.Bulk
         public InvoiceValidationException(long number, string message)
             : base(message) => InvoiceNumber = number;
     }
+    /// <summary>هشدار ساخت یک فاکتور در ارسال گروهی.</summary>
+    /// <param name="Kind">نوع کوتاه هشدار، برای گروه‌بندی در فهرست (مثلاً «مالیات صفر»).</param>
+    public sealed record BulkWarning(long Number, string Kind, string Message);
+
     public sealed class SendInvoiceBulk
     {
         private const int MaxPerRequest = 99;
@@ -40,6 +44,33 @@ namespace Prg_Moadian.Bulk
 
         public string CALLER_NAME { get; set; } = "m";
         public Func<string, bool>? OnValidationWarning { get; set; }
+
+        /// <summary>
+        /// هشدارهای ساخت فاکتور را یکجا می‌دهد، نه یکی‌یکی (با ۱۰۰۰ فاکتور، ده‌ها پنجره باز می‌شد
+        /// و «لغو» فقط همان یک فاکتور را کنار می‌گذاشت). اگر تنظیم شود، همهٔ فاکتورها بی‌وقفه ساخته
+        /// می‌شوند و یک بار با فهرست هشدارها صدا زده می‌شود.
+        /// خروجی: شمارهٔ فاکتورهایی که کاربر نمی‌خواهد بفرستد (خالی = همه بروند، مثل «ادامه» در هر
+        /// هشدار)؛ <c>null</c> = لغو کل ارسال. هشدار «قبلاً ارسال شده» همچنان با OnValidationWarning است.
+        /// </summary>
+        public Func<IReadOnlyList<BulkWarning>, ISet<long>?>? OnValidationWarningsBatch { get; set; }
+
+        /// <summary>هشدارهای جمع‌شده در حالت یکجا؛ null یعنی حالت قدیمیِ یکی‌یکی.</summary>
+        private List<BulkWarning>? _collectedWarnings;
+
+        /// <summary>
+        /// یک هشدار ساخت فاکتور. در حالت یکجا جمع می‌شود و ساخت ادامه پیدا می‌کند (مثل «ادامه»)؛
+        /// وگرنه مثل قبل OnValidationWarning صدا زده می‌شود. false یعنی این فاکتور نرود.
+        /// </summary>
+        private bool Warn(long number, string kind, string message, string? prompt = null)
+        {
+            if (_collectedWarnings != null)
+            {
+                _collectedWarnings.Add(new BulkWarning(number, kind, message));
+                return true;
+            }
+            return OnValidationWarning != null &&
+                   OnValidationWarning(prompt ?? $"{message}\n\nآیا با این وجود ادامه می‌دهید؟");
+        }
 
         /// <summary>
         /// فقط برای ابزار تست (شبیه‌سازی روی دیتابیس واقعی): هیچ نوشتنی در دیتابیس انجام نشود.
@@ -139,6 +170,7 @@ namespace Prg_Moadian.Bulk
             // 1. تبدیل به DTO و جمع‌آوری رکوردها
             var allDtos = new List<InvoiceDto>();
             var allRecords = new Dictionary<InvoiceDto, List<TAXDTL>>();
+            _collectedWarnings = OnValidationWarningsBatch != null ? new List<BulkWarning>() : null;
 
             foreach (var number in numbers)
             {
@@ -164,6 +196,43 @@ namespace Prg_Moadian.Bulk
                     buildProgress++;
                     double buildPercent = (double)buildProgress / totalNumbers;
                     progress?.Report((int)(buildPercent * 50));
+                }
+            }
+
+            // 1-ب. حالت یکجا: یک فهرست از هشدارهای فاکتورهای ساخته‌شده، یک تصمیم.
+            var collected = _collectedWarnings;
+            _collectedWarnings = null;
+            if (collected != null && collected.Count > 0)
+            {
+                var builtByNumber = new Dictionary<long, InvoiceDto>();
+                foreach (var dto in allDtos)
+                    if (allRecords[dto].FirstOrDefault()?.NUMBER is double n && n > 0)
+                        builtByNumber[(long)n] = dto;
+
+                // فاکتوری که بعد از هشدار به خطای دیگری خورد، در Failures هست و نباید در فهرست بیاید.
+                var shown = collected.Where(w => builtByNumber.ContainsKey(w.Number)).ToList();
+                if (shown.Count > 0)
+                {
+                    var excluded = OnValidationWarningsBatch!(shown);
+                    if (excluded == null)
+                    {
+                        // لغو کل ارسال: هیچ فاکتوری نمی‌رود و چیزی هم در دیتابیس ثبت نمی‌شود.
+                        foreach (var num in builtByNumber.Keys)
+                            result.Failures[num] = "ارسال گروهی توسط کاربر لغو شد.";
+                        return result;
+                    }
+
+                    // مثل «لغو ارسال» در هشدار یکی‌یکی. توجه: RecordFailedInvoiceLocal روی SQL Server
+                    // واقعی هرگز ثبت نکرده — ستون Tinb اجباری است و INSERT آن را ندارد (در هیچ
+                    // دیتابیسی ردیف LOCAL_ERROR نیست). عمداً اینجا اصلاح نشد؛ گرید پیگیری ردیف‌های
+                    // بی‌taxid را در یک ردیف جمع می‌کند و تصمیمش جداست (۱۴۰۵/۰۷/۲۲).
+                    foreach (var num in excluded.Where(builtByNumber.ContainsKey).ToList())
+                    {
+                        string msg = string.Join(" | ", shown.Where(w => w.Number == num).Select(w => w.Message));
+                        RecordFailedInvoiceLocal(num, tag, msg);
+                        result.Failures[num] = "کاربر در فهرست هشدارها کنار گذاشت: " + msg;
+                        allDtos.Remove(builtByNumber[num]);
+                    }
                 }
             }
 
@@ -381,7 +450,7 @@ namespace Prg_Moadian.Bulk
                 {
                     string dMsg = $"فاکتور {number}: تاریخ حواله ({FormatYmd(havalehDate.Value)}) با تاریخ فاکتور فروش ({FormatYmd(invoiceDate)}) فرق دارد. " +
                                   "تاریخ فاکتور فروش فرستاده می‌شود. اگر تاریخ درست تاریخ حواله است، تاریخ خود فاکتور فروش را اصلاح کنید یا از تاریخ سفارشی استفاده کنید.";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{dMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (!Warn(number, "تاریخ حواله ≠ تاریخ فاکتور", dMsg))
                     {
                         RecordFailedInvoiceLocal(number, tag, dMsg);
                         throw new InvoiceValidationException(number, dMsg);
@@ -407,7 +476,7 @@ namespace Prg_Moadian.Bulk
             if (!contin)
             {
                 var idMsg = $"فاکتور {number}: شناسه کالا/خدمت (sstid) یا واحد اندازه‌گیری (mu) برای بعضی ردیف‌ها خالی است.";
-                if (OnValidationWarning == null || !OnValidationWarning($"{idMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                if (!Warn(number, "شناسه یا واحد کالا خالی", idMsg))
                 {
                     RecordFailedInvoiceLocal(number, tag, idMsg);
                     throw new InvoiceValidationException(number, idMsg);
@@ -454,7 +523,7 @@ namespace Prg_Moadian.Bulk
                 {
                     string errMsg = $"فاکتور {number}: {buyerError}";
 
-                    if (OnValidationWarning != null && OnValidationWarning($"{errMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (Warn(number, "اطلاعات خریدار", errMsg))
                     {
                         // کاربر آگاهانه ادامه داد
                     }
@@ -518,9 +587,9 @@ namespace Prg_Moadian.Bulk
 
                 if (zeroProblem != null)
                 {
-                    if (OnValidationWarning != null)
+                    if (OnValidationWarning != null || _collectedWarnings != null)
                     {
-                        if (!OnValidationWarning($"{zeroProblem}. آیا مایل به ادامه ارسال هستید؟"))
+                        if (!Warn(number, "مقدار یا مبلغ صفر", $"فاکتور {number}: {zeroProblem}.", $"{zeroProblem}. آیا مایل به ادامه ارسال هستید؟"))
                         {
                             string errMsg = $"ارسال فاکتور {number} به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
                             RecordFailedInvoiceLocal(number, tag, errMsg);
@@ -543,7 +612,7 @@ namespace Prg_Moadian.Bulk
                 if (!(isReturn) && (ln.N_MOIN ?? 0) > (ln.MABL_K ?? 0))
                 {
                     var disMsg = $"فاکتور {number}: تخفیف کالا/خدمت '{ln.KALA}' ({ln.N_MOIN}) از مبلغ قبل از تخفیف ({ln.MABL_K}) بیشتر است.";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{disMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (!Warn(number, "تخفیف بیش از مبلغ", disMsg))
                     {
                         RecordFailedInvoiceLocal(number, tag, disMsg);
                         throw new InvoiceValidationException(number, disMsg);
@@ -554,7 +623,7 @@ namespace Prg_Moadian.Bulk
                 if ((ln.mabkbt ?? 0) > 0 && (ln.vra ?? 0) > 0 && (ln.IMBAA ?? 0) <= 0)
                 {
                     var vatMsg = $"فاکتور {number}: کالا/خدمت '{ln.KALA}' نرخ مالیات {ln.vra}٪ دارد ولی مبلغ مالیاتش صفر است.";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{vatMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (!Warn(number, "نرخ مالیات دارد، مالیات صفر", vatMsg))
                     {
                         RecordFailedInvoiceLocal(number, tag, vatMsg);
                         throw new InvoiceValidationException(number, vatMsg);
@@ -581,7 +650,7 @@ namespace Prg_Moadian.Bulk
                 if (!lines.Any())
                 {
                     string errMsg = $"فاکتور {number}: پس از کسر اقلام مرجوعی هیچ ردیفی باقی نمانده است؛ معمولا برای برگشت کامل باید صورتحساب ابطالی صادر شود.";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{errMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (!Warn(number, "برگشت بدون ردیف", errMsg))
                     {
                         RecordFailedInvoiceLocal(number, tag, errMsg);
                         throw new InvoiceValidationException(number, errMsg);
@@ -628,7 +697,7 @@ namespace Prg_Moadian.Bulk
                     // هشدار، نه سد. قواعد تسویه ممکن است تغییر کنند یا سامانه رفتار
                     // دیگری داشته باشد؛ تصمیم با کاربر است.
                     var capMsg = $"فاکتور {number}: {capInspError}";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{capMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (!Warn(number, "نقدی/نسیه", capMsg))
                     {
                         RecordFailedInvoiceLocal(number, tag, capMsg);
                         throw new InvoiceValidationException(number, capMsg);
@@ -649,7 +718,7 @@ namespace Prg_Moadian.Bulk
                 if (Math.Abs((headExt.cap ?? 0) + (headExt.insp ?? 0) - expectedSum) > 0.01m) // تلرانس برای مقایسه decimal
                 {
                     var buildResult = $"مجموع مبلغ نقدی ({headExt.cap ?? 0}) و نسیه ({headExt.insp ?? 0}) با مبنای تسویه ({expectedSum}) برای فاکتور {number} همخوانی ندارد.";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{buildResult}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (!Warn(number, "نقدی/نسیه", buildResult))
                     {
                         RecordFailedInvoiceLocal(number, tag, buildResult);
                         throw new InvoiceValidationException(number, buildResult);

@@ -226,6 +226,9 @@ internal static class BulkStress
         // سامانه پاسخ داد ولی برای یکی از فاکتورها نه: UNKNOWN و گزارش به کاربر.
         CheckMissingResult(db, mockBaseUrl, check);
 
+        // هشدارهای ساخت فاکتور یکجا در یک فهرست، نه یک پنجره برای هر هشدار.
+        CheckBatchWarnings(db, mockBaseUrl, check);
+
         // --- داده قبلی نباید دست خورده باشد ---
         long otherRowsAfter = db.DoGetDataSQL<long>(
             $"SELECT COUNT(*) FROM dbo.TAXDTL WHERE TAG<>{TestTag}").First();
@@ -496,6 +499,75 @@ internal static class BulkStress
         }
         catch (Exception e) { check("۱۶-۳۲ پاسخ ناقص سامانه", false, Flatten(e.Message)); }
         finally { db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}"); }
+    }
+
+    /// <summary>
+    /// با ۱۰۶۶ فاکتور، برای هر هشدارِ هر فاکتور یک پنجره باز می‌شد و «لغو» فقط همان یکی را
+    /// کنار می‌گذاشت (۱۴۰۵/۰۷/۲۲). حالا هشدارها یکجا می‌آیند و یک تصمیم گرفته می‌شود.
+    /// </summary>
+    private static void CheckBatchWarnings(CL_CCNNMANAGER db, string url, Action<string, bool, string> check)
+    {
+        long[] nums = { 1_000_113, 1_000_114, 1_000_115 };
+        long[] warned = { nums[0], nums[1] };
+        string inList = string.Join(",", nums);
+        string where = $"TAG={TestTag} AND NUMBER IN ({inList})";
+        long Status(long n, string s) => db.DoGetDataSQL<long>(
+            $"SELECT COUNT(*) FROM dbo.TAXDTL WHERE TAG={TestTag} AND NUMBER={n} AND TheStatus='{s}'").First();
+        var saved = db.DoGetDataSQL<ImbaaRow>(
+            $"SELECT NUMBER, RADIF, IMBAA FROM dbo.INVO_LST WHERE TAG={TestTag} AND NUMBER IN ({warned[0]},{warned[1]})").ToList();
+        try
+        {
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}");
+            // نرخ مالیات دارند ولی مالیات ذخیره‌شده صفر است → هشدار «مالیات صفر»
+            db.DoExecuteSQL($"UPDATE dbo.INVO_LST SET IMBAA = 0 WHERE TAG={TestTag} AND NUMBER IN ({warned[0]},{warned[1]})");
+
+            int single = 0, batchCalls = 0;
+            IReadOnlyList<BulkWarning> seen = Array.Empty<BulkWarning>();
+            var bulk = new SendInvoiceBulk(db, url)
+            {
+                OnValidationWarning = _ => { single++; return true; },
+                OnValidationWarningsBatch = list => { batchCalls++; seen = list; return new HashSet<long> { warned[0] }; },
+            };
+            var r = bulk.SendAsync(nums, TestTag, inty_value: 1, setm_value: 1).GetAwaiter().GetResult();
+
+            var seenNums = seen.Select(w => w.Number).Distinct().OrderBy(x => x).ToArray();
+            check("۱۶-۳۳ هشدارها یکجا می‌آیند: یک فهرست، هیچ پنجرهٔ تکی؛ کنارگذاشته نمی‌رود و بقیه می‌روند",
+                  batchCalls == 1 && single == 0 && seenNums.SequenceEqual(warned)
+                  && seen.All(w => w.Kind.Length > 0 && w.Message.Contains(w.Number.ToString()))
+                  && r.Success == 2 && r.Failures.ContainsKey(warned[0])
+                  && Status(warned[0], "PENDING") == 0
+                  && Status(warned[1], "PENDING") > 0 && Status(nums[2], "PENDING") > 0,
+                  $"فهرست {batchCalls} بار، پنجرهٔ تکی {single}، در فهرست [{string.Join(",", seenNums)}]، موفق {r.Success}، " +
+                  $"ناموفق [{string.Join(",", r.Failures.Keys)}]");
+
+            // --- لغو کل ارسال: هیچ فاکتوری نمی‌رود و چیزی ثبت نمی‌شود ---
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}");
+            bulk = new SendInvoiceBulk(db, url)
+            {
+                OnValidationWarning = _ => true,
+                OnValidationWarningsBatch = _ => null,
+            };
+            r = bulk.SendAsync(nums, TestTag, inty_value: 1, setm_value: 1).GetAwaiter().GetResult();
+            long rows = db.DoGetDataSQL<long>($"SELECT COUNT(*) FROM dbo.TAXDTL WHERE {where}").First();
+            check("۱۶-۳۴ «لغو کل ارسال» در فهرست هشدارها: هیچ فاکتوری نمی‌رود، حتی بی‌هشدارها",
+                  r.Success == 0 && r.Failures.Count == nums.Length && rows == 0,
+                  $"موفق {r.Success}، ناموفق {r.Failures.Count}، ردیف {rows}");
+        }
+        catch (Exception e) { check("۱۶-۳۳ هشدارهای یکجا", false, Flatten(e.Message)); }
+        finally
+        {
+            foreach (var s in saved)
+                db.DoExecuteSQL($"UPDATE dbo.INVO_LST SET IMBAA = @I WHERE TAG={TestTag} AND NUMBER=@N AND RADIF=@R",
+                                new { I = s.IMBAA, N = s.NUMBER, R = s.RADIF });
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE {where}");
+        }
+    }
+
+    private sealed class ImbaaRow
+    {
+        public double NUMBER { get; set; }
+        public double RADIF { get; set; }
+        public double? IMBAA { get; set; }
     }
 
     private sealed class StatusRow
