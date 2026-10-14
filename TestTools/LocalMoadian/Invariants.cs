@@ -295,9 +295,7 @@ internal static class Invariants
                 src, @"string checkSql = .*?AND TAG = 2\s+AND ApiTypeSent",
                 System.Text.RegularExpressions.RegexOptions.Singleline);
             bool sendTag   = System.Text.RegularExpressions.Regex.IsMatch(
-                                 src, @"SendAsync\(\s*
-?
-?\s*selected,\s*2,");
+                                 src, @"SendAsync\(\s*selected,\s*2,");   // \s خط‌جدید را هم می‌گیرد؛ مستقل از CRLF/LF
 
             var missing = new List<string>();
             if (!gridTag)   missing.Add("تگ گرید (IsDenafaraz ? 2 : 13)");
