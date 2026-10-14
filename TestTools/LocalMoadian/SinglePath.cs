@@ -212,6 +212,9 @@ internal static class SinglePath
                 check("۲۲-۱۰ شناسه کالا و واحد در دو مسیر یکسان است",
                       idMismatch.Count == 0, string.Join("؛ ", idMismatch.Take(4)));
             }
+
+            check("۲۲-۱۱ در MrCorrect تاریخ صدور از سرگروه فاکتور است، نه از حوالهٔ جدیدتر (هر دو مسیر)؛ گروهی دربارهٔ اختلاف هشدار می‌دهد",
+                  DateComesFromInvoiceHeader(db, http, mockBaseUrl, numbers.Count > 1 ? numbers[1] : target, out var d11), d11);
         }
         finally
         {
@@ -325,6 +328,74 @@ internal static class SinglePath
         }
         catch (Exception e) { detail = One(e.Message); return false; }
         finally { CL_MOADIAN.OnValidationWarning = saved; }
+    }
+
+    /// <summary>
+    /// در MrCorrect سرگروه فاکتور (TAG=13، اینجا 88) و حواله (TAG=2، اینجا 77) هر کدام
+    /// DATE_N خودشان را دارند. در یزدسپار ۷۴ فاکتور حوالهٔ ۱ تا ۱۶ روز دیرتر دارند و
+    /// سامانهٔ واقعی تاریخ سرگروه را پذیرفته است. پیشنهاد «تاریخ جدیدتر بین این دو»
+    /// (۱۴۰۵/۰۷/۲۱، فاکتور ۹۱۵ آبادیس) تاریخ صدور همهٔ آن‌ها را جابه‌جا می‌کرد و هیچ
+    /// تستی آن را نمی‌گرفت.
+    ///
+    /// تصمیم کاربر (۱۴۰۵/۰۷/۲۱): منبع تاریخ، تاریخ فاکتور فروش (سرگروه) است.
+    /// این تست فقط شاخهٔ MrCorrect را می‌سنجد؛ اینکه ارسال گروهی در محیط واقعی
+    /// اصلاً به این شاخه برسد، با تست ۲۰ (تشخیص محصول از کلیدِ جورشده) قفل شده.
+    /// </summary>
+    private static bool DateComesFromInvoiceHeader(CL_CCNNMANAGER db, HttpClient http, string url,
+                                                   long number, out string detail)
+    {
+        long headDate, havalehDate, laterDate, expected;
+        try
+        {
+            headDate = db.DoGetDataSQL<long>(
+                $"SELECT DATE_N FROM dbo.HEAD_LST WHERE TAG={HeadTag} AND NUMBER={number}").First();
+            havalehDate = db.DoGetDataSQL<long>(
+                $"SELECT DATE_N FROM dbo.HEAD_LST WHERE TAG={SendTag} AND NUMBER={number}").First();
+
+            var pc = new System.Globalization.PersianCalendar();
+            string h = headDate.ToString();
+            var later = pc.ToDateTime(int.Parse(h[..4]), int.Parse(h.Substring(4, 2)), int.Parse(h.Substring(6, 2)), 0, 0, 0, 0)
+                          .AddDays(2);
+            laterDate = pc.GetYear(later) * 10000L + pc.GetMonth(later) * 100 + pc.GetDayOfMonth(later);
+
+            var fn = new CL_FUNTIONS();
+            expected = Prg_Moadian.Service.TaxService.ConvertDateToLong(fn.GetGregorianDateTime(headDate.ToString()));
+        }
+        catch (Exception e) { detail = "آماده‌سازی: " + One(e.Message); return false; }
+
+        long? SentIndatim()
+        {
+            var p = Payloads(http, url);
+            return p.Count == 1 ? p.Values.First()["header"]?["indatim"]?.GetValue<long>() : null;
+        }
+
+        try
+        {
+            db.DoExecuteSQL($"UPDATE dbo.HEAD_LST SET DATE_N={laterDate} WHERE TAG={SendTag} AND NUMBER={number}");
+
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER={number}");
+            Reset(http, url);
+            string singleErr = "";
+            try { CL_MOADIAN.DoSendInvoice(new[] { $"{number}_{SendTag}_m" }); }
+            catch (Exception ex) { singleErr = One(ex.Message); }
+            long? single = SentIndatim();
+
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER={number}");
+            Reset(http, url);
+            bool warned = false;
+            var bulk = new SendInvoiceBulk(db, url) { OnValidationWarning = m => { warned |= m.Contains("تاریخ حواله"); return true; } };
+            bulk.SendAsync(new[] { number }, SendTag, inty_value: null, setm_value: null).GetAwaiter().GetResult();
+            long? bulkSent = SentIndatim();
+
+            detail = $"سرگروه {headDate}، حواله {laterDate}؛ انتظار {expected}، تکی {single?.ToString() ?? "ارسال نشد " + singleErr}، گروهی {bulkSent?.ToString() ?? "ارسال نشد"}، هشدار گروهی {warned}";
+            return single == expected && bulkSent == expected && warned;
+        }
+        catch (Exception e) { detail = One(e.Message); return false; }
+        finally
+        {
+            db.DoExecuteSQL($"UPDATE dbo.HEAD_LST SET DATE_N={havalehDate} WHERE TAG={SendTag} AND NUMBER={number}");
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER={number}");
+        }
     }
 
     private static Dictionary<string, JsonNode> Payloads(HttpClient http, string baseUrl)

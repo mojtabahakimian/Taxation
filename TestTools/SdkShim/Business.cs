@@ -60,6 +60,7 @@ namespace TaxCollectData.Library.Business
         ServerInformationModel GetServerInformation();
         TokenModel RequestToken();
         HttpResponse<AsyncResponseModel> SendInvoices(List<InvoiceDto> invoices, Dictionary<string, string> headers);
+        HttpResponse<AsyncResponseModel> SendTspInvoices(List<InvoiceDtoWrapper> invoices, Dictionary<string, string> headers);
         List<InquiryResultModel> InquiryByReferenceId(List<string> referenceIds, DateTime? start = null, DateTime? end = null);
         List<InquiryResultModel> InquiryByUidAndFiscalId(List<UidAndFiscalId> uidAndFiscalIds, DateTime? start = null, DateTime? end = null);
         EconomicCodeModel GetEconomicCodeInformation(string economicCode);
@@ -236,26 +237,32 @@ namespace TaxCollectData.Library.Business
 
         // ------------------------------------------------------------ async
 
-        public HttpResponse<AsyncResponseModel> SendInvoices(List<InvoiceDto> invoices, Dictionary<string, string> extraHeaders)
+        public HttpResponse<AsyncResponseModel> SendInvoices(List<InvoiceDto> invoices, Dictionary<string, string> extraHeaders) =>
+            SendTspInvoices((invoices ?? new List<InvoiceDto>())
+                .Select(i => new InvoiceDtoWrapper { Invoice = i }).ToList(), extraHeaders);
+
+        // مثل SDK رسمی: uid و fiscalId خالی یعنی Guid تازه و شناسهٔ حافظهٔ خود کلاینت.
+        public HttpResponse<AsyncResponseModel> SendTspInvoices(List<InvoiceDtoWrapper> invoices, Dictionary<string, string> extraHeaders)
         {
             if (_serverKey == null) GetServerInformation();
             if (_serverKey == null) throw new TaxApiException("server public key unavailable");
 
             var packets = new JArray();
-            foreach (var inv in invoices ?? new List<InvoiceDto>())
+            foreach (var w in invoices ?? new List<InvoiceDtoWrapper>())
             {
+                var inv = w.Invoice;
                 string json = InvoiceJson.Serialize(inv);
                 var enc = Crypto.EncryptPacketData(Encoding.UTF8.GetBytes(json), _serverKey);
                 packets.Add(new JObject
                 {
-                    ["uid"] = Guid.NewGuid().ToString(),
+                    ["uid"] = string.IsNullOrEmpty(w.Uid) ? Guid.NewGuid().ToString() : w.Uid,
                     ["packetType"] = "INVOICE.V01",
                     ["retry"] = false,
                     ["data"] = enc.Data,
                     ["encryptionKeyId"] = _serverKeyId,
                     ["symmetricKey"] = enc.SymmetricKey,
                     ["iv"] = enc.Iv,
-                    ["fiscalId"] = _clientId,
+                    ["fiscalId"] = string.IsNullOrEmpty(w.FiscalId) ? _clientId : w.FiscalId,
                     ["dataSignature"] = Sign(Normalizer.Normalize(JToken.Parse(json), null)),
                 });
             }

@@ -5,6 +5,7 @@ using Prg_Moadian.FUNCTIONS;
 using Prg_Moadian.Service;
 using TaxCollectData.Library.Business;
 using TaxCollectData.Library.Dto.Content;
+using TaxCollectData.Library.Dto.Transfer;
 
 namespace MoadianLocalTest;
 
@@ -30,6 +31,7 @@ internal static class Program
     {
         var urlArg = args.FirstOrDefault(a => a.StartsWith("http", StringComparison.OrdinalIgnoreCase));
         if (urlArg != null) BaseUrl = urlArg;
+        if (args.Contains("--simulate-branches")) return BranchSimulation.Run(BaseUrl);
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
         Banner("گروه ۱ — سریال صورتحساب (Inno)");
@@ -359,6 +361,22 @@ internal static class Program
               MoadianRules.SettlementBase(500_000m, 0m, 0m) == 500_000m);
         Check("۲-۴۰ نتیجه منفی به صفر بریده می‌شود",
               MoadianRules.SettlementBase(100m, 500m, 0m) == 0m);
+
+        // --- تاریخ سفارشی ارسال گروهی
+        bool P(string? t, out string ymd) => MoadianRules.TryParseShamsiDate(t, out ymd, out _);
+        Check("۲-۴۱ تاریخ سفارشی ۱۴۰۵/۰۷/۰۹ پذیرفته می‌شود",
+              P("1405/07/09", out var a1) && a1 == "14050709", a1);
+        Check("۲-۴۲ تاریخ سفارشی بدون صفر (1405/7/9) هم همان تاریخ است، نه ماه ۷۹",
+              P("1405/7/9", out var a2) && a2 == "14050709", a2);
+        Check("۲-۴۳ تاریخ سفارشی هشت‌رقمی پذیرفته می‌شود",
+              P(" 14050709 ", out var a3) && a3 == "14050709", a3);
+        Check("۲-۴۴ تاریخ سفارشی خالی، ماه ۱۳، روز ۳۲ یا متن نامعتبر رد می‌شود",
+              !P("", out _) && !P(null, out _) && !P("1405/13/01", out _) && !P("1405/07/32", out _)
+              && !P("1405/07/09x", out _) && !P("140579", out _) && !P("1405/07", out _));
+        Check("۲-۴۶ تاریخ سفارشی با رقم فارسی یا جداکنندهٔ «-» هم پذیرفته می‌شود",
+              P("۱۴۰۵/۰۷/۰۹", out var a4) && a4 == "14050709" && P("1405-7-9", out var a5) && a5 == "14050709", a4);
+        Check("۲-۴۵ روز ۳۱ در نیمهٔ دوم سال رد می‌شود (مهر ۳۰ روزه است)",
+              !P("1405/07/31", out _) && P("1405/06/31", out _));
     }
 
     // ================================================================ گروه ۳
@@ -1125,8 +1143,13 @@ internal static class Program
             Extension = new List<InvoiceExtension>(),
         }).ToList();
 
-        var resp = TaxApiService.Instance.TaxApis.SendInvoices(dtos, null);
-        return resp?.Body?.Result?.Select(x => x.ReferenceNumber).ToList() ?? new List<string>();
+        // پاسخ‌ها ترتیب ندارند (HashSet)؛ با uid خودمان به فاکتور برمی‌گردانیم.
+        var wrapped = dtos.Select(d => new InvoiceDtoWrapper { Invoice = d, Uid = Guid.NewGuid().ToString() }).ToList();
+        var resp = TaxApiService.Instance.TaxApis.SendTspInvoices(wrapped, null);
+        var byUid = (resp?.Body?.Result ?? new HashSet<PacketResponse>())
+            .Where(x => x.Uid != null).ToDictionary(x => x.Uid, x => x.ReferenceNumber);
+        return byUid.Count == 0 ? new List<string>()
+            : wrapped.Select(w => byUid.TryGetValue(w.Uid, out var r) ? r : null).ToList();
     }
 
     private static (bool ok, string status, List<string> codes)? Lookup(string reference)

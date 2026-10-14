@@ -41,6 +41,18 @@ namespace Prg_Moadian.Bulk
         public string CALLER_NAME { get; set; } = "m";
         public Func<string, bool>? OnValidationWarning { get; set; }
 
+        /// <summary>
+        /// فقط برای ابزار تست (شبیه‌سازی روی دیتابیس واقعی): هیچ نوشتنی در دیتابیس انجام نشود.
+        /// جایی که ساختن فاکتور باید بنویسد، به‌جایش خطا می‌دهد. در برنامه هرگز روشن نمی‌شود.
+        /// </summary>
+        internal bool DryRun { get; init; }
+
+        private static string FormatYmd(long ymd)
+        {
+            var s = ymd.ToString();
+            return s.Length == 8 ? $"{s[..4]}/{s.Substring(4, 2)}/{s.Substring(6, 2)}" : s;
+        }
+
         private SendInvoiceBulk(CL_CCNNMANAGER db,
                           SAZMAN sazman,
                           TaxService taxService)
@@ -82,7 +94,7 @@ namespace Prg_Moadian.Bulk
         /// <param name="setm_value">روش تسویه</param>
         /// <param name="progress">گزارش پیشرفت</param>
         /// <param name="useCustomDate">استفاده از تاریخ سفارشی</param>
-        /// <param name="customDateText">متن تاریخ سفارشی (مثال: 1404/08/24)</param>
+        /// <param name="customDateText">متن تاریخ سفارشی (مثال: 1404/08/24). اگر useCustomDate روشن و این متن خالی یا نامعتبر باشد، هیچ فاکتوری نمی‌رود و همه در Failures با پیام خطا برمی‌گردند (دیگر بی‌صدا تاریخ اصلی فاکتور نمی‌رود).</param>
         /// <param name="sendOptionalItemName">ارسال نام اختیاری کالا/خدمت در فیلد sstt</param>
         public async Task<BulkSendResult> SendAsync(IEnumerable<long> invoiceNumbers, int tag, int? inty_value = default, int? setm_value = default,
     IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
@@ -92,6 +104,13 @@ namespace Prg_Moadian.Bulk
             var result = new BulkSendResult();
             var numbers = invoiceNumbers.Distinct().ToList();
             if (!numbers.Any()) return result;
+
+            // تاریخ سفارشی نامعتبر: هیچ فاکتوری نرود، نه اینکه بی‌صدا با تاریخ اصلی برود.
+            if (useCustomDate && !MoadianRules.TryParseShamsiDate(customDateText, out _, out var customDateError))
+            {
+                foreach (var n in numbers) result.Failures[n] = customDateError;
+                return result;
+            }
 
             // فاکتورهایی که ارسال زندهٔ قبلی دارند: یک هشدار برای همه، نه یکی‌یکی.
             // گزینهٔ «همه (شامل ارسال شده)» و تغییر وضعیت پس از بارگذاری لیست
@@ -160,6 +179,12 @@ namespace Prg_Moadian.Bulk
                 {
                     progress?.Report(0);
 
+                    // uid هر بسته را خودمان می‌سازیم تا پاسخ سامانه را با uid به فاکتورش
+                    // برگردانیم. SendTspInvoices با FiscalId خالی همان بستهٔ SendInvoices را
+                    // می‌سازد (همان آدرس، رمزنگاری و شناسهٔ حافظه)؛ فقط uid از ما است.
+                    var uids = batch.Select(_ => Guid.NewGuid().ToString()).ToList();
+                    var wrapped = batch.Select((dto, i) => new InvoiceDtoWrapper { Invoice = dto, Uid = uids[i] }).ToList();
+
                     // ۱. متغیرهایی برای نگهداری وضعیت پاسخ سرور
                     List<PacketResponse> responsesToSave = new List<PacketResponse>();
                     string batchErrorMessage = null;
@@ -174,7 +199,7 @@ namespace Prg_Moadian.Bulk
                     try
                     {
                         // ❷ فراخوانی وب‌سرویس
-                        var response = await Task.Run(() => TaxApiService.Instance.TaxApis.SendInvoices(batch, null)).ConfigureAwait(false);
+                        var response = await Task.Run(() => TaxApiService.Instance.TaxApis.SendTspInvoices(wrapped, null)).ConfigureAwait(false);
 
                         // بررسی قطعی بودن پاسخ سرور
                         if (response == null || response.Body == null)
@@ -224,7 +249,7 @@ namespace Prg_Moadian.Bulk
                     var batchRecords = batch.Select(dto => allRecords[dto]).ToList();
 
                     // ذخیره در دیتابیس!
-                    PersistChunk(batch, batchRecords, responsesToSave, tag, outcomeUnknown);
+                    var missing = PersistChunk(batch, batchRecords, uids, responsesToSave, tag, outcomeUnknown);
 
                     // ---------------------------------------------------------------------
                     // ❹ گزارش‌دهی به کاربر
@@ -232,9 +257,13 @@ namespace Prg_Moadian.Bulk
 
                     if (batchErrorMessage == null)
                     {
-                        // کاملاً موفق بود
-                        result.Success += responsesToSave.Count;
-                        progress?.Report(responsesToSave.Count);
+                        // فاکتوری که سامانه برایش پاسخی نداد UNKNOWN ثبت شده و از لیست
+                        // ارسال‌نشده‌ها بیرون می‌رود؛ اگر اینجا گزارش نشود، بی‌صدا گم می‌شود.
+                        foreach (var num in missing)
+                            result.Failures[num] = "سامانه برای این فاکتور پاسخی برنگرداند؛ معلوم نیست ثبت شده یا نه. " +
+                                                   "پیش از ارسال دوباره، کارپوشه را بررسی کنید.";
+                        result.Success += batch.Count - missing.Count;
+                        progress?.Report(batch.Count - missing.Count);
                     }
                     else
                     {
@@ -280,7 +309,7 @@ namespace Prg_Moadian.Bulk
             return prior.Where(p => !nonOriginal.Contains(p.NUMBER)).ToList();
         }
 
-        private (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
+        internal (InvoiceDto Dto, List<TAXDTL> Records) BuildDtoAndRecords(long number, int tag, int? Inty_Value = default, int? Setm_Value = default, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
         {
             // 1. بارگذاری HEAD_LST_EXTENDED
             var headExt = _db.DoGetDataSQL<HEAD_LST_EXTENDED>($"SELECT * FROM dbo.HEAD_LST_EXTENDED WHERE NUMBER={number} AND TGU={tag}").FirstOrDefault();
@@ -291,6 +320,9 @@ namespace Prg_Moadian.Bulk
                 // در غیر این صورت از مقادیر پیش‌فرض استفاده می‌شود
                 int defaultInty = Inty_Value ?? 1;  // پیش‌فرض: نوع اول
                 int defaultSetm = Setm_Value ?? 1;  // پیش‌فرض: نقدی
+
+                if (DryRun)
+                    throw new InvoiceValidationException(number, $"DryRun: HEAD_LST_EXTENDED for invoice {number} tag {tag} is missing");
 
                 try
                 {
@@ -336,6 +368,26 @@ namespace Prg_Moadian.Bulk
             var lines = FetchInvoiceLines(number, tag);
             if (!lines.Any())
                 throw new InvoiceValidationException(number, $"Invoice {number}/{tag} has no detail lines");
+
+            // MrCorrect: تاریخ صدور از فاکتور فروش (سرگروه) است. اگر کاربر فقط تاریخ حواله را عوض
+            // کرده باشد، تاریخ فاکتور کهنه می‌ماند و ممکن است از مهلت گذشته باشد (فاکتور ۹۱۵ آبادیس).
+            // فقط هشدار — دست کاربر باز است (مثلاً تاریخ سفارشی).
+            if (CALLER_NAME == CL_Generaly.MrCorrect && !useCustomDate)
+            {
+                long? havalehDate = _db.DoGetDataSQL<long?>(
+                    $"SELECT DATE_N FROM dbo.HEAD_LST WHERE NUMBER={number} AND TAG={tag}").FirstOrDefault();
+                long invoiceDate = (long)lines.First().DATE_N;
+                if (havalehDate.HasValue && havalehDate.Value != invoiceDate)
+                {
+                    string dMsg = $"فاکتور {number}: تاریخ حواله ({FormatYmd(havalehDate.Value)}) با تاریخ فاکتور فروش ({FormatYmd(invoiceDate)}) فرق دارد. " +
+                                  "تاریخ فاکتور فروش فرستاده می‌شود. اگر تاریخ درست تاریخ حواله است، تاریخ خود فاکتور فروش را اصلاح کنید یا از تاریخ سفارشی استفاده کنید.";
+                    if (OnValidationWarning == null || !OnValidationWarning($"{dMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    {
+                        RecordFailedInvoiceLocal(number, tag, dMsg);
+                        throw new InvoiceValidationException(number, dMsg);
+                    }
+                }
+            }
 
             // 3. اعتبارسنجی هر خط
             bool contin = true;
@@ -614,33 +666,6 @@ namespace Prg_Moadian.Bulk
             bool isExport = headExt.inp == 7;
             if (!isExport) { headExt.cut = null; headExt.exr = null; }
 
-            // محاسبه تاریخ و TaxId
-            //var dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
-            // اگر تاریخ سفارشی فعال شده باشد، از آن استفاده کن، در غیر این صورت از تاریخ فاکتور استفاده کن
-            DateTime dt;
-            if (useCustomDate && !string.IsNullOrWhiteSpace(customDateText))
-            {
-                try
-                {
-                    // تبدیل تاریخ شمسی سفارشی به میلادی
-                    // فرمت انتظاری: 1404/08/24
-                    var customDateInt = int.Parse(customDateText.Replace("/", ""));
-                    dt = _fn.GetGregorianDateTime(customDateInt.ToString());
-                }
-                catch
-                {
-                    // اگر تاریخ سفارشی نامعتبر بود، از تاریخ فاکتور استفاده کن
-                    dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
-                }
-            }
-            else
-            {
-                dt = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
-            }
-
-            // تاریخ فاکتور تاریخچه‌ای است و نباید اختلاف ساعت سرور به آن اعمال شود
-            // ServerClockSkew فقط برای عملیات زمان‌واقعی (مثل ابطالی/اصلاحی) کاربرد دارد
-            var ts = TaxService.ConvertDateToLong(dt);
 
             // =================================================================
             // ❶ محاسبه زمان "همین الان" بر اساس ساعت دقیق و سینک‌شده‌ی سرور دارایی
@@ -657,19 +682,13 @@ namespace Prg_Moadian.Bulk
             // ❷ محاسبه "تاریخ صدور" (Indatim) - بر اساس تاریخ سفارشی یا تاریخ واقعی
             // =================================================================
             DateTime issueDate;
-            if (useCustomDate && !string.IsNullOrWhiteSpace(customDateText))
+            if (useCustomDate)
             {
-                try
-                {
-                    // تبدیل تاریخ شمسی سفارشی به میلادی (کاربر می‌خواهد فاکتور قدیمی را جدید جا بزند)
-                    var customDateInt = int.Parse(customDateText.Replace("/", ""));
-                    issueDate = _fn.GetGregorianDateTime(customDateInt.ToString());
-                }
-                catch
-                {
-                    // در صورت خطای تایپی کاربر در تاریخ سفارشی، بازگشت به تاریخ اصلی فاکتور
-                    issueDate = _fn.GetGregorianDateTime(lines.First().DATE_N.ToString());
-                }
+                // SendAsync پیش از ساخت هر فاکتور تاریخ را سنجیده است. اینجا دیگر بازگشت
+                // بی‌صدا به تاریخ اصلی فاکتور نداریم: کاربر فکر می‌کرد تاریخ سفارشی رفته.
+                if (!MoadianRules.TryParseShamsiDate(customDateText, out var customYmd, out var customErr))
+                    throw new NullyExceptiony(customErr);
+                issueDate = _fn.GetGregorianDateTime(customYmd);
             }
             else
             {
@@ -927,6 +946,7 @@ namespace Prg_Moadian.Bulk
 
         private void RecordFailedInvoiceLocal(long number, int tag, string errorMessage)
         {
+            if (DryRun) return;
             try
             {
                 var idd = _fn.GetNewIDD();
@@ -948,17 +968,35 @@ namespace Prg_Moadian.Bulk
             }
         }
 
-        private void PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, IEnumerable<PacketResponse> responses, int tag, bool outcomeUnknown = false)
+        /// <returns>شمارهٔ فاکتورهایی که سامانه پاسخ داد ولی uid آن‌ها در پاسخ نبود.</returns>
+        private List<long> PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, List<string> sentUids, IEnumerable<PacketResponse> responses, int tag, bool outcomeUnknown = false)
         {
-            // مرتب‌سازی مطابق با ایندکس
-            var pairs = sent.Select((dto, idx) => new { dto, records = recordsSets[idx], resp = responses.ElementAt(idx) });
+            var missingNumbers = new List<long>();
+            // پاسخ با uid به فاکتور برمی‌گردد، نه با ترتیب. Result در SDK یک HashSet است و
+            // سامانه به ترتیب ارسال جواب نمی‌دهد. قبلاً با ایندکس جفت می‌شد و کد رهگیریِ هر
+            // فاکتور مال فاکتور دیگری ثبت می‌شد: یزدسپار ۱۴۰۵/۰۷/۲۰، فاکتور ۸۵۷۸ «موفق» ولی
+            // در کارپوشه نبود و فاکتور یک‌قلمی ۸۴۴۹ خطای «قلم ۲» گرفت. تست ۱۶-۳۱.
+            var byUid = responses.Where(r => r?.Uid != null)
+                                 .GroupBy(r => r.Uid, StringComparer.OrdinalIgnoreCase)
+                                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            // پاسخ ساختگیِ خطای کل بسته uid ندارد و برای همهٔ فاکتورهای بسته یکی است.
+            // فقط وقتی هیچ پاسخی uid ندارد؛ وگرنه فاکتورِ بی‌جفت باید UNKNOWN و گزارش شود.
+            var batchWide = byUid.Count == 0 ? responses.FirstOrDefault(r => r != null && r.Uid == null) : null;
             Exception firstDbException = null;
 
-            foreach (var pair in pairs)
+            for (int idx = 0; idx < sent.Count; idx++)
             {
-                var header = pair.dto.Header;
-                var uid = pair.resp.Uid;
-                var refNum = pair.resp.ReferenceNumber;
+                var dto = sent[idx];
+                var records = recordsSets[idx];
+                var resp = byUid.TryGetValue(sentUids[idx], out var matched) ? matched : batchWide;
+                var header = dto.Header;
+                var uid = resp?.Uid;
+                var refNum = resp?.ReferenceNumber;
+
+                // سامانه پاسخ داده ولی نه برای این فاکتور: نمی‌دانیم گرفته یا نه.
+                bool missingFromResponse = resp == null;
+                if (missingFromResponse && records.FirstOrDefault()?.NUMBER is double n && n > 0)
+                    missingNumbers.Add((long)n);
 
                 // تفکیک سه حالت — قبلاً هر چیزی که UID نداشت FAILED ثبت می‌شد،
                 // از جمله قطعی شبکه که در آن اصلاً نمی‌دانیم سامانه سند را گرفته یا نه.
@@ -967,14 +1005,14 @@ namespace Prg_Moadian.Bulk
                 //   FAILED  : سامانه صریحاً رد کرده.
                 var status = uid != null
                     ? "PENDING"
-                    : (outcomeUnknown ? "UNKNOWN" : "FAILED");
+                    : (outcomeUnknown || missingFromResponse ? "UNKNOWN" : "FAILED");
 
                 try
                 {
-                    for (int i = 0; i < pair.dto.Body.Count; i++)
+                    for (int i = 0; i < dto.Body.Count; i++)
                     {
-                        var body = pair.dto.Body[i];
-                        var record = pair.records[i];   // اینجا ردیف TAXDTL متناظر
+                        var body = dto.Body[i];
+                        var record = records[i];   // اینجا ردیف TAXDTL متناظر
                         var idd = _fn.GetNewIDD();
 
                         var sql = @"
@@ -1081,6 +1119,8 @@ namespace Prg_Moadian.Bulk
 
             if (firstDbException != null)
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(firstDbException).Throw();
+
+            return missingNumbers;
         }
 
         #region MyRegion

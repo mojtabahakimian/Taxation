@@ -61,6 +61,62 @@ namespace Prg_Moadian.FUNCTIONS
 
         #endregion
 
+        #region تاریخ سفارشی
+
+        /// <summary>
+        /// تاریخ شمسی ورودی کاربر را می‌سنجد و به شکل yyyyMMdd برمی‌گرداند.
+        /// قالب‌های «1405/07/09»، «1405/7/9» و «14050709» پذیرفته می‌شوند.
+        ///
+        /// قبلاً ارسال گروهی «/» را حذف می‌کرد و رقم‌ها را با برش ثابت می‌خواند؛ «1405/7/9»
+        /// ماه ۷۹ می‌شد، خطا می‌داد و بی‌صدا تاریخ اصلی فاکتور می‌رفت — کاربر فکر می‌کرد
+        /// تاریخ سفارشی رفته.
+        /// </summary>
+        public static bool TryParseShamsiDate(string? text, out string yyyymmdd, out string error)
+        {
+            yyyymmdd = "";
+            error = "";
+            // رقم فارسی و عربی (صفحه‌کلید فارسی) → لاتین؛ «-» و «.» هم به‌عنوان جداکننده.
+            var sb = new System.Text.StringBuilder();
+            foreach (var ch in (text ?? "").Trim())
+            {
+                if (ch >= '۰' && ch <= '۹') sb.Append((char)('0' + (ch - '۰')));
+                else if (ch >= '٠' && ch <= '٩') sb.Append((char)('0' + (ch - '٠')));
+                else if (ch == '-' || ch == '.') sb.Append('/');
+                else sb.Append(ch);
+            }
+            var s = sb.ToString();
+            if (s.Length == 0) { error = "تاریخ سفارشی خالی است."; return false; }
+
+            int y, m, d;
+            var parts = s.Split('/');
+            if (parts.Length == 3 && parts.All(p => p.Length > 0 && IsAllDigits(p)) && parts[0].Length == 4
+                && parts[1].Length <= 2 && parts[2].Length <= 2)
+            {
+                y = int.Parse(parts[0]); m = int.Parse(parts[1]); d = int.Parse(parts[2]);
+            }
+            else if (s.Length == 8 && IsAllDigits(s))
+            {
+                y = int.Parse(s[..4]); m = int.Parse(s.Substring(4, 2)); d = int.Parse(s.Substring(6, 2));
+            }
+            else
+            {
+                error = $"تاریخ سفارشی «{s}» قالب درستی ندارد. نمونهٔ درست: 1405/07/09";
+                return false;
+            }
+
+            var pc = new System.Globalization.PersianCalendar();
+            if (y < 1300 || y > 1500 || m < 1 || m > 12 || d < 1 || d > pc.GetDaysInMonth(y, m))
+            {
+                error = $"تاریخ سفارشی «{s}» معتبر نیست (ماه یا روز نادرست).";
+                return false;
+            }
+
+            yyyymmdd = $"{y:0000}{m:00}{d:00}";
+            return true;
+        }
+
+        #endregion
+
         #region شناسه خریدار
 
         /// <summary>
