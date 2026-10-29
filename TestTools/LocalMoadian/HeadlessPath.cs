@@ -97,6 +97,7 @@ internal static class HeadlessPath
                   r4.Error ?? "");
 
             BulkAndInquiry(db, cs, mockBaseUrl, http, check);
+            HeadlessFixPath.Run(db, cs, mockBaseUrl, http, check);
         }
         finally
         {

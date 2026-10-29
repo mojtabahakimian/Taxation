@@ -258,7 +258,16 @@ MrCorrect هر دو را دارد، DenaFaraz فقط ۲ را.
 - `InquiryRunner` — کارِ BGWorker و دکمه‌ی استعلامِ Prg_TrackSentInvoice با `CL_ESTELAM`؛ بی‌تکلیفِ بیش از ۳۱ روز
   EXPIRED می‌شود، با کدِ رهگیری (در Prg_TrackSentInvoice با IDD ِ ردیفِ گروه‌بندی‌شده که همیشه ۰ بود، پس هیچ‌وقت).
 
-هر سه از `HeadlessGate` رد می‌شوند: یک SemaphoreSlim برای همه (ارسالِ گروهی async است)، که هنگامِ خروج
+و دو تا برای پنجره‌های Prg_TrackSentInvoice:
+
+- `ResendRunner` (گروه ۳۲) — حلقه‌ی RESEND_BTN_Click با CreateHeader/CreateBody/InsertNewTaxDtlRecord ِ همان‌جا، **کپی**
+  نه انتقال (پنجره دست نخورده). ۳۲-۱ متنِ ساختِ سربرگ، اقلام و Cleaning_RestoreValiding را (بی توضیح و فاصله) با
+  پنجره مقایسه می‌کند: **اگر یکی را عوض کردید، دیگری را هم عوض کنید**، وگرنه قرمز می‌شود.
+- `CorrectionRunner` (گروه ۳۳) — WIN_MODIFYINVOICE: `Load` (ReGetData)، `Recalculate` و `Validate` (خطا مانع، هشدار فقط
+  پرسیده می‌شود؛ WarnOnReferenceChain و شرط‌های BTN_SEND)، `Send` (taxid ِ تازه، payload، درج در یک تراکنش، فایلِ
+  RECOVERY). ریاضیات همان CorrectionMath است.
+
+همه از `HeadlessGate` رد می‌شوند: یک SemaphoreSlim برای همه (ارسالِ گروهی async است)، که هنگامِ خروج
 `ConnectionOverride` و `CONNECTION_STR` ِ استاتیک را هم برمی‌گرداند — وگرنه کدی که بعدش در همان پروسه بی Override کار
 می‌کند (هارنسِ تست) به دیتابیسِ آخرین میزبان یا رشته‌ی خرابی که سازنده با آن شکست خورده بود وصل می‌ماند.
 
