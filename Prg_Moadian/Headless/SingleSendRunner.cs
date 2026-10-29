@@ -27,8 +27,6 @@ namespace Prg_Moadian.Headless
         public const string MainUrl = "https://tp.tax.gov.ir/req/api/";
         public const string SandboxUrl = "https://sandboxrc.tax.gov.ir/req/api/";
 
-        private static readonly object Gate = new object();
-
         public sealed class Request
         {
             public string ConnectionString { get; set; } = "";
@@ -67,20 +65,10 @@ namespace Prg_Moadian.Headless
             if (string.IsNullOrWhiteSpace(request.ConnectionString))
                 return new Result { Error = "رشتهٔ اتصال دیتابیس خالی است." };
 
-            lock (Gate)
-            {
-                // پیش از هر دسترسی به CL_MOADIAN: مقداردهی استاتیک آن یک CL_CCNNMANAGER
-                // می‌سازد و بدون این خط سراغ CNR.udl می‌رفت.
-                CL_CCNNMANAGER.ConnectionOverride = request.ConnectionString;
-                try
-                {
-                    return RunCore(request);
-                }
-                finally
-                {
-                    CL_CCNNMANAGER.ConnectionOverride = null;
-                }
-            }
+            // رشته‌ی اتصال پیش از هر دسترسی به CL_MOADIAN گذاشته می‌شود: مقداردهی استاتیکِ آن یک
+            // CL_CCNNMANAGER می‌سازد و بدونِ این سراغِ CNR.udl می‌رفت.
+            using (HeadlessGate.Enter(request.ConnectionString))
+                return RunCore(request);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
