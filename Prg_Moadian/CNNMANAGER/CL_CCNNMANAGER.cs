@@ -80,12 +80,24 @@ namespace Prg_Moadian.CNNMANAGER
 
             return cs;
         }
+        /// <summary>
+        /// رشتهٔ اتصالی که برنامهٔ میزبان (مثلاً سرور سفیر) می‌دهد. وقتی پر باشد،
+        /// سازنده به‌جای خواندن C:\correct\CNR.udl همین را به کار می‌برد.
+        /// برنامه‌های ویندوزی این را پر نمی‌کنند، پس رفتارشان عوض نمی‌شود.
+        /// </summary>
+        public static string? ConnectionOverride { get; set; }
+
         public CL_CCNNMANAGER()
         {
-            string path0 = @"C:\correct\CNR.udl";
-            string pathuspath = File.ReadLines(path0).Last();
-
-            CONNECTION_STR = ExtractConnectionString(path0);
+            if (!string.IsNullOrWhiteSpace(ConnectionOverride))
+            {
+                CONNECTION_STR = ConnectionOverride;
+            }
+            else
+            {
+                string path0 = @"C:\correct\CNR.udl";
+                CONNECTION_STR = ExtractConnectionString(path0);
+            }
 
             using (IDbConnection db = new SqlConnection(CONNECTION_STR))
             {
