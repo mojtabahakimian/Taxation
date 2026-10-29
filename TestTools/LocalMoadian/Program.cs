@@ -210,7 +210,7 @@ internal static class Program
                 Check("۲۱ اجرای تست مسیر تکی", false, ex.Message);
             }
 
-            Banner("گروه ۳۰ — ارسال تکی بدون پنجره (سرور سفیر)");
+            Banner("گروه ۳۰ و ۳۱ — ارسال تکی، گروهی و استعلامِ بدون پنجره (سرور سفیر)");
             try
             {
                 HeadlessPath.Run(BaseUrl.TrimEnd('/') + "/sandbox/", Control, Check, Console.WriteLine);

@@ -95,6 +95,8 @@ internal static class HeadlessPath
             check("۳۰-۷ دیتابیس در دسترس نیست: پیام روشن، بدون استثنا، بدون ارسال",
                   !r4.Sent && r4.Error == "خطا در ارتباط با دیتابیس" && CL_CCNNMANAGER.ConnectionOverride == null,
                   r4.Error ?? "");
+
+            BulkAndInquiry(db, cs, mockBaseUrl, http, check);
         }
         finally
         {
@@ -104,6 +106,103 @@ internal static class HeadlessPath
             CL_MOADIAN.OnValidationWarning = savedWarn;
             db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER BETWEEN 1000001 AND 1000120");
         }
+    }
+
+    /// <summary>
+    /// گروه ۳۱ — ارسالِ گروهی و استعلامِ بی‌پنجره (BulkSendRunner و InquiryRunner).
+    /// </summary>
+    private static void BulkAndInquiry(CL_CCNNMANAGER db, string cs, string mockBaseUrl, HttpClient http, Action<string, bool, string> check)
+    {
+        var numbers = db.DoGetDataSQL<double>(
+            $@"SELECT TOP 3 NUMBER FROM dbo.HEAD_LST WHERE TAG={HeadTag} AND NUMBER>={FirstNumber} ORDER BY NUMBER")
+            .Select(x => (long)x).ToList();
+        if (numbers.Count < 3) { check("۳۱-۰ سه فاکتورِ تستی هست", false, numbers.Count.ToString()); return; }
+
+        BulkSendRunner.Request Req() => new()
+        {
+            ConnectionString = cs, Numbers = numbers, Tag = SendTag, TaxUrlOverride = mockBaseUrl,
+        };
+
+        // ---- ۱: ارسالِ گروهیِ سه فاکتور ----
+        Reset(http, mockBaseUrl);
+        db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER BETWEEN 1000001 AND 1000120");
+        int reviewed = -1, lastProgress = -1;
+        var req = Req();
+        req.ReviewWarnings = w => { reviewed = w.Count; return new HashSet<long>(); };
+        req.Progress = new SyncProgress(p => lastProgress = p);
+        var r1 = BulkSendRunner.RunAsync(req).GetAwaiter().GetResult();
+        var p1 = Payloads(http, mockBaseUrl);
+        check("۳۱-۱ ارسالِ گروهیِ بی‌پنجره هر سه فاکتور را فرستاد",
+              r1.Error == null && r1.Success == 3 && r1.Failures.Count == 0 && p1.Count == 3,
+              $"Success={r1.Success} Failures={r1.Failures.Count} ارسال={p1.Count} خطا={r1.Error} {string.Join("؛ ", r1.Failures.Values.Take(2))}");
+        // مقدارهای progress ِ SendInvoiceBulk یکدست نیستند (۲۵، درصدِ ساخت، ۰، تعدادِ هر بسته)؛ فقط رسیدنشان قفل می‌شود.
+        // فهرستِ هشدارها فقط وقتی هشداری هست صدا زده می‌شود (فاکتورهای seed بی‌هشدارند).
+        check("۳۱-۲ بی‌هشدار، فهرستِ هشدارها پرسیده نشد و پیشرفت گزارش شد",
+              reviewed == -1 && lastProgress >= 0, $"هشدارها={reviewed} آخرین پیشرفت={lastProgress}");
+        check("۳۱-۳ بعد از ارسالِ گروهی رشته‌ی اتصالِ میزبان پاک شد",
+              CL_CCNNMANAGER.ConnectionOverride == null, CL_CCNNMANAGER.ConnectionOverride ?? "");
+
+        // ---- ۲: دوباره همان‌ها؛ میزبان «لغو» می‌زند ----
+        Reset(http, mockBaseUrl);
+        string? asked = null;
+        req = Req();
+        req.Confirm = q => { asked = q; return false; };
+        var r2 = BulkSendRunner.RunAsync(req).GetAwaiter().GetResult();
+        check("۳۱-۴ فاکتورهای ارسال‌شده: یک پرسش و با «لغو» هیچ‌کدام دوباره نمی‌روند",
+              asked != null && r2.Success == 0 && r2.Failures.Count == 3 && Payloads(http, mockBaseUrl).Count == 0,
+              $"پرسید={asked != null} Success={r2.Success} Failures={r2.Failures.Count}");
+
+        // ---- ۳: «ReviewWarnings» فاکتورِ هشداردار را کنار می‌گذارد (مثلِ ۱۶-۳۳: نرخ دارد، مالیات صفر) ----
+        Reset(http, mockBaseUrl);
+        db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER BETWEEN 1000001 AND 1000120");
+        var imbaa = db.DoGetDataSQL<(double Radif, double? Imbaa)>(
+            $"SELECT RADIF, IMBAA FROM dbo.INVO_LST WHERE TAG={SendTag} AND NUMBER={numbers[0]}").ToList();
+        IReadOnlyList<Prg_Moadian.Bulk.BulkWarning> seen = Array.Empty<Prg_Moadian.Bulk.BulkWarning>();
+        Prg_Moadian.Headless.BulkSendRunner.Result r3;
+        try
+        {
+            db.DoExecuteSQL($"UPDATE dbo.INVO_LST SET IMBAA = 0 WHERE TAG={SendTag} AND NUMBER={numbers[0]}");
+            req = Req();
+            req.Inty = 1; req.Setm = 1;
+            req.ReviewWarnings = w => { seen = w; return new HashSet<long> { numbers[0] }; };
+            r3 = BulkSendRunner.RunAsync(req).GetAwaiter().GetResult();
+        }
+        finally
+        {
+            foreach (var s in imbaa)
+                db.DoExecuteSQL($"UPDATE dbo.INVO_LST SET IMBAA = @I WHERE TAG={SendTag} AND NUMBER={numbers[0]} AND RADIF=@R", new { I = s.Imbaa, R = s.Radif });
+        }
+        check("۳۱-۵ هشدارِ ساخت به میزبان رسید؛ فاکتوری که کنار گذاشت نرفت و بقیه رفتند",
+              seen.Any(w => w.Number == numbers[0]) && r3.Success == 2 && r3.Failures.ContainsKey(numbers[0]) && Payloads(http, mockBaseUrl).Count == 2,
+              $"هشدارها={seen.Count} Success={r3.Success} Failures={string.Join(",", r3.Failures.Keys)}");
+
+        // ---- ۴: استعلام ----
+        var refs = db.DoGetDataSQL<string>(
+            $"SELECT DISTINCT RefrenceNumber FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER BETWEEN 1000001 AND 1000120 AND ISNULL(RefrenceNumber,'')<>''").ToList();
+        db.DoExecuteSQL($"UPDATE dbo.TAXDTL SET TheStatus=N'PENDING' WHERE TAG={SendTag} AND NUMBER BETWEEN 1000001 AND 1000120");
+        var iq = InquiryRunner.Run(cs, false, refs, mockBaseUrl);
+        var statuses = db.DoGetDataSQL<string>(
+            $"SELECT DISTINCT ISNULL(TheStatus,'(null)') FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER BETWEEN 1000001 AND 1000120").ToList();
+        check("۳۱-۶ استعلامِ بی‌پنجره وضعیتِ همه‌ی کدهای رهگیری را از PENDING به‌روز کرد",
+              iq.Error == null && refs.Count > 0 && iq.Items.Count == refs.Count && !statuses.Contains("PENDING") && iq.Items.All(i => !string.IsNullOrEmpty(i.Status)),
+              $"کدها={refs.Count} نتیجه={iq.Items.Count} وضعیت‌ها={string.Join(",", statuses)} خطا={iq.Error}");
+
+        // ---- ۵: بی‌تکلیفِ قدیمی بی‌استعلام منقضی می‌شود ----
+        db.DoExecuteSQL($"UPDATE dbo.TAXDTL SET TheStatus=N'PENDING', CRT=DATEADD(DAY,-40,GETDATE()) WHERE RefrenceNumber=N'{refs[0]}'");
+        Reset(http, mockBaseUrl);
+        var iq2 = InquiryRunner.Run(cs, false, new[] { refs[0] }, mockBaseUrl);
+        var st = db.DoGetDataSQL<string>($"SELECT DISTINCT TheStatus FROM dbo.TAXDTL WHERE RefrenceNumber=N'{refs[0]}'").ToList();
+        check("۳۱-۷ ارسالِ بی‌تکلیفِ بیش از ۳۱ روز EXPIRED شد (همه‌ی ردیف‌هایش)",
+              iq2.Items.Single().Status == "EXPIRED" && st.Count == 1 && st[0] == "EXPIRED" && CL_CCNNMANAGER.ConnectionOverride == null,
+              string.Join(",", st));
+    }
+
+    /// <summary>Progress&lt;T&gt; گزارش را روی SynchronizationContext می‌فرستد؛ اینجا باید همان لحظه ثبت شود.</summary>
+    private sealed class SyncProgress : IProgress<int>
+    {
+        private readonly Action<int> _a;
+        public SyncProgress(Action<int> a) => _a = a;
+        public void Report(int value) => _a(value);
     }
 
     private static Dictionary<string, JsonNode> Payloads(HttpClient http, string baseUrl)
