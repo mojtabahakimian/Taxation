@@ -1458,6 +1458,12 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                 {
                     new Msgwin(false, "صورت حساب با موفقیت در سامانه ثبت شد.").ShowDialog();
                 }
+
+                // در این فرم نوع و خریدار فقط‌خواندنی و کپیِ مرجع‌اند، پس عملاً هیچ‌وقت
+                // فعال نمی‌شود؛ برای یکسان ماندن با مسیر تکی (Payewin) اینجا هم هست.
+                var _ignored = MoadianRules.CheckIgnoredReferenceChanges(dbms, _ReferenceNumber_);
+                if (_ignored != null)
+                    new Msgwin(false, _ignored).ShowDialog();
             }
             catch (Exception) { }
             #endregion

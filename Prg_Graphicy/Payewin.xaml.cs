@@ -403,6 +403,13 @@ namespace Prg_Graphicy
                             {
                                 new Msgwin(false, "صورت حساب با موفقیت در سامانه ثبت شد.").ShowDialog();
                             }
+
+                            // اصلاحی/برگشتی‌ای که نوع یا خریدار را عوض کرده «موفق» می‌گیرد ولی
+                            // سامانه تغییر را نمی‌پذیرد. فقط همین حالت گفته می‌شود؛ بقیهٔ هشدارها
+                            // ساکت می‌مانند. MoadianRules، بخش «صورتحساب ارجاعی» را ببینید.
+                            var _ignored = MoadianRules.CheckIgnoredReferenceChanges(dbms, FactorInfoSent.ReferenceNumber);
+                            if (_ignored != null)
+                                new Msgwin(false, _ignored).ShowDialog();
                         }
                         catch (Exception) { }
                         #endregion

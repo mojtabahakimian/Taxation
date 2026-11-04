@@ -378,6 +378,7 @@ namespace Prg_TrackSentInvoice
                                                          MAX(T.DATE_N) AS DATE_N,
                                                          MAX(CAST(T.ApiTypeSent AS INT)) AS ApiTypeSent,
                                                          MAX(T.TheError) AS TheError,
+                                                         MAX(T.TheWarning) AS TheWarning,
                                                          MAX(H.CUST_NO) AS CUST_NO,
                                                          MAX(H.MOLAH) AS MOLAH,
                                                          MAX(H.SHARAYET) AS SHARAYET
@@ -419,6 +420,7 @@ namespace Prg_TrackSentInvoice
                                                          MAX(T.DATE_N) AS DATE_N,
                                                          MAX(CAST(T.ApiTypeSent AS INT)) AS ApiTypeSent,
                                                          MAX(T.TheError) AS TheError,
+                                                         MAX(T.TheWarning) AS TheWarning,
                                                          MAX(H.CUST_NO) AS CUST_NO,
                                                          MAX(H.MOLAH) AS MOLAH,
                                                          MAX(H.SHARAYET) AS SHARAYET
@@ -613,10 +615,14 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
                             dbms.DoExecuteSQL(updateIrtaxidSql, new { RefrenceNumber = referenceCode });
                         }
                         catch (Exception) { }
+
+                        PersistInquiryResult(referenceCode, result);
                         new Msgwin(false, @"صورت‌حساب با موفقیت در سامانه ثبت شده است.").ShowDialog();
+                        ShowIgnoredReferenceChangesIfAny(referenceCode);
                         break;
 
                     case "FAILED":
+                        PersistInquiryResult(referenceCode, result);
                         ShowFailedErrors(result);
                         break;
 
@@ -710,6 +716,100 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
                 .Replace("\n", string.Empty)
                 .Trim();
         }
+        /// <summary>
+        /// نتیجهٔ «بررسی لحظه‌ای» را در TAXDTL می‌نویسد.
+        ///
+        /// قبلاً این پنجره فقط پیام می‌داد و چیزی ذخیره نمی‌کرد؛ پس اگر پاسخ زنده با
+        /// وضعیت ذخیره‌شده فرق داشت، پنجره یک چیز می‌گفت و گرید چیز دیگری. استعلام
+        /// پس‌زمینه (CL_ESTELAM.GETESTELAM_REFCODE_UPDATE) از ابتدا همین کار را می‌کرد؛
+        /// این فقط همان رفتار را به مسیر دستی هم می‌آورد.
+        ///
+        /// اگر بدنهٔ پاسخ قابل خواندن نبود، فقط وضعیت نوشته می‌شود — خطا و هشدار قبلی
+        /// پاک نمی‌شوند، چون ندانستن با «وجود ندارد» یکی نیست.
+        ///
+        /// ⚠ ردیفی که SUCCESS است هرگز با وضعیت دیگری بازنویسی نمی‌شود. سامانه ثبات
+        /// ندارد؛ اگر یک استعلام گذرا FAILED برگرداند و ما SUCCESS را FAILED کنیم، فاکتور
+        /// به لیست ارسال‌نشده‌ها برمی‌گردد و هشدار «قبلاً ارسال شده» هم دیگر نمی‌آید
+        /// (FindLiveOriginals ردیف FAILED را زنده نمی‌داند) — یعنی راه ثبت دوباره در
+        /// کارپوشه باز می‌شود. استعلام پس‌زمینه هم ردیف SUCCESS را دوباره نمی‌پرسد.
+        /// برعکسش (FAILED/PENDING ← SUCCESS) مجاز است و جلوی ارسال تکراری را می‌گیرد.
+        /// </summary>
+        private void PersistInquiryResult(string refNumber, InquiryResultModel result)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(refNumber) || result is null) return;
+
+                var status = (result.Status ?? string.Empty).Trim().ToUpperInvariant();
+                if (status.Length == 0) return;
+
+                byte success = status == "SUCCESS" ? (byte)1 : (byte)0;
+
+                TaxModel.InquiryByReferenceIdModel.Root root = null;
+                try
+                {
+                    var dataJson = result.Data?.ToString();
+                    if (!string.IsNullOrWhiteSpace(dataJson))
+                        root = JsonConvert.DeserializeObject<TaxModel.InquiryByReferenceIdModel.Root>(dataJson);
+                }
+                catch (Exception) { root = null; }
+
+                // شرط مشترک هر دو UPDATE: SUCCESS را پایین نیاور.
+                const string noDowngrade =
+                    " AND NOT (ISNULL(TheStatus, N'') = N'SUCCESS' AND @TheStatus <> N'SUCCESS')";
+
+                if (root is null)
+                {
+                    dbms.DoExecuteSQL(
+                        "UPDATE dbo.TAXDTL SET TheStatus=@TheStatus, TheSuccess=@TheSuccess WHERE RefrenceNumber=@RefrenceNumber" + noDowngrade,
+                        new { TheStatus = status, TheSuccess = success, RefrenceNumber = refNumber });
+                    return;
+                }
+
+                var errs = (root.error ?? new List<TaxModel.InquiryByReferenceIdModel.Error>())
+                    .Select(x => $"{x.code} | {x.message}").ToList();
+                var warns = (root.warning ?? new List<TaxModel.InquiryByReferenceIdModel.Warning>())
+                    .Select(x => $"{x.code} | {x.message}").ToList();
+                string theError = errs.Count > 0 ? string.Join(",", errs) : null;
+                string theWarning = warns.Count > 0 ? string.Join(",", warns) : null;
+
+                dbms.DoExecuteSQL(
+                    @"UPDATE dbo.TAXDTL
+                         SET TheConfirmationReferenceId = @Conf,
+                             TheError   = @TheError,
+                             TheWarning = @TheWarning,
+                             TheStatus  = @TheStatus,
+                             TheSuccess = @TheSuccess
+                       WHERE RefrenceNumber = @RefrenceNumber" + noDowngrade,
+                    new
+                    {
+                        Conf = CL_MOADIAN.SafeString(root.confirmationReferenceId?.ToString(), 100),
+                        TheError = CL_MOADIAN.SafeString(theError, 4000),
+                        TheWarning = CL_MOADIAN.SafeString(theWarning, 4000),
+                        TheStatus = status,
+                        TheSuccess = success,
+                        RefrenceNumber = refNumber
+                    });
+            }
+            catch (Exception er)
+            {
+                // ذخیره‌نشدن نتیجه نباید جلوی نمایشش را بگیرد.
+                CL_Generaly.DoWritePRGLOG("PersistInquiryResult : \n", er);
+            }
+        }
+
+        /// <summary>
+        /// اگر این صورتحساب اصلاحی/برگشتی است و نوع یا خریدار را عوض کرده که سامانه
+        /// نپذیرفته، همان‌جا بگو. بقیهٔ هشدارها ساکت می‌مانند و فقط با دکمهٔ «هشدارهای
+        /// سامانه» دیده می‌شوند. (خودِ متن هشدار کافی نیست؛ MoadianRules را ببینید.)
+        /// </summary>
+        private void ShowIgnoredReferenceChangesIfAny(string refNumber)
+        {
+            var msg = MoadianRules.CheckIgnoredReferenceChanges(dbms, refNumber);
+            if (msg != null)
+                new Msgwin(false, msg).ShowDialog();
+        }
+
         private void ShowFailedErrors(InquiryResultModel result)
         {
             try
@@ -740,6 +840,87 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
             {
                 new Msgwin(false, "خطا در پردازش جزئیات FAILED.").ShowDialog();
             }
+        }
+
+        /// <summary>
+        /// هشدارهای سامانه برای صورت‌حساب انتخاب‌شده — فقط به درخواست کاربر.
+        ///
+        /// این هشدارها از ابتدا در ستون <c>TAXDTL.TheWarning</c> ذخیره می‌شدند
+        /// (CL_ESTELAM و CL_FUNTIONS آن را پر می‌کنند) ولی هیچ‌جای برنامه خوانده
+        /// نمی‌شدند. نمایش ندادنشان عمدی بود: سامانه ناپایدار است و هشدارهای
+        /// «خارج از الگو» روی ارسال‌های کاملاً سالم هم می‌آیند و کاربر را بی‌جهت
+        /// می‌ترسانند. پس اینجا هم ستون گرید نشده و پیام خودکار نمی‌دهد؛ فقط با
+        /// فشردن این دکمه دیده می‌شود.
+        ///
+        /// توجه: این هشدارها حتی روی اصلاحیِ کاملاً سالم هم «نوع صورتحساب» و «شماره
+        /// اقتصادی خریدار» را خارج از الگو می‌گویند (ابطالی و برگشتی هم). پس خودشان
+        /// نشانهٔ مشکل نیستند. نمونهٔ مشکل واقعی (آبادیس، حواله ۱۰۵۴ و ۱۳ فاکتور دیگر،
+        /// ۱۴۰۵/۰۷/۲۳) اصلاحی‌ای بود که نوع دوم را به نوع اول با خریدار تبدیل می‌کرد:
+        /// همان هشدارها را گرفت ولی چون مقدارش با مرجع فرق داشت، تغییرش اعمال نشد.
+        /// آن تشخیص با MoadianRules.CheckIgnoredReferenceChanges است.
+        /// </summary>
+        private void WARNINGS_BTN_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (INVOCIE_DTGR.SelectedItem is not TRACK_TAXDTL row)
+                {
+                    new Msgwin(false, "اول یک صورت‌حساب را از لیست انتخاب کنید.").ShowDialog();
+                    return;
+                }
+
+                // از دیتابیس می‌خوانیم نه از گرید: استعلام پس‌زمینه ممکن است بعد از
+                // آخرین بارگذاری لیست، هشدارها را به‌روز کرده باشد.
+                string warning = row.TheWarning;
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(row.RefrenceNumber))
+                    {
+                        warning = dbms.DoGetDataSQL<string>(
+                            "SELECT TOP 1 TheWarning FROM dbo.TAXDTL WHERE RefrenceNumber = @ref AND TheWarning IS NOT NULL AND TheWarning <> ''",
+                            new { @ref = row.RefrenceNumber }).FirstOrDefault() ?? warning;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(row.Taxid))
+                    {
+                        warning = dbms.DoGetDataSQL<string>(
+                            "SELECT TOP 1 TheWarning FROM dbo.TAXDTL WHERE Taxid = @tax AND TheWarning IS NOT NULL AND TheWarning <> ''",
+                            new { tax = row.Taxid }).FirstOrDefault() ?? warning;
+                    }
+                }
+                catch (Exception) { /* اگر دیتابیس نداد، همان مقدار گرید را نشان می‌دهیم */ }
+
+                if (string.IsNullOrWhiteSpace(warning) || warning is "NULL")
+                {
+                    new Msgwin(false,
+                        "برای این صورت‌حساب هشداری از سامانه ثبت نشده است.\n\n" +
+                        "اگر وضعیتش هنوز تعیین نشده، اول «بررسی لحظه‌ای (استعلام)» را بزنید.")
+                        .ShowDialog();
+                    return;
+                }
+
+                var items = Functions.GetNormilizedMsg(warning).ToList();
+                if (items.Count == 0)
+                {
+                    new Msgwin(false, warning).ShowDialog();
+                    return;
+                }
+
+                new MsgListwin(false, items, "#FFE65100").ShowDialog();
+
+                // هشدارهای «خارج از الگو» روی نوع و خریدار در هر اصلاحی و ابطالی‌ای
+                // می‌آیند و به‌تنهایی معنایی ندارند. فقط اگر این سند واقعاً چیزی را عوض
+                // کرده باشد که سامانه نپذیرفته، توضیح اضافه می‌دهیم.
+                var ignored = MoadianRules.CheckIgnoredReferenceChanges(dbms, row.RefrenceNumber, row.Taxid);
+                if (ignored != null)
+                    new Msgwin(false, ignored).ShowDialog();
+            }
+            catch (Exception er)
+            {
+                CL_Generaly.DoWritePRGLOG("WARNINGS_BTN_Click : \n", er);
+                new Msgwin(false, "خطا در نمایش هشدارهای سامانه.").ShowDialog();
+            }
+            // IsOtherProccessingNow عمداً دست نمی‌خورد: این دکمه فقط می‌خواند، و پایین
+            // آوردن پرچم وسط کار استعلام پس‌زمینه، اجرای دوم BGWorker را آزاد می‌کرد.
         }
 
         private void INVOCIE_DTGR_PreviewMouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)

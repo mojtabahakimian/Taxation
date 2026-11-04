@@ -164,9 +164,12 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Button x:Name="ESTELAM_BTN" Grid.Column="0" Content="بررسی لحظه‌ای (استعلام)" Style="{StaticResource MaterialDesignRaisedButton}" Click="ESTELAM_BTN_Click" Margin="0,0,4,0" Height="36" Foreground="#DDFFFFFF"/>
-                        <Button x:Name="RESEND_BTN" Grid.Column="1" IsEnabled="False" Content="ارسال مجدد فاکتور(ها)" Style="{StaticResource MaterialDesignOutlinedButton}" Click="RESEND_BTN_Click" Margin="4,0,0,0" Height="36" Foreground="#D32F2F" BorderBrush="#D32F2F"/>
+                        <!-- نمایش هشدارها عمداً اختیاری است؛ بخش ۴ راهنمای مخزن را ببینید. -->
+                        <Button x:Name="WARNINGS_BTN" Grid.Column="1" Content="هشدارهای سامانه" Style="{StaticResource MaterialDesignOutlinedButton}" Click="WARNINGS_BTN_Click" Margin="4,0,4,0" Height="36" Foreground="#E65100" BorderBrush="#E65100" ToolTip="آنچه سامانه دربارهٔ همین صورت‌حساب گفته ولی مانع ثبتش نشده (کدهای با رقم اول ۱)"/>
+                        <Button x:Name="RESEND_BTN" Grid.Column="2" IsEnabled="False" Content="ارسال مجدد فاکتور(ها)" Style="{StaticResource MaterialDesignOutlinedButton}" Click="RESEND_BTN_Click" Margin="4,0,0,0" Height="36" Foreground="#D32F2F" BorderBrush="#D32F2F"/>
                     </Grid>
                 </Grid>
             </Border>
