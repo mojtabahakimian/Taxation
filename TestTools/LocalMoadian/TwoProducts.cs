@@ -167,7 +167,7 @@ internal static class TwoProducts
             WHERE H.TAG = 13 AND EXISTS (
                 SELECT 1 FROM dbo.TAXDTL T
                 WHERE T.NUMBER = H.NUMBER AND T.TAG = H.TAG
-                  AND T.Ins = 1 AND T.TheStatus IN ('SUCCESS','PENDING','UNKNOWN'))").First();
+                  AND T.Ins = 1 AND T.TheStatus IN ('SUCCESS','PENDING','UNKNOWN','EXPIRED'))").First();
 
         // آنچه کد *بعد* از اصلاح می‌کند: مقایسه با تگ ذخیره‌شده در TAXDTL
         long newWay = db.DoGetDataSQL<long>(@"
@@ -175,7 +175,7 @@ internal static class TwoProducts
             WHERE H.TAG = 13 AND EXISTS (
                 SELECT 1 FROM dbo.TAXDTL T
                 WHERE T.NUMBER = H.NUMBER AND T.TAG = 2
-                  AND T.Ins = 1 AND T.TheStatus IN ('SUCCESS','PENDING','UNKNOWN'))").First();
+                  AND T.Ins = 1 AND T.TheStatus IN ('SUCCESS','PENDING','UNKNOWN','EXPIRED'))").First();
 
         line($"      · MrCorrect: از {headRows:N0} فاکتور سرصفحه — " +
              $"فیلتر قدیمی {oldWay:N0} تا را «ارسال‌شده» می‌شناخت؛ با تگ حواله {newWay:N0} تا شناخته می‌شود");
@@ -195,7 +195,7 @@ internal static class TwoProducts
                         AND T.TheStatus = 'FAILED'
                         AND NOT EXISTS (SELECT 1 FROM dbo.TAXDTL S
                                         WHERE S.NUMBER = T.NUMBER AND S.TAG = T.TAG
-                                          AND S.TheStatus IN ('SUCCESS','PENDING','UNKNOWN')))
+                                          AND S.TheStatus IN ('SUCCESS','PENDING','UNKNOWN','EXPIRED')))
                   -- طرح موازی روی YAZDSEPAR1405 بیش از ۵۰ دقیقه در CXSYNC_PORT گیر کرد؛
                   -- تک‌رشته‌ای ۰٫۱ ثانیه است.
                   OPTION (MAXDOP 1)").First() > 0,
@@ -209,7 +209,7 @@ internal static class TwoProducts
             WHERE H.TAG = 2 AND EXISTS (
                 SELECT 1 FROM dbo.TAXDTL T
                 WHERE T.NUMBER = H.NUMBER AND T.TAG = 2
-                  AND T.Ins = 1 AND T.TheStatus IN ('SUCCESS','PENDING','UNKNOWN'))").First();
+                  AND T.Ins = 1 AND T.TheStatus IN ('SUCCESS','PENDING','UNKNOWN','EXPIRED'))").First();
         line($"      · DenaFaraz: از {dnHead:N0} فاکتور، {dnMatched:N0} تا «ارسال‌شده» شناخته می‌شوند");
 
         check("۱۸-۱۲ در DenaFaraz اصلاح چیزی را خراب نمی‌کند (هر دو تگ ۲ بودند)",

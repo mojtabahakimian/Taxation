@@ -789,9 +789,9 @@ namespace Prg_Moadian.FUNCTIONS
             {
                 try
                 {
-                    var _refRow = dbms.DoGetDataSQL<TAXDTL>(
-                        "SELECT TOP 1 Inty, Inp, Tinb, Bid, Bpc FROM dbo.TAXDTL WHERE Taxid = @tax ORDER BY IDD",
-                        new { tax = irtaxid_RefNum_cancel }).FirstOrDefault();
+                    // مقادیر مؤثر مرجع، نه ردیف خامش: اگر مرجع خودش اصلاحیِ بی‌اثر بوده، ردیفش
+                    // مقدار فرستاده‌شده را دارد نه آنچه سامانه نگه داشت (MoadianRules.ResolveEffectiveIdentity).
+                    var _refRow = MoadianRules.ResolveEffectiveIdentity(dbms, irtaxid_RefNum_cancel);
 
                     if (_refRow is not null &&
                         !MoadianRules.ValidateReferenceConsistency(
@@ -800,11 +800,16 @@ namespace Prg_Moadian.FUNCTIONS
                             _refRow.Inty, _refRow.Inp, _refRow.Tinb, _refRow.Bid, _refRow.Bpc,
                             out var _refWarning))
                     {
-                        if (OnValidationWarning == null ||
-                            !OnValidationWarning($"{_refWarning}\n\nآیا با این وجود ادامه می‌دهید؟"))
-                        {
+                        // هشدار است نه بلاک: سامانه ثبات ندارد و قاعده ممکن است عوض شود. اگر کسی
+                        // نیست که بپرسیم (میزبان بی‌پنجره بدون Confirm)، فقط ثبت در لاگ و ادامه.
+                        bool _goOn = OnValidationWarning == null ||
+                                     OnValidationWarning($"{_refWarning}\n\nآیا با این وجود ادامه می‌دهید؟");
+                        DoGetwriteAppenLog($"ReferenceConsistency warning, invoice {NUMBER}, ref {irtaxid_RefNum_cancel}, " +
+                                           $"effective {_refRow.Taxid} (hops {_refRow.Hops}): " +
+                                           (OnValidationWarning == null ? "no prompt, continued" : _goOn ? "user continued" : "user cancelled") +
+                                           $"\n{_refWarning}");
+                        if (!_goOn)
                             throw new NullyExceptiony(_refWarning);
-                        }
                     }
                 }
                 catch (NullyExceptiony) { throw; }
@@ -947,10 +952,18 @@ namespace Prg_Moadian.FUNCTIONS
             else
                 _apitypesent = 0;
 
+            // uid را خودمان می‌سازیم و پیش از ارسال روی ردیف‌ها می‌گذاریم، تا اگر پاسخ نرسید
+            // (UNKNOWN) هنوز کلیدی برای استعلام داشته باشیم — CL_ESTELAM.ResolveUnknownByUid.
+            // قبلاً uid را SDK می‌ساخت و با نرسیدن پاسخ گم می‌شد؛ ردیف UNKNOWN هیچ راهی برای
+            // تعیین تکلیف در برنامه نداشت (آبادیس، فاکتور ۱۰۶۴).
+            var sendUid = Guid.NewGuid().ToString();
+            for (int i = 0; i < L_TAXDTL_US.Count; i++)
+                L_TAXDTL_US[i].UID = sendUid;
+
             TaxModel.SendInvoicesModel sendInvoicesModel;
             try
             {
-                sendInvoicesModel = taxService.SendInvoices(header, bodies, payments);
+                sendInvoicesModel = taxService.SendInvoices(header, bodies, payments, sendUid);
             }
             catch (Exception sendEx) when (MoadianRules.IsOutcomeUnknown(sendEx))
             {

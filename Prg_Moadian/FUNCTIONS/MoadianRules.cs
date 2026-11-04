@@ -680,19 +680,89 @@ namespace Prg_Moadian.FUNCTIONS
             public string Bpc { get; set; }
             public string Irtaxid { get; set; }
             public string TheWarning { get; set; }
+            public string TheStatus { get; set; }
+        }
+
+        /// <summary>
+        /// نوع، الگو و خریداری که سامانه واقعاً برای یک صورتحساب نگه داشته است.
+        /// </summary>
+        public sealed class EffectiveIdentity
+        {
+            public string Taxid { get; set; }
+            public int? Inty { get; set; }
+            public int? Inp { get; set; }
+            public string Tinb { get; set; }
+            public string Bid { get; set; }
+            public string Bpc { get; set; }
+            /// <summary>چند حلقه از زنجیرهٔ ارجاع رد شد تا به منبع رسید (۰ = خود مرجع).</summary>
+            public int Hops { get; set; }
+        }
+
+        /// <summary>
+        /// مقادیر مؤثرِ نوع/الگو/خریدارِ یک صورتحساب مرجع، با دنبال کردن زنجیرهٔ ارجاع.
+        ///
+        /// چرا: ردیف TAXDTL ِ یک اصلاحی/برگشتی همان چیزی را دارد که *فرستادیم*، نه آنچه
+        /// سامانه نگه داشت. اگر اصلاحیِ اول نوع ۲ را به ۱ تبدیل کرده بود و سامانه نپذیرفت،
+        /// ردیفش Inty=1 دارد ولی نوع مؤثر هنوز ۲ است. اصلاحیِ دومی که به اولی ارجاع دهد و
+        /// همان Inty=1 را بفرستد، با مقایسهٔ مستقیم «بی‌تغییر» دیده می‌شد و هشدار نمی‌گرفت.
+        /// این فیلدها در ارجاعی‌ها خارج از الگو هستند (ص۳۰)، پس مقدار مؤثر همیشه مال اولین
+        /// صورتحسابِ غیرارجاعیِ زنجیره است. (یزدسپار: ۲ اصلاحی به اصلاحی ارجاع داده‌اند.)
+        ///
+        /// null یعنی مرجع در TAXDTL نیست. حلقه و زنجیرهٔ بیش از ۲۰ حلقه متوقف می‌شوند.
+        /// </summary>
+        public static EffectiveIdentity ResolveEffectiveIdentity(CNNMANAGER.CL_CCNNMANAGER db, string referenceTaxid)
+        {
+            if (string.IsNullOrWhiteSpace(referenceTaxid)) return null;
+            const string sql = "SELECT TOP 1 Taxid, Ins, Inty, Inp, Tinb, Bid, Bpc, Irtaxid FROM dbo.TAXDTL WHERE Taxid = @k ORDER BY IDD";
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string key = referenceTaxid.Trim();
+            EffectiveRow row = null;
+            int hops = -1;
+            while (!string.IsNullOrWhiteSpace(key) && seen.Add(key) && hops < 20)
+            {
+                var next = db.DoGetDataSQL<EffectiveRow>(sql, new { k = key }).FirstOrDefault();
+                if (next is null) break;          // مرجعِ مرجع نیست: همان آخرینِ پیداشده
+                row = next; hops++;
+                if (row.Ins is not (2 or 4)) break;
+                key = row.Irtaxid?.Trim();
+            }
+            if (row is null) return null;
+            return new EffectiveIdentity
+            {
+                Taxid = row.Taxid, Inty = row.Inty, Inp = row.Inp,
+                Tinb = row.Tinb, Bid = row.Bid, Bpc = row.Bpc, Hops = hops
+            };
+        }
+
+        private sealed class EffectiveRow
+        {
+            public string Taxid { get; set; }
+            public int? Ins { get; set; }
+            public int? Inty { get; set; }
+            public int? Inp { get; set; }
+            public string Tinb { get; set; }
+            public string Bid { get; set; }
+            public string Bpc { get; set; }
+            public string Irtaxid { get; set; }
         }
 
         /// <summary>
         /// همان <see cref="CheckIgnoredReferenceChanges(int,string,int?,int?,string,string,string,int?,int?,string,string,string,out string)"/>
         /// با خواندن ردیف و مرجعش از TAXDTL. هر خطایی یعنی «چیزی برای گفتن نیست» —
         /// این فقط یک پیام کمکی است و نباید جلوی هیچ پیام یا کار دیگری را بگیرد.
+        ///
+        /// فقط برای ردیفی که TheStatus آن SUCCESS است: پیام می‌گوید «سامانه موفق ثبت کرد»،
+        /// و اصلاحیِ ردشده هم می‌تواند همین هشدارهای «خارج از الگو» را داشته باشد. Payewin
+        /// این را بلافاصله بعد از ارسال صدا می‌زند، وقتی نتیجه ممکن است FAILED باشد.
+        /// مقایسه با مقادیر مؤثر مرجع است (<see cref="ResolveEffectiveIdentity"/>)، نه ردیف خامش.
         /// </summary>
         /// <param name="refNumber">کد رهگیری؛ اگر خالی بود از taxid استفاده می‌شود.</param>
         public static string CheckIgnoredReferenceChanges(CNNMANAGER.CL_CCNNMANAGER db, string refNumber, string taxid = null)
         {
             try
             {
-                const string cols = "Ins, Inty, Inp, Tinb, Bid, Bpc, Irtaxid, TheWarning";
+                const string cols = "Ins, Inty, Inp, Tinb, Bid, Bpc, Irtaxid, TheWarning, TheStatus";
                 RefCheckRow row = null;
 
                 if (!string.IsNullOrWhiteSpace(refNumber))
@@ -705,17 +775,21 @@ namespace Prg_Moadian.FUNCTIONS
                         new { k = taxid }).FirstOrDefault();
 
                 if (row?.Ins is not (2 or 4) || string.IsNullOrWhiteSpace(row.Irtaxid)) return null;
+                if (!string.Equals(row.TheStatus?.Trim(), "SUCCESS", StringComparison.OrdinalIgnoreCase)) return null;
 
-                var refRow = db.DoGetDataSQL<RefCheckRow>(
-                    $"SELECT TOP 1 {cols} FROM dbo.TAXDTL WHERE Taxid = @k ORDER BY IDD",
-                    new { k = row.Irtaxid }).FirstOrDefault();
+                var refRow = ResolveEffectiveIdentity(db, row.Irtaxid);
                 if (refRow is null) return null;
 
-                return CheckIgnoredReferenceChanges(
-                    row.Ins.Value, row.TheWarning,
-                    row.Inty, row.Inp, row.Tinb, row.Bid, row.Bpc,
-                    refRow.Inty, refRow.Inp, refRow.Tinb, refRow.Bid, refRow.Bpc,
-                    out var message) ? message : null;
+                if (!CheckIgnoredReferenceChanges(
+                        row.Ins.Value, row.TheWarning,
+                        row.Inty, row.Inp, row.Tinb, row.Bid, row.Bpc,
+                        refRow.Inty, refRow.Inp, refRow.Tinb, refRow.Bid, refRow.Bpc,
+                        out var message))
+                    return null;
+
+                try { Generaly.CL_Generaly.DoGetwriteAppenLog($"IgnoredReferenceChanges ref={refNumber} taxid={taxid} effectiveRef={refRow.Taxid} hops={refRow.Hops}\n{message}"); }
+                catch (Exception) { }
+                return message;
             }
             catch (Exception)
             {

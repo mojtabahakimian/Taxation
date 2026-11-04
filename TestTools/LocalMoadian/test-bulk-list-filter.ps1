@@ -50,13 +50,14 @@ try {
         # 1/2/3: main SUCCESS/PENDING/UNKNOWN; 4/5: retryable errors;
         # 6/7: sandbox (including legacy NULL ApiTypeSent); 8: another document;
         # 9: correction only; 10: no history; 11: failed then successful;
-        # 12/13: legacy NULL TAG/Ins (must not guess their document identity).
+        # 12/13: legacy NULL TAG/Ins (must not guess their document identity);
+        # 14: EXPIRED (31+ days undecided) still counts as sent - it may be in the karpusheh.
         $fixture = @"
 SET NOCOUNT ON;
 DECLARE @HEAD_LST TABLE (NUMBER float, TAG float);
 DECLARE @TAXDTL TABLE (NUMBER float, TAG float, Ins int, ApiTypeSent bit, TheStatus nvarchar(30));
 INSERT INTO @HEAD_LST SELECT n, $headTag FROM
-    (VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13)) v(n);
+    (VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14)) v(n);
 INSERT INTO @TAXDTL VALUES
  (1,2,1,1,'SUCCESS'),(1,2,1,1,'SUCCESS'),
  (2,2,1,1,'PENDING'),(3,2,1,1,'UNKNOWN'),
@@ -64,7 +65,8 @@ INSERT INTO @TAXDTL VALUES
  (6,2,1,0,'SUCCESS'),(7,2,1,NULL,'SUCCESS'),
  (8,5,1,1,'SUCCESS'),(9,2,2,1,'SUCCESS'),
  (11,2,1,1,'FAILED'),(11,2,1,1,'SUCCESS'),
- (12,NULL,1,1,'SUCCESS'),(13,2,NULL,1,'SUCCESS');
+ (12,NULL,1,1,'SUCCESS'),(13,2,NULL,1,'SUCCESS'),
+ (14,2,1,1,'EXPIRED');
 "@
         foreach ($api in @(1, 0)) {
             $apiSql = if ($api -eq 1) { $mainApi } else { $sandboxApi }
@@ -75,17 +77,17 @@ INSERT INTO @TAXDTL VALUES
                 # Table variables need aliases for qualified column references.
                 $query = $query.Replace('@HEAD_LST.', 'H.').Replace('@TAXDTL.', 'T.')
                 $query = $query.Replace('FROM @HEAD_LST', 'FROM @HEAD_LST H').Replace('FROM @TAXDTL', 'FROM @TAXDTL T')
-                $expected = if ($includeSent) { '1,2,3,4,5,6,7,8,9,10,11,12,13' }
+                $expected = if ($includeSent) { '1,2,3,4,5,6,7,8,9,10,11,12,13,14' }
                     elseif ($api -eq 1) { '4,5,6,7,8,9,10,12,13' }
-                    else { '1,2,3,4,5,8,9,10,11,12,13' }
+                    else { '1,2,3,4,5,8,9,10,11,12,13,14' }
                 Assert-Numbers (Query ($fixture + $query)) $expected "list head=$headTag api=$api includeSent=$includeSent"
             }
         }
-        $query = $warning.Replace('{condition}', [string]$headTag).Replace('{string.Join(",", selected)}', '1,2,3,4,5,6,7,8,9,10,11,12,13')
+        $query = $warning.Replace('{condition}', [string]$headTag).Replace('{string.Join(",", selected)}', '1,2,3,4,5,6,7,8,9,10,11,12,13,14')
         $query = $query.Replace('dbo.TAXDTL', '@TAXDTL')
         $table = Query ($fixture + $query)
         $count = [int]$table.Rows[0][0]
-        if ($count -ne 4) { throw "warning head=${headTag}: expected 4 distinct invoices, got $count" }
+        if ($count -ne 5) { throw "warning head=${headTag}: expected 5 distinct invoices, got $count" }
         Write-Output "PASS warning head=$headTag count=$count"
     }
 

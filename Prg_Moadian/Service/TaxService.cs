@@ -111,7 +111,13 @@ namespace Prg_Moadian.Service
             return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified), iranOffset).ToUnixTimeMilliseconds();
         }
 
-        public TaxModel.SendInvoicesModel SendInvoices(TaxModel.InvoiceModel.Header header, List<TaxModel.InvoiceModel.Body> body, List<TaxModel.InvoiceModel.Payment> payment)
+        /// <param name="uid">
+        /// اگر داده شود، بسته با همین uid می‌رود (SendTspInvoices با FiscalId خالی — همان
+        /// بستهٔ SendInvoices، فقط uid از ما؛ همان راهی که ارسال گروهی از ۱۴۰۵/۰۷/۲۲ می‌رود).
+        /// فایده‌اش: اگر پاسخ نرسید، uid را از قبل داریم و می‌شود با InquiryByUidAndFiscalId
+        /// پرسید. null = رفتار قدیمی (uid را SDK می‌سازد).
+        /// </param>
+        public TaxModel.SendInvoicesModel SendInvoices(TaxModel.InvoiceModel.Header header, List<TaxModel.InvoiceModel.Body> body, List<TaxModel.InvoiceModel.Payment> payment, string? uid = null)
         {
             List<InvoiceDto> list = new List<InvoiceDto>();
             List<InvoiceBodyDto> list2 = new List<InvoiceBodyDto>();
@@ -221,7 +227,10 @@ namespace Prg_Moadian.Service
             });
 
             TaxModel.SendInvoicesModel sendInvoicesModel = new TaxModel.SendInvoicesModel();
-            HttpResponse<AsyncResponseModel> httpResponse = TaxApiService.Instance.TaxApis.SendInvoices(list, null);
+            HttpResponse<AsyncResponseModel> httpResponse = string.IsNullOrWhiteSpace(uid)
+                ? TaxApiService.Instance.TaxApis.SendInvoices(list, null)
+                : TaxApiService.Instance.TaxApis.SendTspInvoices(
+                    list.Select(dto => new InvoiceDtoWrapper { Invoice = dto, Uid = uid }).ToList(), null);
             const string serverSideErrorMessage = "خطا در ارتباط با سامانه مودیان رخ داد و مشکل از سمت سرورهای سامانه است. لطفاً بعداً دوباره تلاش کنید.";
             HashSet<PacketResponse>? packetResponses = httpResponse.Body?.Result;
             if (packetResponses == null || !packetResponses.Any())
@@ -240,7 +249,11 @@ namespace Prg_Moadian.Service
                 throw new MoadianOutcomeUnknownException($"{serverSideErrorMessage} جزئیات: Status Code : {httpResponse.Status}");
             }
 
-            PacketResponse? packetResponse = packetResponses.FirstOrDefault();
+            // با uid جفت کن، نه با ترتیب؛ یک بسته است ولی همان قاعدهٔ گروهی.
+            PacketResponse? packetResponse = string.IsNullOrWhiteSpace(uid)
+                ? packetResponses.FirstOrDefault()
+                : packetResponses.FirstOrDefault(p => p != null && string.Equals(p.Uid, uid, StringComparison.OrdinalIgnoreCase))
+                  ?? packetResponses.FirstOrDefault();
 
             if (packetResponse == null)
             {

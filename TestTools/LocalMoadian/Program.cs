@@ -220,6 +220,16 @@ internal static class Program
                 Check("۳۰ اجرای تست ارسال بی‌پنجره", false, ex.Message);
             }
 
+            Banner("گروه ۳۴ — پنجرهٔ پیگیری و استعلام: گرید، EXPIRED، UNKNOWN با uid");
+            try
+            {
+                TrackingWindow.Run(BaseUrl.TrimEnd('/') + "/sandbox/", Control, Check, Console.WriteLine);
+            }
+            catch (Exception ex)
+            {
+                Check("۳۴ اجرای تست پنجرهٔ پیگیری", false, ex.Message);
+            }
+
             Banner("گروه ۱۹ — تثبیت رفتار (Golden)");
             try
             {

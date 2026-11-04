@@ -182,7 +182,7 @@ namespace Prg_Moadian.Headless
             if (head.ins == 1) //اصلی
             {
                 var sent = dbms.DoGetDataSQL<string>(
-                    $"SELECT TheStatus FROM dbo.TAXDTL WHERE ApiTypeSent = 1 AND Ins = 1 AND TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN') AND NUMBER = {number} AND TAG = {tag}  ").ToList();
+                    $"SELECT TheStatus FROM dbo.TAXDTL WHERE ApiTypeSent = 1 AND Ins = 1 AND TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN', 'EXPIRED') AND NUMBER = {number} AND TAG = {tag}  ").ToList();
                 if (sent.Count > 0)
                 {
                     if (sent.Contains("SUCCESS"))
@@ -191,6 +191,8 @@ namespace Prg_Moadian.Headless
                         return ask($"این صورت حساب اصلی (فروش) به شماره (حواله) {factorNum} قبلا ارسال شده اما وضعیت آن هنوز در انتظار (PENDING) است , آیا مایلید مجددا ارسال کنید ؟");
                     if (sent.Contains("UNKNOWN"))
                         return ask($"این صورت حساب اصلی (فروش) به شماره (حواله) {factorNum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
+                    if (sent.Contains("EXPIRED"))
+                        return ask($"این صورت حساب اصلی (فروش) به شماره (حواله) {factorNum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                 }
                 return true;
             }
@@ -216,6 +218,8 @@ namespace Prg_Moadian.Headless
                 ok = ask($"این صورت حساب از نوع {kind} به شماره (حواله) {factorNum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟");
             else if (prior.Contains("UNKNOWN"))
                 ok = ask($"این صورت حساب {kindShort} به شماره (حواله) {factorNum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
+            else if (prior.Contains("EXPIRED"))
+                ok = ask($"این صورت حساب {kind} به شماره (حواله) {factorNum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
             else if (prior.Contains("FAILED"))
                 ok = ask($"این صورت حساب {kindShort} به شماره (حواله) {factorNum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
             if (!ok) return false;

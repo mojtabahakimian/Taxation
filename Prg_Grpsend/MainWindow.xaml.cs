@@ -297,7 +297,7 @@ namespace Prg_Grpsend
                                  AND TAG = 2
                                  AND ApiTypeSent = 1
                                  AND Ins = 1
-                                 AND TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN')";
+                                 AND TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN', 'EXPIRED')";
 
             int alreadySentCount = 0;
             try
@@ -351,7 +351,7 @@ namespace Prg_Grpsend
                                                                               dbo.TAXDTL.NUMBER = dbo.HEAD_LST.NUMBER AND
                                                                               dbo.TAXDTL.TAG = 2 AND
                                                                               dbo.TAXDTL.Ins = 1 AND
-                                                                              dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN') AND
+                                                                              dbo.TAXDTL.TheStatus IN ('SUCCESS', 'PENDING', 'UNKNOWN', 'EXPIRED') AND
                                                                               {apiSqlCondition}
                                                                       )";
 
