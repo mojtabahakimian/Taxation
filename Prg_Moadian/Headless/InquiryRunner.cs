@@ -11,8 +11,8 @@ namespace Prg_Moadian.Headless
     /// SUCCESS شماره‌ی مالیاتی را در HEAD_LST_EXTENDED.irtaxid می‌گذارد. ارسالِ بی‌تکلیفی که بیش از ۳۱ روز گذشته
     /// EXPIRED می‌شود.
     ///
-    /// تفاوتِ عمدی با Prg_TrackSentInvoice: آنجا EXPIRED با «WHERE IDD = …» ِ ردیفِ گروه‌بندی‌شده زده می‌شد، ولی کوئریِ
-    /// گرید ستونِ IDD را نمی‌خواند (همیشه ۰)، پس هیچ ردیفی منقضی نمی‌شد. اینجا با کدِ رهگیری، همه‌ی ردیف‌های همان ارسال.
+    /// EXPIRED با کدِ رهگیری، همه‌ی ردیف‌های همان ارسال که هنوز بی‌تکلیف‌اند — همان TrackingQueries.ExpireSql ِ پنجره‌ی
+    /// پیگیری (آنجا تا ۱۴۰۵/۰۸/۱۳ با «WHERE IDD = …» بود و هیچ‌وقت کار نکرد).
     /// </summary>
     public static class InquiryRunner
     {
@@ -61,7 +61,9 @@ namespace Prg_Moadian.Headless
                 if (stale.Count > 0)
                 {
                     using var cn = new SqlConnection(connectionString);
-                    cn.Execute("UPDATE dbo.TAXDTL SET TheStatus = N'EXPIRED' WHERE RefrenceNumber IN @stale", new { stale });
+                    // همان دستور پنجرهٔ پیگیری (TrackingQueries.ExpireSql): فقط ردیف‌های هنوز بی‌تکلیف.
+                    foreach (var reference in stale)
+                        cn.Execute(TrackingQueries.ExpireSql, new { RefrenceNumber = reference });
                 }
 
                 CL_ESTELAM? estelam = null;
@@ -105,7 +107,7 @@ namespace Prg_Moadian.Headless
         }
 
         /// <summary>ارسالی که هنوز تکلیفش روشن نیست (همان فیلترِ UndecidedData ِ Prg_TrackSentInvoice؛ UNKNOWN عمداً بیرون است).</summary>
-        public static bool Undecided(string? status) => status is null or "" or "NULL" or "PENDING";
+        public static bool Undecided(string? status) => TrackingQueries.IsUndecided(status);
 
         /// <summary>خطایی که فقط همان یک کدِ رهگیری را می‌گیرد، نه کلِ استعلام را.</summary>
         private static bool ReferenceLevel(Exception ex) => ex is not SqlException && ex is not HttpRequestException && ex is not NullyExceptiony;

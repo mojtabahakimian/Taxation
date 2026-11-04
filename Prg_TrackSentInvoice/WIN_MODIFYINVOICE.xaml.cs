@@ -813,7 +813,7 @@ VALUES
                 {
                     var liveSibling = dbms.DoGetDataSQL<TAXDTL>(
                         "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
-                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING', N'EXPIRED')",
                         new { @ref = irtaxid }).FirstOrDefault();
 
                     if (liveSibling != null)
@@ -832,7 +832,7 @@ VALUES
                 {
                     var siblings = dbms.DoGetDataSQL<TAXDTL>(
                         "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
-                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING', N'EXPIRED')",
                         new { @ref = irtaxid }).FirstOrDefault();
 
                     var chainMsg = "توجه: صورتحساب مرجع خودش یک " + (refInfo.Ins == 2 ? "اصلاحی" : "برگشت از فروش") +
@@ -850,7 +850,7 @@ VALUES
 
                 var previous = dbms.DoGetDataSQL<TAXDTL>(
                     "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
-                    "WHERE Irtaxid = @ref AND Ins = 3 AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                    "WHERE Irtaxid = @ref AND Ins = 3 AND TheStatus IN (N'SUCCESS', N'PENDING', N'EXPIRED')",
                     new { @ref = irtaxid }).FirstOrDefault();
 
                 if (previous != null)
@@ -1458,6 +1458,12 @@ VALUES (@Taxid, @Indatim, @Indati2m, @Indatim_Sec, @Indati2m_Sec, @Inty, @Inno, 
                 {
                     new Msgwin(false, "صورت حساب با موفقیت در سامانه ثبت شد.").ShowDialog();
                 }
+
+                // در این فرم نوع و خریدار فقط‌خواندنی و کپیِ مرجع‌اند، پس عملاً هیچ‌وقت
+                // فعال نمی‌شود؛ برای یکسان ماندن با مسیر تکی (Payewin) اینجا هم هست.
+                var _ignored = MoadianRules.CheckIgnoredReferenceChanges(dbms, _ReferenceNumber_);
+                if (_ignored != null)
+                    new Msgwin(false, _ignored).ShowDialog();
             }
             catch (Exception) { }
             #endregion

@@ -486,6 +486,319 @@ namespace Prg_Moadian.FUNCTIONS
 
         #endregion
 
+        #region صورتحساب ارجاعی‌ای که چیزِ غیرقابل‌اصلاح را عوض می‌کند
+
+        // ---------------------------------------------------------------------
+        // ص۱۵ بند ۱ دستورالعمل: «نوع و الگوی صورتحساب، اقلام اطلاعاتی مربوط به
+        // خریدار، شناسه کالا/خدمت و نرخ مالیات بر ارزش افزوده غیر قابل اصلاح بوده و
+        // برای اصلاح آن‌ها می‌بایست صورتحساب مرجع ابطال و صورتحساب جدید صادر گردد.»
+        // ص۳۰ جدول ۱۰ بند ۴: در اصلاحی، ابطالی و برگشت از فروش «کلیه اطلاعات مربوط
+        // به خریدار خارج از الگو خواهند بود». ص۲۲: خارج از الگو یعنی «مقدار ثبت‌شده
+        // برای این فیلد توسط سامانه دریافت نمی‌شود».
+        //
+        // نمونهٔ واقعی: آبادیس ۱۴۰۵/۰۷/۲۳ — ۱۴ اصلاحی که می‌خواستند صورتحساب نوع دومِ
+        // بی‌خریدار را به نوع اول با شماره اقتصادی تبدیل کنند، همه SUCCESS گرفتند و
+        // همه بی‌اثر ماندند؛ سند در کارپوشهٔ خریدار ننشست.
+        //
+        // ⚠ هشدارهای سامانه به‌تنهایی این حالت را نشان نمی‌دهند. کدهای 14004 (نوع)،
+        // 14007 (الگو)، 14010 (نوع شخص خریدار) و 14012 (شماره اقتصادی خریدار) روی
+        // *هر* صورتحساب ارجاعی‌ای که این فیلدها را بفرستد می‌آیند — حتی وقتی مقدارشان
+        // با مرجع یکی است. شاهد: یزدسپار، ۱۸ اصلاحیِ سالم با نوع و خریدارِ عیناً برابر
+        // مرجع، همین چهار هشدار را دارند؛ و هر ابطالی هم. تنها نشانهٔ واقعی، تفاوت
+        // مقدار با صورتحساب مرجع است. در آبادیس این مقایسه دقیقاً همان ۱۴ مورد را
+        // جدا می‌کند و در یزدسپار هیچ اصلاحی‌ای را.
+        // ---------------------------------------------------------------------
+
+        /// <summary>نام فیلد داخل «...» را از متن هشدار سامانه بیرون می‌کشد.</summary>
+        private static string ExtractFieldName(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return string.Empty;
+            int start = message.IndexOf('«');
+            if (start < 0) return string.Empty;
+            int end = message.IndexOf('»', start + 1);
+            if (end < 0) return string.Empty;
+            return message.Substring(start + 1, end - start - 1).Trim();
+        }
+
+        private static readonly string[] IdentityFieldNames = { "نوع صورتحساب", "الگوی صورتحساب" };
+
+        /// <summary>
+        /// فیلدهای خریدار یا نوع/الگو که سامانه «خارج از الگو» اعلام کرده (یعنی نگرفته).
+        /// تشخیص روی *نام فیلدِ داخل «...»* است، چون متن هر هشداری عبارت «در الگوی
+        /// صورتحساب ارسالی» را دارد. روی کد عددی نیست، چون از کدها فقط 14004/14007/
+        /// 14010/14012 شاهد واقعی داریم.
+        ///
+        /// این تابع فقط *می‌خواند* چه گفته شده؛ تصمیم به هشدار دادن با
+        /// <see cref="CheckIgnoredReferenceChanges(int,string,int?,int?,string,string,string,int?,int?,string,string,string,out string)"/>
+        /// است — بالای این بخش را ببینید.
+        /// </summary>
+        public static bool WarnsIdentityDiscarded(string warningText, out List<string> droppedFields)
+        {
+            droppedFields = new List<string>();
+            if (string.IsNullOrWhiteSpace(warningText)) return false;
+
+            foreach (var part in warningText.Split(','))
+            {
+                if (part.IndexOf("خارج از الگو", StringComparison.Ordinal) < 0) continue;
+
+                var field = ExtractFieldName(part);
+                if (field.Length == 0) continue;
+
+                bool isIdentity =
+                    field.IndexOf("خریدار", StringComparison.Ordinal) >= 0 ||
+                    Array.IndexOf(IdentityFieldNames, field) >= 0;
+
+                if (isIdentity && !droppedFields.Contains(field))
+                    droppedFields.Add(field);
+            }
+
+            return droppedFields.Count > 0;
+        }
+
+        /// <summary>
+        /// چه چیزهایی در این صورتحساب ارجاعی با صورتحساب مرجع فرق دارد که سامانه
+        /// نمی‌پذیرد. خالی و null یکی حساب می‌شوند (TAXDTL برای Tinb ِ خالی رشتهٔ تهی
+        /// می‌نویسد). نوع شخص خریدار (Tob) عمداً نیست: در پانویس ص۱۵ جزو «اقلام
+        /// اطلاعاتی خریدار» نیامده و در هر دو مسیر از جدول مشتری پیش‌فرض می‌گیرد.
+        /// </summary>
+        public static List<string> ListReferenceChanges(
+            int? inty, int? inp, string tinb, string bid, string bpc,
+            int? refInty, int? refInp, string refTinb, string refBid, string refBpc)
+        {
+            var changes = new List<string>();
+
+            void Num(string label, int? now, int? before)
+            {
+                if (now.HasValue && before.HasValue && now.Value != before.Value)
+                    changes.Add($"{label}: {before.Value} ← {now.Value}");
+            }
+            void Text(string label, string now, string before)
+            {
+                var a = (now ?? string.Empty).Trim();
+                var b = (before ?? string.Empty).Trim();
+                if (a != b)
+                    changes.Add($"{label}: «{(b.Length == 0 ? "خالی" : b)}» ← «{(a.Length == 0 ? "خالی" : a)}»");
+            }
+
+            Num("نوع صورتحساب", inty, refInty);
+            Num("الگوی صورتحساب", inp, refInp);
+            Text("شماره اقتصادی خریدار", tinb, refTinb);
+            Text("شناسه/شماره ملی خریدار", bid, refBid);
+            Text("کد پستی خریدار", bpc, refBpc);
+            return changes;
+        }
+
+        private static string KindName(int ins) => ins == 4 ? "برگشت از فروش" : "اصلاحی";
+
+        /// <summary>
+        /// پیش از ارسال: این صورتحساب اصلاحی/برگشتی چیزی را عوض می‌کند که سامانه
+        /// نمی‌پذیرد؟ ابطالی (ins=3) معاف است: نوع و الگویش خودشان خارج از الگو هستند
+        /// (ص۳۰ بند ۳) و بدنه هم ندارد.
+        ///
+        /// هشدار است نه بلاک. متن عمداً تجویزی نیست: ممکن است هدف کاربر فقط اصلاح
+        /// مبلغ باشد و تفاوتِ خریدار فقط از این بیاید که پروندهٔ مشتری بعد از ارسال
+        /// مرجع ویرایش شده — آن‌وقت ادامه دادن درست است.
+        /// </summary>
+        /// <returns>true یعنی مشکلی نیست.</returns>
+        public static bool ValidateReferenceConsistency(
+            int ins,
+            int? inty, int? inp, string tinb, string bid, string bpc,
+            int? refInty, int? refInp, string refTinb, string refBid, string refBpc,
+            out string warning)
+        {
+            warning = null;
+            if (ins != 2 && ins != 4) return true;
+
+            var changes = ListReferenceChanges(inty, inp, tinb, bid, bpc, refInty, refInp, refTinb, refBid, refBpc);
+            if (changes.Count == 0) return true;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"این صورتحساب {KindName(ins)} با صورتحساب مرجعش در این موارد فرق دارد:");
+            sb.AppendLine();
+            foreach (var c in changes) sb.AppendLine($"  • {c}");
+            sb.AppendLine();
+            sb.AppendLine("سامانه این تغییرها را در صورتحساب ارجاعی نمی‌پذیرد (دستورالعمل ص۱۵ بند ۱ و ص۳۰): " +
+                          "سند را «موفق» ثبت می‌کند ولی همان مقادیر صورتحساب مرجع را نگه می‌دارد.");
+            sb.AppendLine();
+            sb.AppendLine("• اگر هدف شما همین تغییرهاست (مثلاً تبدیل نوع دوم به نوع اول، یا عوض کردن خریدار)، " +
+                          "این راه جواب نمی‌دهد: باید صورتحساب مرجع ابطال و صورتحساب جدید صادر شود.");
+            sb.Append("• اگر هدف فقط اصلاح مبلغ یا تعداد است و این تفاوت‌ها ناخواسته‌اند، می‌توانید ادامه دهید.");
+
+            warning = sb.ToString();
+            return false;
+        }
+
+        /// <summary>
+        /// بعد از ارسال/استعلام: آیا این صورتحسابِ «موفق» در واقع تغییری را که خواسته
+        /// بوده اعمال نکرده؟ فقط وقتی true است که هر سه برقرار باشد:
+        ///   ۱. اصلاحی یا برگشت از فروش است،
+        ///   ۲. با مرجع فرق دارد (<see cref="ListReferenceChanges"/>)،
+        ///   ۳. سامانه هم صریحاً گفته آن فیلدها را نگرفته.
+        /// شرط سوم تا وقتی سامانه رفتارش را عوض نکرده همیشه با دوم همراه است؛ نگهش
+        /// داشته‌ایم تا اگر روزی پذیرفت، هشدار بی‌جا ندهیم.
+        /// </summary>
+        public static bool CheckIgnoredReferenceChanges(
+            int ins, string warningText,
+            int? inty, int? inp, string tinb, string bid, string bpc,
+            int? refInty, int? refInp, string refTinb, string refBid, string refBpc,
+            out string message)
+        {
+            message = null;
+            if (ins != 2 && ins != 4) return false;
+            if (!WarnsIdentityDiscarded(warningText, out _)) return false;
+
+            var changes = ListReferenceChanges(inty, inp, tinb, bid, bpc, refInty, refInp, refTinb, refBid, refBpc);
+            if (changes.Count == 0) return false;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"توجه: سامانه این صورتحساب {KindName(ins)} را «موفق» ثبت کرد، " +
+                          "ولی این تغییرها را نپذیرفت و همان مقادیر صورتحساب مرجع را نگه داشت:");
+            sb.AppendLine();
+            foreach (var c in changes) sb.AppendLine($"  • {c}");
+
+            if (refInty == 2 && inty == 1)
+            {
+                sb.AppendLine();
+                sb.AppendLine("یعنی سند همچنان «نوع دوم» و بدون خریدار است و در کارپوشهٔ خریدار نمی‌نشیند.");
+            }
+
+            sb.AppendLine();
+            sb.Append("اگر هدف همین تغییرها بوده، طبق دستورالعمل (ص۱۵ بند ۱) باید صورتحساب مرجع ابطال و " +
+                      "صورتحساب جدید صادر شود.");
+
+            message = sb.ToString();
+            return true;
+        }
+
+        private sealed class RefCheckRow
+        {
+            public int? Ins { get; set; }
+            public int? Inty { get; set; }
+            public int? Inp { get; set; }
+            public string Tinb { get; set; }
+            public string Bid { get; set; }
+            public string Bpc { get; set; }
+            public string Irtaxid { get; set; }
+            public string TheWarning { get; set; }
+            public string TheStatus { get; set; }
+        }
+
+        /// <summary>
+        /// نوع، الگو و خریداری که سامانه واقعاً برای یک صورتحساب نگه داشته است.
+        /// </summary>
+        public sealed class EffectiveIdentity
+        {
+            public string Taxid { get; set; }
+            public int? Inty { get; set; }
+            public int? Inp { get; set; }
+            public string Tinb { get; set; }
+            public string Bid { get; set; }
+            public string Bpc { get; set; }
+            /// <summary>چند حلقه از زنجیرهٔ ارجاع رد شد تا به منبع رسید (۰ = خود مرجع).</summary>
+            public int Hops { get; set; }
+        }
+
+        /// <summary>
+        /// مقادیر مؤثرِ نوع/الگو/خریدارِ یک صورتحساب مرجع، با دنبال کردن زنجیرهٔ ارجاع.
+        ///
+        /// چرا: ردیف TAXDTL ِ یک اصلاحی/برگشتی همان چیزی را دارد که *فرستادیم*، نه آنچه
+        /// سامانه نگه داشت. اگر اصلاحیِ اول نوع ۲ را به ۱ تبدیل کرده بود و سامانه نپذیرفت،
+        /// ردیفش Inty=1 دارد ولی نوع مؤثر هنوز ۲ است. اصلاحیِ دومی که به اولی ارجاع دهد و
+        /// همان Inty=1 را بفرستد، با مقایسهٔ مستقیم «بی‌تغییر» دیده می‌شد و هشدار نمی‌گرفت.
+        /// این فیلدها در ارجاعی‌ها خارج از الگو هستند (ص۳۰)، پس مقدار مؤثر همیشه مال اولین
+        /// صورتحسابِ غیرارجاعیِ زنجیره است. (یزدسپار: ۲ اصلاحی به اصلاحی ارجاع داده‌اند.)
+        ///
+        /// null یعنی مرجع در TAXDTL نیست. حلقه و زنجیرهٔ بیش از ۲۰ حلقه متوقف می‌شوند.
+        /// </summary>
+        public static EffectiveIdentity ResolveEffectiveIdentity(CNNMANAGER.CL_CCNNMANAGER db, string referenceTaxid)
+        {
+            if (string.IsNullOrWhiteSpace(referenceTaxid)) return null;
+            const string sql = "SELECT TOP 1 Taxid, Ins, Inty, Inp, Tinb, Bid, Bpc, Irtaxid FROM dbo.TAXDTL WHERE Taxid = @k ORDER BY IDD";
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string key = referenceTaxid.Trim();
+            EffectiveRow row = null;
+            int hops = -1;
+            while (!string.IsNullOrWhiteSpace(key) && seen.Add(key) && hops < 20)
+            {
+                var next = db.DoGetDataSQL<EffectiveRow>(sql, new { k = key }).FirstOrDefault();
+                if (next is null) break;          // مرجعِ مرجع نیست: همان آخرینِ پیداشده
+                row = next; hops++;
+                if (row.Ins is not (2 or 4)) break;
+                key = row.Irtaxid?.Trim();
+            }
+            if (row is null) return null;
+            return new EffectiveIdentity
+            {
+                Taxid = row.Taxid, Inty = row.Inty, Inp = row.Inp,
+                Tinb = row.Tinb, Bid = row.Bid, Bpc = row.Bpc, Hops = hops
+            };
+        }
+
+        private sealed class EffectiveRow
+        {
+            public string Taxid { get; set; }
+            public int? Ins { get; set; }
+            public int? Inty { get; set; }
+            public int? Inp { get; set; }
+            public string Tinb { get; set; }
+            public string Bid { get; set; }
+            public string Bpc { get; set; }
+            public string Irtaxid { get; set; }
+        }
+
+        /// <summary>
+        /// همان <see cref="CheckIgnoredReferenceChanges(int,string,int?,int?,string,string,string,int?,int?,string,string,string,out string)"/>
+        /// با خواندن ردیف و مرجعش از TAXDTL. هر خطایی یعنی «چیزی برای گفتن نیست» —
+        /// این فقط یک پیام کمکی است و نباید جلوی هیچ پیام یا کار دیگری را بگیرد.
+        ///
+        /// فقط برای ردیفی که TheStatus آن SUCCESS است: پیام می‌گوید «سامانه موفق ثبت کرد»،
+        /// و اصلاحیِ ردشده هم می‌تواند همین هشدارهای «خارج از الگو» را داشته باشد. Payewin
+        /// این را بلافاصله بعد از ارسال صدا می‌زند، وقتی نتیجه ممکن است FAILED باشد.
+        /// مقایسه با مقادیر مؤثر مرجع است (<see cref="ResolveEffectiveIdentity"/>)، نه ردیف خامش.
+        /// </summary>
+        /// <param name="refNumber">کد رهگیری؛ اگر خالی بود از taxid استفاده می‌شود.</param>
+        public static string CheckIgnoredReferenceChanges(CNNMANAGER.CL_CCNNMANAGER db, string refNumber, string taxid = null)
+        {
+            try
+            {
+                const string cols = "Ins, Inty, Inp, Tinb, Bid, Bpc, Irtaxid, TheWarning, TheStatus";
+                RefCheckRow row = null;
+
+                if (!string.IsNullOrWhiteSpace(refNumber))
+                    row = db.DoGetDataSQL<RefCheckRow>(
+                        $"SELECT TOP 1 {cols} FROM dbo.TAXDTL WHERE RefrenceNumber = @k ORDER BY CASE WHEN TheWarning IS NULL OR TheWarning = '' THEN 1 ELSE 0 END, IDD",
+                        new { k = refNumber }).FirstOrDefault();
+                else if (!string.IsNullOrWhiteSpace(taxid))
+                    row = db.DoGetDataSQL<RefCheckRow>(
+                        $"SELECT TOP 1 {cols} FROM dbo.TAXDTL WHERE Taxid = @k ORDER BY CASE WHEN TheWarning IS NULL OR TheWarning = '' THEN 1 ELSE 0 END, IDD",
+                        new { k = taxid }).FirstOrDefault();
+
+                if (row?.Ins is not (2 or 4) || string.IsNullOrWhiteSpace(row.Irtaxid)) return null;
+                if (!string.Equals(row.TheStatus?.Trim(), "SUCCESS", StringComparison.OrdinalIgnoreCase)) return null;
+
+                var refRow = ResolveEffectiveIdentity(db, row.Irtaxid);
+                if (refRow is null) return null;
+
+                if (!CheckIgnoredReferenceChanges(
+                        row.Ins.Value, row.TheWarning,
+                        row.Inty, row.Inp, row.Tinb, row.Bid, row.Bpc,
+                        refRow.Inty, refRow.Inp, refRow.Tinb, refRow.Bid, refRow.Bpc,
+                        out var message))
+                    return null;
+
+                try { Generaly.CL_Generaly.DoGetwriteAppenLog($"IgnoredReferenceChanges ref={refNumber} taxid={taxid} effectiveRef={refRow.Taxid} hops={refRow.Hops}\n{message}"); }
+                catch (Exception) { }
+                return message;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        #endregion
+
         internal static bool IsAllDigits(string s)
         {
             if (string.IsNullOrEmpty(s)) return false;

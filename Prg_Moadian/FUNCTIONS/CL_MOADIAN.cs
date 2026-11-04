@@ -773,6 +773,54 @@ namespace Prg_Moadian.FUNCTIONS
                 }
             }
 
+            #region صورتحساب ارجاعی چیزی را عوض نکند که سامانه نمی‌پذیرد
+            // ص۱۵ بند ۱: «نوع و الگوی صورتحساب، اقلام اطلاعاتی مربوط به خریدار، شناسه
+            // کالا/خدمت و نرخ مالیات بر ارزش افزوده غیر قابل اصلاح بوده و برای اصلاح
+            // آن‌ها می‌بایست صورتحساب مرجع ابطال و صورتحساب جدید صادر گردد.»
+            //
+            // بدون این هشدار، کاربر هیچ نشانه‌ای نمی‌بیند: سامانه سند را می‌پذیرد،
+            // مقادیر تازه را دور می‌اندازد و «موفق» می‌گوید. آبادیس ۱۴۰۵/۰۷/۲۳ —
+            // ۱۴ صورتحساب با همین الگو، همه «موفق» و همه بی‌اثر.
+            //
+            // ابطالی (Ins=3) اینجا نمی‌آید: نوع و الگویش خودشان خارج از الگو هستند
+            // (ص۳۰ جدول ۱۰ بند ۳) و بدنه هم لازم ندارد.
+            var _firstRow = L_TAXDTL_US.First();
+            if ((_firstRow.Ins == 2 || _firstRow.Ins == 4) && !string.IsNullOrWhiteSpace(irtaxid_RefNum_cancel))
+            {
+                try
+                {
+                    // مقادیر مؤثر مرجع، نه ردیف خامش: اگر مرجع خودش اصلاحیِ بی‌اثر بوده، ردیفش
+                    // مقدار فرستاده‌شده را دارد نه آنچه سامانه نگه داشت (MoadianRules.ResolveEffectiveIdentity).
+                    var _refRow = MoadianRules.ResolveEffectiveIdentity(dbms, irtaxid_RefNum_cancel);
+
+                    if (_refRow is not null &&
+                        !MoadianRules.ValidateReferenceConsistency(
+                            Convert.ToInt32(_firstRow.Ins),
+                            _firstRow.Inty, _firstRow.Inp, _firstRow.Tinb, _firstRow.Bid, _firstRow.Bpc,
+                            _refRow.Inty, _refRow.Inp, _refRow.Tinb, _refRow.Bid, _refRow.Bpc,
+                            out var _refWarning))
+                    {
+                        // هشدار است نه بلاک: سامانه ثبات ندارد و قاعده ممکن است عوض شود. اگر کسی
+                        // نیست که بپرسیم (میزبان بی‌پنجره بدون Confirm)، فقط ثبت در لاگ و ادامه.
+                        bool _goOn = OnValidationWarning == null ||
+                                     OnValidationWarning($"{_refWarning}\n\nآیا با این وجود ادامه می‌دهید؟");
+                        DoGetwriteAppenLog($"ReferenceConsistency warning, invoice {NUMBER}, ref {irtaxid_RefNum_cancel}, " +
+                                           $"effective {_refRow.Taxid} (hops {_refRow.Hops}): " +
+                                           (OnValidationWarning == null ? "no prompt, continued" : _goOn ? "user continued" : "user cancelled") +
+                                           $"\n{_refWarning}");
+                        if (!_goOn)
+                            throw new NullyExceptiony(_refWarning);
+                    }
+                }
+                catch (NullyExceptiony) { throw; }
+                catch (Exception _refEx)
+                {
+                    // نرسیدن به ردیف مرجع نباید جلوی ارسال را بگیرد — این فقط یک هشدار است.
+                    DoGetwriteAppenLog($"ValidateReferenceConsistency skipped: {_refEx.Message}");
+                }
+            }
+            #endregion
+
             TaxModel.InvoiceModel.Header header = new TaxModel.InvoiceModel.Header();
             header.Taxid = L_TAXDTL_US.First().Taxid; //شماره منحصر به فرد مالیاتی
             header.Indatim = (long)L_TAXDTL_US.First().Indatim_Sec; //تاریخ و زمان صدور صورتحساب (میلادی)
@@ -904,10 +952,18 @@ namespace Prg_Moadian.FUNCTIONS
             else
                 _apitypesent = 0;
 
+            // uid را خودمان می‌سازیم و پیش از ارسال روی ردیف‌ها می‌گذاریم، تا اگر پاسخ نرسید
+            // (UNKNOWN) هنوز کلیدی برای استعلام داشته باشیم — CL_ESTELAM.ResolveUnknownByUid.
+            // قبلاً uid را SDK می‌ساخت و با نرسیدن پاسخ گم می‌شد؛ ردیف UNKNOWN هیچ راهی برای
+            // تعیین تکلیف در برنامه نداشت (آبادیس، فاکتور ۱۰۶۴).
+            var sendUid = Guid.NewGuid().ToString();
+            for (int i = 0; i < L_TAXDTL_US.Count; i++)
+                L_TAXDTL_US[i].UID = sendUid;
+
             TaxModel.SendInvoicesModel sendInvoicesModel;
             try
             {
-                sendInvoicesModel = taxService.SendInvoices(header, bodies, payments);
+                sendInvoicesModel = taxService.SendInvoices(header, bodies, payments, sendUid);
             }
             catch (Exception sendEx) when (MoadianRules.IsOutcomeUnknown(sendEx))
             {

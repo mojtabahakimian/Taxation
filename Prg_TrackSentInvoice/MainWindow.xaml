@@ -148,13 +148,15 @@
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
                             <!-- Label kept separate to preserve the DoubleClick Event -->
                             <Label Content="شناسه صورت‌حساب (Refrence Number):" FontSize="11" Opacity="0.7" Padding="0,0,0,4" PreviewMouseDoubleClick="Label_PreviewMouseDoubleClick" ToolTip="دابل کلیک برای اعتبارسنجی محاسباتی"/>
-                            <TextBox x:Name="UID_TXB" Text="{Binding ElementName=INVOCIE_DTGR, Path=SelectedItem.RefrenceNumber, UpdateSourceTrigger=PropertyChanged}" 
+                            <!-- OneWay عمدی: کادر قابل ویرایش است و تایپ در آن نباید RefrenceNumber ِ ردیف انتخاب‌شده را بازنویسی کند
+                                 (وگرنه دکمهٔ «هشدارهای سامانه» و شاخهٔ uid ِ استعلام دربارهٔ فاکتور دیگری حرف می‌زدند). -->
+                            <TextBox x:Name="UID_TXB" Text="{Binding ElementName=INVOCIE_DTGR, Path=SelectedItem.RefrenceNumber, Mode=OneWay}" 
                                      TextChanged="UID_TXB_TextChanged" PreviewLostKeyboardFocus="UID_TXB_PreviewLostKeyboardFocus" Height="28"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
                             <Label Content="شماره مالیاتی (جهت کپی):" FontSize="11" Opacity="0.7" Padding="0,0,0,4"/>
-                            <TextBox x:Name="TAXId_TextBox" Text="{Binding ElementName=INVOCIE_DTGR, Path=SelectedItem.Taxid, UpdateSourceTrigger=PropertyChanged}" 
+                            <TextBox x:Name="TAXId_TextBox" Text="{Binding ElementName=INVOCIE_DTGR, Path=SelectedItem.Taxid, Mode=OneWay}" 
                                      IsReadOnly="True" PreviewGotKeyboardFocus="TAXId_TextBox_PreviewGotKeyboardFocus" Height="28" Background="#FFF9F9F9"/>
                         </StackPanel>
                     </Grid>
@@ -164,9 +166,12 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Button x:Name="ESTELAM_BTN" Grid.Column="0" Content="بررسی لحظه‌ای (استعلام)" Style="{StaticResource MaterialDesignRaisedButton}" Click="ESTELAM_BTN_Click" Margin="0,0,4,0" Height="36" Foreground="#DDFFFFFF"/>
-                        <Button x:Name="RESEND_BTN" Grid.Column="1" IsEnabled="False" Content="ارسال مجدد فاکتور(ها)" Style="{StaticResource MaterialDesignOutlinedButton}" Click="RESEND_BTN_Click" Margin="4,0,0,0" Height="36" Foreground="#D32F2F" BorderBrush="#D32F2F"/>
+                        <!-- نمایش هشدارها عمداً اختیاری است؛ بخش ۴ راهنمای مخزن را ببینید. -->
+                        <Button x:Name="WARNINGS_BTN" Grid.Column="1" Content="هشدارهای سامانه" Style="{StaticResource MaterialDesignOutlinedButton}" Click="WARNINGS_BTN_Click" Margin="4,0,4,0" Height="36" Foreground="#BF360C" BorderBrush="#BF360C" ToolTip="آنچه سامانه دربارهٔ همین صورت‌حساب گفته ولی مانع ثبتش نشده (کدهای با رقم اول ۱)"/>
+                        <Button x:Name="RESEND_BTN" Grid.Column="2" IsEnabled="False" Content="ارسال مجدد فاکتور(ها)" Style="{StaticResource MaterialDesignOutlinedButton}" Click="RESEND_BTN_Click" Margin="4,0,0,0" Height="36" Foreground="#D32F2F" BorderBrush="#D32F2F"/>
                     </Grid>
                 </Grid>
             </Border>

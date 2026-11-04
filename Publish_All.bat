@@ -141,7 +141,7 @@ copy /y "%TRACK_XAML%" "%TRACK_BAK%" >nul
 
 :: --- 3A: Production (MainTax: RD_MAINTAX=True, RD_SANDBOX=False) ---
 echo -------------------------------------------------------------------------------
-echo [3/5] Publishing Prg_TrackSentInvoice -> MainTax.exe (سامانه اصلی)...
+echo [3/5] Publishing Prg_TrackSentInvoice -^> MainTax.exe (سامانه اصلی)...
 echo -------------------------------------------------------------------------------
 
 powershell -NoProfile -Command "$p = '%TRACK_XAML%'; $c = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8); $c = $c -replace '<RadioButton\s+IsChecked=.+?\s+x:Name=.RD_MAINTAX.', '<RadioButton IsChecked=\"True\"  x:Name=\"RD_MAINTAX\"' -replace '<RadioButton\s+IsChecked=.+?\s+x:Name=.RD_SANDBOX.', '<RadioButton IsChecked=\"False\" x:Name=\"RD_SANDBOX\"'; [System.IO.File]::WriteAllText($p, $c, [System.Text.Encoding]::UTF8);"
@@ -177,7 +177,7 @@ echo.
 
 :: --- 3B: Sandbox (SandBoxTax: RD_MAINTAX=False, RD_SANDBOX=True) ---
 echo -------------------------------------------------------------------------------
-echo [4/5] Publishing Prg_TrackSentInvoice -> SandBoxTax.exe (آزمایشی Sandbox)...
+echo [4/5] Publishing Prg_TrackSentInvoice -^> SandBoxTax.exe (آزمایشی Sandbox)...
 echo -------------------------------------------------------------------------------
 
 powershell -NoProfile -Command "$p = '%TRACK_XAML%'; $c = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8); $c = $c -replace '<RadioButton\s+IsChecked=.+?\s+x:Name=.RD_MAINTAX.', '<RadioButton IsChecked=\"False\"  x:Name=\"RD_MAINTAX\"' -replace '<RadioButton\s+IsChecked=.+?\s+x:Name=.RD_SANDBOX.', '<RadioButton IsChecked=\"True\" x:Name=\"RD_SANDBOX\"'; [System.IO.File]::WriteAllText($p, $c, [System.Text.Encoding]::UTF8);"

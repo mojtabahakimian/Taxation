@@ -36,7 +36,7 @@ internal static class HeadlessFixPath
         db.DoExecuteSQL($"UPDATE dbo.TAXDTL SET TheStatus=N'FAILED' WHERE Taxid=N'{taxid}'");
 
         check("۳۲-۲ قاعده‌ی دکمه: فقط PENDING / IN_PROGRESS / FAILED (UNKNOWN و SUCCESS نه)",
-              ResendRunner.Resendable("pending") && ResendRunner.Resendable("IN_PROGRESS") && ResendRunner.Resendable("FAILED")
+              ResendRunner.Resendable("pending") && ResendRunner.Resendable("IN_PROGRESS") && ResendRunner.Resendable("FAILED") && ResendRunner.Resendable("EXPIRED")
               && !ResendRunner.Resendable("UNKNOWN") && !ResendRunner.Resendable("SUCCESS") && !ResendRunner.Resendable(null), "");
 
         Reset(http, mockBaseUrl);

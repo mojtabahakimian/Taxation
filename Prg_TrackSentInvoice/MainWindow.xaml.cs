@@ -118,15 +118,9 @@ namespace Prg_TrackSentInvoice
             {
                 IsOtherProccessingNow = true;
 
-                List<TRACK_TAXDTL> UndecidedData = TAXDTL_DATA.Where(item =>
-                item.TheStatus == null ||
-                item.TheStatus == "PENDING" ||
-                // توجه: UNKNOWN عمداً اینجا نیست. آن ردیف‌ها اصلاً کد رهگیری ندارند
-                // (پاسخی از سامانه نرسیده) و تنها استعلامِ پیاده‌سازی‌شده در برنامه
-                // InquiryByReferenceId است. تعیین تکلیف آن‌ها باید از کارپوشه و با
-                // شماره مالیاتی انجام شود؛ تا آن زمان ارسال مجددشان مسدود است.
-                item.TheStatus == "" ||
-                item.TheStatus == "NULL").ToList();
+                // UNKNOWN اینجا نیست: کد رهگیری ندارد. اگر uid دارد (ارسال تکی از ۱۴۰۵/۰۸/۱۳
+                // و گروهی) پایین‌تر جدا با uid پرسیده می‌شود؛ اگر ندارد، فقط از کارپوشه.
+                List<TRACK_TAXDTL> UndecidedData = TAXDTL_DATA.Where(item => TrackingQueries.IsUndecided(item.TheStatus)).ToList();
 
                 for (int i = 0; i < UndecidedData.Count; i++)
                 {
@@ -135,7 +129,11 @@ namespace Prg_TrackSentInvoice
                         TimeSpan difference = DateTime.Today - UndecidedData[i].CRT.Value;
                         if (difference.TotalDays > 31) // Check if the difference is greater than 31 days
                         {
-                            dbms.DoExecuteSQL($"UPDATE dbo.TAXDTL SET TheStatus = N'EXPIRED' WHERE IDD = {UndecidedData[i].IDD}");
+                            // قبلاً «WHERE IDD = {IDD}» بود و IDD در گرید خوانده نمی‌شد: دستور
+                            // «WHERE IDD = » می‌شد، خطای نحوی، بلعیده در catch. هیچ‌وقت کار نکرد.
+                            // حالا همهٔ ردیف‌های همان کد رهگیری، فقط اگر هنوز بی‌تکلیف‌اند.
+                            if (!string.IsNullOrWhiteSpace(UndecidedData[i].RefrenceNumber))
+                                dbms.DoExecuteSQL(TrackingQueries.ExpireSql, new { RefrenceNumber = UndecidedData[i].RefrenceNumber });
                         }
                         else if (!string.IsNullOrWhiteSpace(UndecidedData[i].RefrenceNumber))
                         {
@@ -177,6 +175,27 @@ namespace Prg_TrackSentInvoice
                         return;
                     }
                 }
+
+                // ارسال‌هایی که پاسخشان نرسید (UNKNOWN) ولی uid ِ ما را دارند. فقط پاسخ قطعی
+                // سامانه وضعیت را عوض می‌کند؛ NOT_FOUND همان UNKNOWN می‌ماند.
+                var unknownWithUid = TAXDTL_DATA.Where(item =>
+                        item.TheStatus == "UNKNOWN" &&
+                        string.IsNullOrWhiteSpace(item.RefrenceNumber) &&
+                        !string.IsNullOrWhiteSpace(item.UID) &&
+                        !string.IsNullOrWhiteSpace(item.Taxid)).ToList();
+                foreach (var item in unknownWithUid)
+                {
+                    if (BGWorker.CancellationPending) { e.Cancel = true; return; }
+                    try
+                    {
+                        ESTELAM.ResolveUnknownByUid(item.Taxid, item.UID);
+                    }
+                    catch (Exception er)
+                    {
+                        CL_Generaly.DoWritePRGLOG($"ResolveUnknownByUid : {item.Taxid} / {item.UID} \n", er);
+                    }
+                }
+
                 Dispatcher.Invoke(new Action(() =>
                 {
                     RefGetData();
@@ -356,87 +375,8 @@ namespace Prg_TrackSentInvoice
 
             bool isOnlyLast30Days = Convert.ToBoolean(RD_LAST30.IsChecked);
 
-            if (isOnlyLast30Days)
-            {
-                TAXDTL_DATA = dbms.DoGetDataSQL<TRACK_TAXDTL>(@$"SELECT 
-                                                         ROW_NUMBER() OVER (ORDER BY MAX(T.CRT) DESC) AS RowNumber,
-                                                         T.Taxid,
-                                                         MAX(T.Inno) AS Inno,
-                                                         MAX(T.NUMBER) AS NUMBER,
-                                                         MAX(T.TAG) AS TAG,
-                                                         MAX(T.Inty) AS Inty,
-                                                         MAX(T.Inp) AS Inp,
-                                                         MAX(T.Ins) AS Ins,
-                                                         COUNT(*) AS LineCount,
-                                                         T.UID,
-                                                         T.RefrenceNumber,
-                                                         T.TheConfirmationReferenceId,
-                                                         T.SentTaxMemory,
-                                                         MAX(T.CRT) AS CRT,
-                                                         MAX(CAST(T.TheSuccess AS INT)) AS TheSuccess,
-                                                         T.TheStatus,
-                                                         MAX(T.DATE_N) AS DATE_N,
-                                                         MAX(CAST(T.ApiTypeSent AS INT)) AS ApiTypeSent,
-                                                         MAX(T.TheError) AS TheError,
-                                                         MAX(H.CUST_NO) AS CUST_NO,
-                                                         MAX(H.MOLAH) AS MOLAH,
-                                                         MAX(H.SHARAYET) AS SHARAYET
-                                                     FROM 
-                                                         dbo.TAXDTL T
-                                                     -- اتصال مستقیم با شماره فاکتور، نه با تجزیه Inno.
-                                                     -- Inno حالا سریال هگزادسیمال حافظه مالیاتی است و
-                                                     -- شش کاراکتر آخرش دیگر شماره فاکتور نیست.
-                                                     LEFT OUTER JOIN dbo.HEAD_LST H ON 
-                                                         T.NUMBER = H.NUMBER 
-                                                         AND H.TAG = 2
-                                                     WHERE 
-                                                         T.ApiTypeSent = {_apitypesent} 
-                                                         AND T.CRT >= DATEADD(DAY, -30, GETDATE())
-                                                     GROUP BY 
-                                                         T.Taxid, T.TheStatus, T.UID, T.RefrenceNumber, T.TheConfirmationReferenceId, T.SentTaxMemory
-                                                     ORDER BY 
-                                                         CRT DESC;").ToList();
-            }
-            else
-            {
-                TAXDTL_DATA = dbms.DoGetDataSQL<TRACK_TAXDTL>(@$"SELECT 
-                                                         ROW_NUMBER() OVER (ORDER BY MAX(T.CRT) DESC) AS RowNumber,
-                                                         T.Taxid,
-                                                         MAX(T.Inno) AS Inno,
-                                                         MAX(T.NUMBER) AS NUMBER,
-                                                         MAX(T.TAG) AS TAG,
-                                                         MAX(T.Inty) AS Inty,
-                                                         MAX(T.Inp) AS Inp,
-                                                         MAX(T.Ins) AS Ins,
-                                                         COUNT(*) AS LineCount,
-                                                         T.UID,
-                                                         T.RefrenceNumber,
-                                                         T.TheConfirmationReferenceId,
-                                                         T.SentTaxMemory,
-                                                         MAX(T.CRT) AS CRT,
-                                                         MAX(CAST(T.TheSuccess AS INT)) AS TheSuccess,
-                                                         T.TheStatus,
-                                                         MAX(T.DATE_N) AS DATE_N,
-                                                         MAX(CAST(T.ApiTypeSent AS INT)) AS ApiTypeSent,
-                                                         MAX(T.TheError) AS TheError,
-                                                         MAX(H.CUST_NO) AS CUST_NO,
-                                                         MAX(H.MOLAH) AS MOLAH,
-                                                         MAX(H.SHARAYET) AS SHARAYET
-                                                     FROM 
-                                                         dbo.TAXDTL T
-                                                     -- اتصال مستقیم با شماره فاکتور، نه با تجزیه Inno.
-                                                     -- Inno حالا سریال هگزادسیمال حافظه مالیاتی است و
-                                                     -- شش کاراکتر آخرش دیگر شماره فاکتور نیست.
-                                                     LEFT OUTER JOIN dbo.HEAD_LST H ON 
-                                                         T.NUMBER = H.NUMBER 
-                                                         AND H.TAG = 2
-                                                     WHERE 
-                                                         T.ApiTypeSent = {_apitypesent}
-                                                     GROUP BY 
-                                                         T.Taxid, T.TheStatus, T.UID, T.RefrenceNumber, T.TheConfirmationReferenceId, T.SentTaxMemory
-                                                     ORDER BY 
-                                                         CRT DESC;").ToList();
-            }
+            // متن کوئری در Prg_Moadian/FUNCTIONS/TrackingQueries.cs است (گروه ۳۴ تست‌ها).
+            TAXDTL_DATA = dbms.DoGetDataSQL<TRACK_TAXDTL>(TrackingQueries.GridSql(_apitypesent, isOnlyLast30Days)).ToList();
             foreach (var item in TAXDTL_DATA)
             {
 
@@ -533,6 +473,34 @@ namespace Prg_TrackSentInvoice
             {
                 // 1) ورودی
                 var referenceCode = UID_TXB?.Text?.Trim();
+
+                // ارسالی که پاسخش نرسید (UNKNOWN) کد رهگیری ندارد. قبلاً اینجا فقط «کد رهگیری
+                // وارد نشده» می‌آمد و هیچ راهی نبود؛ حالا اگر uid دارد با uid پرسیده می‌شود.
+                if (string.IsNullOrWhiteSpace(referenceCode) &&
+                    INVOCIE_DTGR.SelectedItem is TRACK_TAXDTL unknownRow &&
+                    unknownRow.TheStatus == "UNKNOWN")
+                {
+                    InquireUnknownRow(unknownRow);
+                    return;
+                }
+
+                // ارسالی که سامانه همان لحظه رد کرد (خطای سطح درخواست) یا اصلاً نرفت (LOCAL_ERROR):
+                // به صف نرفته و کد رهگیری ندارد، پس چیزی برای استعلام نیست. قبلاً اینجا فقط «کد رهگیری
+                // وارد نشده» می‌آمد و کاربر نمی‌فهمید چرا (سندباکس ۱۴۰۵/۰۸/۱۳، فاکتور ۹۸۸۴).
+                if (string.IsNullOrWhiteSpace(referenceCode) &&
+                    INVOCIE_DTGR.SelectedItem is TRACK_TAXDTL notQueued &&
+                    notQueued.TheStatus is "FAILED" or "LOCAL_ERROR")
+                {
+                    var why = string.IsNullOrWhiteSpace(notQueued.TheError) || notQueued.TheError == "NULL"
+                        ? "متن خطایی ثبت نشده است (نسخه‌های پیش از ۹.۰.۹ علت ردِ لحظهٔ ارسال را در ارسال گروهی ذخیره نمی‌کردند)."
+                        : notQueued.TheError;
+                    new Msgwin(false,
+                        "این ارسال به صف سامانه نرفت و کد رهگیری ندارد، پس چیزی برای استعلام نیست.\n\n" +
+                        $"علت ثبت‌شده: {why}\n\n" +
+                        "اگر علت برطرف شده، می‌توانید دوباره بفرستید.").ShowDialog();
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(referenceCode))
                 {
                     new Msgwin(false, "کد رهگیری (UID/Reference) وارد نشده است.").ShowDialog();
@@ -602,21 +570,14 @@ namespace Prg_TrackSentInvoice
                         break;
 
                     case "SUCCESS":
-                        try
-                        {
-                            const string updateIrtaxidSql = @"
-UPDATE hle
-SET hle.irtaxid = t.Taxid
-FROM dbo.HEAD_LST_EXTENDED hle
-INNER JOIN dbo.TAXDTL t ON hle.NUMBER = t.NUMBER AND hle.TGU = t.TAG
-WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
-                            dbms.DoExecuteSQL(updateIrtaxidSql, new { RefrenceNumber = referenceCode });
-                        }
-                        catch (Exception) { }
+                        // irtaxid ِ HEAD_LST_EXTENDED هم همان‌جا (CL_ESTELAM.SaveInquiryResult) به‌روز می‌شود.
+                        PersistInquiryResult(referenceCode, result);
                         new Msgwin(false, @"صورت‌حساب با موفقیت در سامانه ثبت شده است.").ShowDialog();
+                        ShowIgnoredReferenceChangesIfAny(referenceCode);
                         break;
 
                     case "FAILED":
+                        PersistInquiryResult(referenceCode, result);
                         ShowFailedErrors(result);
                         break;
 
@@ -626,7 +587,11 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
                             var rechecked = false;
                             if (INVOCIE_DTGR.SelectedItem is TRACK_TAXDTL row)
                             {
-                                var _UID_REF_ = string.IsNullOrWhiteSpace(row.UID) ? referenceCode : row.UID;
+                                // uid ِ ردیف فقط وقتی که کد رهگیریِ پرسیده‌شده هم مال همین ردیف است.
+                                // کادر کد رهگیری قابل ویرایش است؛ اگر کاربر کد دیگری تایپ کرده،
+                                // نباید استعلام دوم دربارهٔ فاکتورِ انتخاب‌شده باشد و پیامش به اولی بچسبد.
+                                var rowOwnsReference = string.Equals(row.RefrenceNumber?.Trim(), referenceCode, StringComparison.OrdinalIgnoreCase);
+                                var _UID_REF_ = (!rowOwnsReference || string.IsNullOrWhiteSpace(row.UID)) ? referenceCode : row.UID;
 
                                 var uidAndFiscalId = new UidAndFiscalId(_UID_REF_.Trim(), memoryTax);
                                 var byUidResults = TaxApiService.Instance.TaxApis.InquiryByUidAndFiscalId(new List<UidAndFiscalId> { uidAndFiscalId });
@@ -637,20 +602,30 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
                                     rechecked = true;
                                     var status2 = (r2.Status ?? string.Empty).Trim().ToUpperInvariant();
 
+                                    // نتیجه فقط وقتی ذخیره می‌شود که هویت تلاش تأیید شده باشد: uid ِ همین
+                                    // ردیف پرسیده شده و پاسخ (اگر uid دارد) همان uid را برگردانده. ذخیره با
+                                    // Taxid + uid، با همان قواعد مسیر اصلی (SUCCESS پایین نمی‌آید و …).
+                                    // قبلاً این شاخه فقط پیام می‌داد و نه وضعیت را ثبت می‌کرد نه هشدارها را.
+                                    bool verifiedAttempt = rowOwnsReference && !string.IsNullOrWhiteSpace(row.UID) &&
+                                        (string.IsNullOrWhiteSpace(r2.Uid) || string.Equals(r2.Uid.Trim(), row.UID.Trim(), StringComparison.OrdinalIgnoreCase));
+                                    if (verifiedAttempt)
+                                    {
+                                        try { CL_ESTELAM.SaveInquiryResult(dbms, r2, reference: null, taxid: row.Taxid, uid: row.UID); }
+                                        catch (Exception saveEx) { CL_Generaly.DoWritePRGLOG("SaveInquiryResult (uid fallback) : \n", saveEx); }
+                                    }
+                                    else
+                                    {
+                                        CL_Generaly.DoGetwriteAppenLog($"uid fallback for {referenceCode}: {status2} not saved (attempt not verified for the selected row)");
+                                    }
+
                                     if (status2 == "SUCCESS")
                                     {
-                                        try
-                                        {
-                                            const string updateIrtaxidSql = @"
-UPDATE hle
-SET hle.irtaxid = t.Taxid
-FROM dbo.HEAD_LST_EXTENDED hle
-INNER JOIN dbo.TAXDTL t ON hle.NUMBER = t.NUMBER AND hle.TGU = t.TAG
-WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
-                                            dbms.DoExecuteSQL(updateIrtaxidSql, new { RefrenceNumber = referenceCode });
-                                        }
-                                        catch (Exception) { }
                                         new Msgwin(false, @"(استعلام ثانویه) صورت‌حساب شما با موفقیت ثبت شده است.").ShowDialog();
+                                        if (verifiedAttempt)
+                                        {
+                                            var ignored = MoadianRules.CheckIgnoredReferenceChanges(dbms, null, row.Taxid);
+                                            if (ignored != null) new Msgwin(false, ignored).ShowDialog();
+                                        }
                                         break;
                                     }
                                     else if (status2 == "FAILED")
@@ -699,6 +674,46 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
             }
         }
         /// <summary>
+        /// «بررسی لحظه‌ای» برای ارسالی که پاسخش نرسید (UNKNOWN). با uid اگر داریم؛ وگرنه
+        /// فقط راهنمایی، چون بدون کد رهگیری و uid هیچ استعلامی در SDK نیست (۰.۰.۳۴ استعلام با
+        /// شماره مالیاتی ندارد).
+        /// </summary>
+        private void InquireUnknownRow(TRACK_TAXDTL row)
+        {
+            string searchHint = $"شماره مالیاتی {row.Taxid} را در کارپوشه جستجو کنید؛ اگر آنجا هست، این فاکتور را دوباره نفرستید.";
+
+            if (string.IsNullOrWhiteSpace(row.UID) || string.IsNullOrWhiteSpace(row.Taxid))
+            {
+                new Msgwin(false,
+                    "این ارسال هیچ پاسخی از سامانه نگرفت و نه کد رهگیری دارد نه uid، پس از داخل برنامه نمی‌شود وضعیتش را پرسید " +
+                    "(ارسال‌های پیش از ۱۴۰۵/۰۸/۱۳ این‌طورند).\n\n" + searchHint).ShowDialog();
+                return;
+            }
+
+            var status = ESTELAM.ResolveUnknownByUid(row.Taxid, row.UID);
+            switch (status)
+            {
+                case "SUCCESS":
+                    new Msgwin(false, "سامانه این صورت‌حساب را دریافت و ثبت کرده است (استعلام با uid). وضعیت به «موفق» تغییر کرد.").ShowDialog();
+                    break;
+                case "FAILED":
+                    new Msgwin(false, "سامانه این صورت‌حساب را دریافت کرده ولی رد کرده است (استعلام با uid). وضعیت به «ناموفق» تغییر کرد؛ خطاها در ستون خطا هستند.").ShowDialog();
+                    break;
+                case "PENDING":
+                    new Msgwin(false, "سامانه این صورت‌حساب را دریافت کرده و هنوز در حال پردازش است. کد رهگیری ثبت شد و از این به بعد خودکار پیگیری می‌شود.").ShowDialog();
+                    break;
+                case "NOT_FOUND":
+                    new Msgwin(false,
+                        "سامانه با این uid صورت‌حسابی پیدا نکرد. «پیدا نشد» ممکن است فقط «هنوز نرسیده» باشد، پس وضعیت همان «نامعلوم» ماند.\n\n" + searchHint).ShowDialog();
+                    break;
+                default:
+                    new Msgwin(false, "پاسخی از سامانه نیامد؛ وضعیت همان «نامعلوم» ماند. کمی بعد دوباره امتحان کنید.\n\n" + searchHint).ShowDialog();
+                    break;
+            }
+            RefGetData();
+        }
+
+        /// <summary>
         /// حذف هدر/فوتر PEM و تمیزکردن کلید خصوصی
         /// </summary>
         private static string CleanPrivateKey(string pem)
@@ -710,6 +725,51 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
                 .Replace("\n", string.Empty)
                 .Trim();
         }
+        /// <summary>
+        /// نتیجهٔ «بررسی لحظه‌ای» را در TAXDTL می‌نویسد.
+        ///
+        /// قبلاً این پنجره فقط پیام می‌داد و چیزی ذخیره نمی‌کرد؛ پس اگر پاسخ زنده با
+        /// وضعیت ذخیره‌شده فرق داشت، پنجره یک چیز می‌گفت و گرید چیز دیگری. استعلام
+        /// پس‌زمینه (CL_ESTELAM.GETESTELAM_REFCODE_UPDATE) از ابتدا همین کار را می‌کرد؛
+        /// این فقط همان رفتار را به مسیر دستی هم می‌آورد.
+        ///
+        /// اگر بدنهٔ پاسخ قابل خواندن نبود، فقط وضعیت نوشته می‌شود — خطا و هشدار قبلی
+        /// پاک نمی‌شوند، چون ندانستن با «وجود ندارد» یکی نیست.
+        ///
+        /// ⚠ ردیفی که SUCCESS است هرگز با وضعیت دیگری بازنویسی نمی‌شود. سامانه ثبات
+        /// ندارد؛ اگر یک استعلام گذرا FAILED برگرداند و ما SUCCESS را FAILED کنیم، فاکتور
+        /// به لیست ارسال‌نشده‌ها برمی‌گردد و هشدار «قبلاً ارسال شده» هم دیگر نمی‌آید
+        /// (FindLiveOriginals ردیف FAILED را زنده نمی‌داند) — یعنی راه ثبت دوباره در
+        /// کارپوشه باز می‌شود. استعلام پس‌زمینه هم ردیف SUCCESS را دوباره نمی‌پرسد.
+        /// برعکسش (FAILED/PENDING ← SUCCESS) مجاز است و جلوی ارسال تکراری را می‌گیرد.
+        /// </summary>
+        private void PersistInquiryResult(string refNumber, InquiryResultModel result)
+        {
+            try
+            {
+                // یک نویسنده برای همهٔ مسیرهای استعلام (CL_ESTELAM.SaveInquiryResult): SUCCESS پایین
+                // نمی‌آید، NOT_FOUND چیزی نمی‌نویسد، بدنهٔ ناخوانا خطا/هشدار قبلی را پاک نمی‌کند.
+                CL_ESTELAM.SaveInquiryResult(dbms, result, refNumber);
+            }
+            catch (Exception er)
+            {
+                // ذخیره‌نشدن نتیجه نباید جلوی نمایشش را بگیرد.
+                CL_Generaly.DoWritePRGLOG("PersistInquiryResult : \n", er);
+            }
+        }
+
+        /// <summary>
+        /// اگر این صورتحساب اصلاحی/برگشتی است و نوع یا خریدار را عوض کرده که سامانه
+        /// نپذیرفته، همان‌جا بگو. بقیهٔ هشدارها ساکت می‌مانند و فقط با دکمهٔ «هشدارهای
+        /// سامانه» دیده می‌شوند. (خودِ متن هشدار کافی نیست؛ MoadianRules را ببینید.)
+        /// </summary>
+        private void ShowIgnoredReferenceChangesIfAny(string refNumber)
+        {
+            var msg = MoadianRules.CheckIgnoredReferenceChanges(dbms, refNumber);
+            if (msg != null)
+                new Msgwin(false, msg).ShowDialog();
+        }
+
         private void ShowFailedErrors(InquiryResultModel result)
         {
             try
@@ -740,6 +800,87 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
             {
                 new Msgwin(false, "خطا در پردازش جزئیات FAILED.").ShowDialog();
             }
+        }
+
+        /// <summary>
+        /// هشدارهای سامانه برای صورت‌حساب انتخاب‌شده — فقط به درخواست کاربر.
+        ///
+        /// این هشدارها از ابتدا در ستون <c>TAXDTL.TheWarning</c> ذخیره می‌شدند
+        /// (CL_ESTELAM و CL_FUNTIONS آن را پر می‌کنند) ولی هیچ‌جای برنامه خوانده
+        /// نمی‌شدند. نمایش ندادنشان عمدی بود: سامانه ناپایدار است و هشدارهای
+        /// «خارج از الگو» روی ارسال‌های کاملاً سالم هم می‌آیند و کاربر را بی‌جهت
+        /// می‌ترسانند. پس اینجا هم ستون گرید نشده و پیام خودکار نمی‌دهد؛ فقط با
+        /// فشردن این دکمه دیده می‌شود.
+        ///
+        /// توجه: این هشدارها حتی روی اصلاحیِ کاملاً سالم هم «نوع صورتحساب» و «شماره
+        /// اقتصادی خریدار» را خارج از الگو می‌گویند (ابطالی و برگشتی هم). پس خودشان
+        /// نشانهٔ مشکل نیستند. نمونهٔ مشکل واقعی (آبادیس، حواله ۱۰۵۴ و ۱۳ فاکتور دیگر،
+        /// ۱۴۰۵/۰۷/۲۳) اصلاحی‌ای بود که نوع دوم را به نوع اول با خریدار تبدیل می‌کرد:
+        /// همان هشدارها را گرفت ولی چون مقدارش با مرجع فرق داشت، تغییرش اعمال نشد.
+        /// آن تشخیص با MoadianRules.CheckIgnoredReferenceChanges است.
+        /// </summary>
+        private void WARNINGS_BTN_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (INVOCIE_DTGR.SelectedItem is not TRACK_TAXDTL row)
+                {
+                    new Msgwin(false, "اول یک صورت‌حساب را از لیست انتخاب کنید.").ShowDialog();
+                    return;
+                }
+
+                // از دیتابیس می‌خوانیم نه از گرید: استعلام پس‌زمینه ممکن است بعد از
+                // آخرین بارگذاری لیست، هشدارها را به‌روز کرده باشد.
+                string warning = row.TheWarning;
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(row.RefrenceNumber))
+                    {
+                        warning = dbms.DoGetDataSQL<string>(
+                            "SELECT TOP 1 TheWarning FROM dbo.TAXDTL WHERE RefrenceNumber = @ref AND TheWarning IS NOT NULL AND TheWarning <> ''",
+                            new { @ref = row.RefrenceNumber }).FirstOrDefault() ?? warning;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(row.Taxid))
+                    {
+                        warning = dbms.DoGetDataSQL<string>(
+                            "SELECT TOP 1 TheWarning FROM dbo.TAXDTL WHERE Taxid = @tax AND TheWarning IS NOT NULL AND TheWarning <> ''",
+                            new { tax = row.Taxid }).FirstOrDefault() ?? warning;
+                    }
+                }
+                catch (Exception) { /* اگر دیتابیس نداد، همان مقدار گرید را نشان می‌دهیم */ }
+
+                if (string.IsNullOrWhiteSpace(warning) || warning is "NULL")
+                {
+                    new Msgwin(false,
+                        "برای این صورت‌حساب هشداری از سامانه ثبت نشده است.\n\n" +
+                        "اگر وضعیتش هنوز تعیین نشده، اول «بررسی لحظه‌ای (استعلام)» را بزنید.")
+                        .ShowDialog();
+                    return;
+                }
+
+                var items = Functions.GetNormilizedMsg(warning).ToList();
+                if (items.Count == 0)
+                {
+                    new Msgwin(false, warning).ShowDialog();
+                    return;
+                }
+
+                new MsgListwin(false, items, "#FFE65100").ShowDialog();
+
+                // هشدارهای «خارج از الگو» روی نوع و خریدار در هر اصلاحی و ابطالی‌ای
+                // می‌آیند و به‌تنهایی معنایی ندارند. فقط اگر این سند واقعاً چیزی را عوض
+                // کرده باشد که سامانه نپذیرفته، توضیح اضافه می‌دهیم.
+                var ignored = MoadianRules.CheckIgnoredReferenceChanges(dbms, row.RefrenceNumber, row.Taxid);
+                if (ignored != null)
+                    new Msgwin(false, ignored).ShowDialog();
+            }
+            catch (Exception er)
+            {
+                CL_Generaly.DoWritePRGLOG("WARNINGS_BTN_Click : \n", er);
+                new Msgwin(false, "خطا در نمایش هشدارهای سامانه.").ShowDialog();
+            }
+            // IsOtherProccessingNow عمداً دست نمی‌خورد: این دکمه فقط می‌خواند، و پایین
+            // آوردن پرچم وسط کار استعلام پس‌زمینه، اجرای دوم BGWorker را آزاد می‌کرد.
         }
 
         private void INVOCIE_DTGR_PreviewMouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -1358,7 +1499,7 @@ WHERE t.RefrenceNumber = @RefrenceNumber AND t.Taxid IS NOT NULL";
                 bool allResendable = selectedItems.All(item =>
                 {
                     var s = item.TheStatus?.ToUpper();
-                    return s == "PENDING" || s == "IN_PROGRESS" || s == "FAILED";
+                    return s == "PENDING" || s == "IN_PROGRESS" || s == "FAILED" || s == "EXPIRED";   // EXPIRED = PENDING ِ بیش از ۳۱ روز؛ ارسال مجدد همان taxid است و بی‌خطر
                 });
 
                 RESEND_BTN.IsEnabled = allResendable;

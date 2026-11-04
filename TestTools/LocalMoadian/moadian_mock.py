@@ -578,6 +578,14 @@ class Handler(BaseHTTPRequestHandler):
                 STATE["drop_next_send"] = body.get("mode", "empty")
             self._send({"ok": True})
             return
+        if route == "__fail_next_send":
+            # Next enqueue gets HTTP 500 with a request-level error, exactly as the real
+            # sandbox answered on 1405/08/13 (invoice 9884). Note the field names: the
+            # server uses "code"/"message", which SDK 0.0.34 does not read.
+            with LOCK:
+                STATE["fail_next_send"] = int(body.get("status", 500))
+            self._send({"ok": True})
+            return
         if route == "__omit_next_result":
             # {"count": 1} -> next send's response lacks that many results
             with LOCK:
@@ -588,6 +596,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 STATE.pop("drop_next_send", None)
                 STATE.pop("omit_next_result", None)
+                STATE.pop("fail_next_send", None)
                 STATE["invoices"].clear()
                 STATE["by_reference"].clear()
                 STATE["by_uid"].clear()
@@ -617,6 +626,13 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if route.endswith("normal-enqueue"):
+            with LOCK:
+                fail = STATE.pop("fail_next_send", None)
+            if fail:
+                self._send({"timestamp": now_ms(), "requestTraceId": uuid.uuid4().hex,
+                            "errors": [{"code": "5199",
+                                        "message": "خطای غیر منتظره‌ای در انجام درخواست رخ داد."}]}, fail)
+                return
             results = []
             for packet in body.get("packets", []):
                 uid = packet.get("uid") or str(uuid.uuid4())

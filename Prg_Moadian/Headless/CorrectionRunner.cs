@@ -176,7 +176,7 @@ namespace Prg_Moadian.Headless
                 if (!isEbtali)
                 {
                     var liveSibling = cn.Query<TAXDTL>(
-                        "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                        "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING', N'EXPIRED')",
                         new { @ref = irtaxid }).FirstOrDefault();
                     if (liveSibling != null)
                         w.Add("روی این صورتحساب مرجع قبلا یک " + (liveSibling.Ins == 2 ? "اصلاحی" : "برگشت از فروش") +
@@ -190,7 +190,7 @@ namespace Prg_Moadian.Headless
                 }
 
                 var previous = cn.Query<TAXDTL>(
-                    "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL WHERE Irtaxid = @ref AND Ins = 3 AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                    "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL WHERE Irtaxid = @ref AND Ins = 3 AND TheStatus IN (N'SUCCESS', N'PENDING', N'EXPIRED')",
                     new { @ref = irtaxid }).FirstOrDefault();
                 if (previous != null)
                     w.Add("روی این صورتحساب مرجع قبلا یک ابطالی با وضعیت «" + previous.TheStatus + "» ثبت شده است (شماره مالیاتی " + previous.Taxid +

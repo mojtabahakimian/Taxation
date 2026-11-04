@@ -18,6 +18,12 @@
         public string? RefrenceNumber { get; set; }
         public string? TheConfirmationReferenceId { get; set; }
         public string? TheError { get; set; }
+        /// <summary>
+        /// هشدارهای سامانه (کدهای با رقم اول ۱). سند ثبت می‌شود ولی سامانه
+        /// می‌گوید بخشی از آنچه فرستاده‌ایم را نپذیرفته. عمداً در گرید ستون
+        /// ندارد و فقط با دکمهٔ «هشدارهای سامانه» نشان داده می‌شود.
+        /// </summary>
+        public string? TheWarning { get; set; }
         public string? TheStatus { get; set; }
         public bool? TheSuccess { get; set; }
         public bool? ApiTypeSent { get; set; }
