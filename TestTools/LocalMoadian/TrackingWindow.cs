@@ -16,6 +16,7 @@ namespace MoadianLocalTest;
 ///            باید مثل PENDING «ارسال‌شده» بماند وگرنه فاکتور به لیست ارسال‌نشده‌ها برمی‌گردد.
 ///   ۳۴-۵..۸، ۱۰ ارسال تکیِ بی‌پاسخ (UNKNOWN) هیچ کلیدی برای استعلام نداشت؛ حالا uid ِ خودمان را دارد.
 ///   ۳۴-۹     استعلام پس‌زمینه SUCCESS را پایین نمی‌آورد.
+///   ۳۴-۱۷   خطای HTTP 500 ِ سامانه با متن بی‌خوانا، پیام خالی نمی‌دهد.
 ///   ۳۴-۱۱..۱۶ یافته‌های بازبینی Codex: SUCCESS پیش از پیام، زنجیرهٔ ارجاع، نویسندهٔ مشترک، کادر OneWay.
 ///
 /// دادهٔ تستی در بازهٔ ۱۰۰۰۰۰۱..۱۰۰۰۱۲۰ با TAG=77 است تا cleanup_bulk_test.sql هم پاکش کند.
@@ -179,6 +180,27 @@ internal static class TrackingWindow
             check("۳۴-۱۰ استعلام با uid: پاسخ قطعی SUCCESS مستقیم ثبت شد (TheSuccess=1 و کد رهگیری)، ارسال قبلی دست نخورد",
                   r10 == "SUCCESS" && st10 == "SUCCESS" && success10 && Statuses(db, $"Taxid=N'{taxid}'") == "SUCCESS",
                   $"ارسال‌های UNKNOWN={second.Count} پاسخ={r10 ?? "(هیچ)"} وضعیت={st10}");
+
+            // ---------------- ۳۴-۱۷ : خطای سطح درخواست (HTTP 500) بی‌متن نماند ----------------
+            // سندباکس ۱۴۰۵/۰۸/۱۳، فاکتور ۹۸۸۴: HTTP 500 با {"code":"5199","message":…}؛ SDK فیلدهای
+            // errorCode/detail را می‌خواند و پیام و TheError خالی می‌شدند.
+            db.DoExecuteSQL($"DELETE FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER={target}");
+            Post(http, mockBaseUrl, "__reset", "{}");
+            Post(http, mockBaseUrl, "__fail_next_send", "{\"status\":500}");
+            var bulk = new Prg_Moadian.Bulk.SendInvoiceBulk(db, mockBaseUrl)
+            {
+                OnValidationWarning = _ => true,
+                OnValidationWarningsBatch = _ => new HashSet<long>()
+            };
+            var br = bulk.SendAsync(new[] { target }, SendTag, inty_value: null, setm_value: null).GetAwaiter().GetResult();
+            br.Failures.TryGetValue(target, out var shown);
+            var saved17 = db.DoGetDataSQL<(string TheStatus, string TheError)>(
+                $"SELECT TheStatus, CAST(TheError AS nvarchar(1000)) FROM dbo.TAXDTL WHERE TAG={SendTag} AND NUMBER={target}").ToList();
+            check("۳۴-۱۷ خطای HTTP 500 ِ بی‌متن: پیام کاربر و TheError خالی نیستند و وضعیت HTTP را می‌گویند؛ وضعیت همان FAILED",
+                  br.Success == 0 && (shown ?? "").Contains("HTTP 500") &&
+                  saved17.Count > 0 && saved17.All(x => x.TheStatus == "FAILED" && (x.TheError ?? "").Contains("HTTP 500")) &&
+                  Prg_Moadian.Bulk.SendInvoiceBulk.DescribeRequestErrors(400, new[] { "متن سامانه" }) == "متن سامانه",
+                  $"پیام=[{shown}] ردیف‌ها={string.Join(";", saved17.Select(x => x.TheStatus + ":" + (x.TheError ?? "").Length))}");
         }
         finally
         {

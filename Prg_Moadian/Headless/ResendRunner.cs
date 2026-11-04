@@ -37,8 +37,9 @@ namespace Prg_Moadian.Headless
             public string? Error { get; set; }
         }
 
-        /// <summary>INVOCIE_DTGR_SelectionChanged: فقط این وضعیت‌ها ارسالِ مجدد دارند (UNKNOWN عمداً بیرون است).</summary>
-        public static bool Resendable(string? status) => (status?.ToUpperInvariant()) is "PENDING" or "IN_PROGRESS" or "FAILED";
+        /// <summary>INVOCIE_DTGR_SelectionChanged: فقط این وضعیت‌ها ارسالِ مجدد دارند (UNKNOWN عمداً بیرون است).
+        /// EXPIRED همان PENDING ِ بیش از ۳۱ روز است؛ ارسال مجدد همان taxid را می‌فرستد، پس بی‌خطر است.</summary>
+        public static bool Resendable(string? status) => (status?.ToUpperInvariant()) is "PENDING" or "IN_PROGRESS" or "FAILED" or "EXPIRED";
 
         /// <param name="user">برای REMARKS («ResendDuplicate|کاربر|زمان») — در پنجره Environment.UserName.</param>
         public static Result Run(string connectionString, bool mainSystem, IEnumerable<string> taxIds, string user, string? taxUrlOverride = null)

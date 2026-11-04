@@ -278,8 +278,16 @@ namespace Prg_Moadian.Bulk
                         }
                         else if (response.Body.Errors != null && response.Body.Errors.Any())
                         {
-                            // اگر Detail نال بود، ErrorCode را نشان بده
-                            batchErrorMessage = string.Join(" | ", response.Body.Errors.Select(e => !string.IsNullOrEmpty(e.Detail) ? e.Detail : e.ErrorCode));
+                            // اگر Detail نال بود، ErrorCode را نشان بده.
+                            // خطای سطح درخواست (مثلاً HTTP 500) را سامانه با «code» و «message» می‌فرستد، ولی
+                            // ErrorModel ِ SDK ۰.۰.۳۴ «errorCode» و «detail» می‌خواند؛ هر دو خالی می‌رسند و
+                            // پیام کاربر و TheError خالی می‌شد. شاهد: سندباکس ۱۴۰۵/۰۸/۱۳، فاکتور ۹۸۸۴ —
+                            // جواب خام HTTP 500، کد 5199 «خطای غیر منتظره‌ای در انجام درخواست رخ داد».
+                            // پاسخ خام از SDK در دسترس نیست؛ دست‌کم وضعیت HTTP را بگو. رفتار (FAILED) عوض نشده.
+                            batchErrorMessage = DescribeRequestErrors(response.Status,
+                                response.Body.Errors.Select(e => !string.IsNullOrWhiteSpace(e?.Detail) ? e!.Detail : e?.ErrorCode));
+                            try { CL_Generaly.DoGetwriteAppenLog($"[BulkSend] request error: HTTP {response.Status}, {response.Body.Errors.Count} error(s): {batchErrorMessage}"); }
+                            catch (Exception) { }
                         }
                         else if (response.Body.Result == null || !response.Body.Result.Any())
                         {
@@ -1037,6 +1045,24 @@ namespace Prg_Moadian.Bulk
             }
         }
 
+        /// <summary>
+        /// متن خطای سطح درخواست برای کاربر و TheError. اگر SDK متن و کد را خالی داد (بالا را ببینید)،
+        /// به جای رشتهٔ خالی، وضعیت HTTP و راهنمای کوتاه برمی‌گردد. هرگز خالی برنمی‌گرداند.
+        /// </summary>
+        public static string DescribeRequestErrors(int httpStatus, IEnumerable<string?> parts)
+        {
+            var readable = (parts ?? Enumerable.Empty<string?>())
+                .Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim()).Distinct().ToList();
+            if (readable.Count > 0)
+                return string.Join(" | ", readable);
+
+            if (httpStatus >= 500)
+                return $"سامانهٔ مؤدیان با خطای داخلی پاسخ داد (HTTP {httpStatus}) و متن خطا قابل خواندن نبود. " +
+                       "این خطا از سمت سرور سامانه است و معمولاً گذراست؛ صورتحساب به صف نرفته است. کمی بعد دوباره ارسال کنید.";
+            return $"سامانهٔ مؤدیان درخواست را رد کرد (HTTP {httpStatus}) ولی متن خطا قابل خواندن نبود. " +
+                   "صورتحساب به صف نرفته است. اگر تکرار شد، تنظیمات حافظهٔ مالیاتی و کلید را بررسی کنید.";
+        }
+
         /// <returns>شمارهٔ فاکتورهایی که سامانه پاسخ داد ولی uid آن‌ها در پاسخ نبود.</returns>
         private List<long> PersistChunk(List<InvoiceDto> sent, List<List<TAXDTL>> recordsSets, List<string> sentUids, IEnumerable<PacketResponse> responses, int tag, bool outcomeUnknown = false)
         {
@@ -1092,7 +1118,7 @@ namespace Prg_Moadian.Bulk
                              Todam, Tbill, Setm, Cap, Insp, Tvop, Tax17, Cdcd,
                              DATE_N,
                              NUMBER, TAG, Sstid, Sstt, Mu, Am, Fee, Prdis, Dis, Adis, Vra, Vam, Tsstam,
-                             UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, IDD, REMARKS
+                             UID, RefrenceNumber, TheStatus, ApiTypeSent, SentTaxMemory, IDD, REMARKS, TheError
                          )
                          VALUES
                          (
@@ -1101,7 +1127,7 @@ namespace Prg_Moadian.Bulk
                              @Todam, @Tbill, @Setm, @Cap, @Insp, @Tvop, @Tax17, @Cdcd,
                              @Date_N,
                              @Number, @Tag, @Sstid, @Sstt, @Mu, @Am, @Fee, @Prdis, @Dis, @Adis, @Vra, @Vam, @Tsstam,
-                             @UID, @Ref, @Status, @Api, @Mem, @IDD, N'Bulk'
+                             @UID, @Ref, @Status, @Api, @Mem, @IDD, N'Bulk', @Err
                          )";
                         var p = new Dictionary<string, object>
                         {
@@ -1154,7 +1180,13 @@ namespace Prg_Moadian.Bulk
                             ["Status"] = status,
                             ["Api"] = _isSandbox ? 0 : 1,
                             ["Mem"] = _memoryId,
-                            ["IDD"] = idd
+                            ["IDD"] = idd,
+                            // علت شکستِ سطح درخواست (بی‌کد رهگیری). قبلاً اصلاً ذخیره نمی‌شد و در پنجرهٔ
+                            // پیگیری فقط «ناموفق» بی‌دلیل دیده می‌شد. ارسالی که به صف رفته (PENDING) خالی می‌ماند
+                            // تا استعلام آن را پر کند.
+                            ["Err"] = status == "PENDING" || string.IsNullOrWhiteSpace(resp?.ErrorDetail)
+                                ? null   // Dapper: null، نه DBNull (DBNull را به‌عنوان پارامتر نمی‌پذیرد)
+                                : (resp!.ErrorDetail.Length > 4000 ? resp.ErrorDetail.Substring(0, 4000) : resp.ErrorDetail)
                         };
                         _db.DoExecuteSQL(sql, p);
                     }

@@ -484,6 +484,23 @@ namespace Prg_TrackSentInvoice
                     return;
                 }
 
+                // ارسالی که سامانه همان لحظه رد کرد (خطای سطح درخواست) یا اصلاً نرفت (LOCAL_ERROR):
+                // به صف نرفته و کد رهگیری ندارد، پس چیزی برای استعلام نیست. قبلاً اینجا فقط «کد رهگیری
+                // وارد نشده» می‌آمد و کاربر نمی‌فهمید چرا (سندباکس ۱۴۰۵/۰۸/۱۳، فاکتور ۹۸۸۴).
+                if (string.IsNullOrWhiteSpace(referenceCode) &&
+                    INVOCIE_DTGR.SelectedItem is TRACK_TAXDTL notQueued &&
+                    notQueued.TheStatus is "FAILED" or "LOCAL_ERROR")
+                {
+                    var why = string.IsNullOrWhiteSpace(notQueued.TheError) || notQueued.TheError == "NULL"
+                        ? "متن خطایی ثبت نشده است (نسخه‌های پیش از ۹.۰.۹ علت ردِ لحظهٔ ارسال را در ارسال گروهی ذخیره نمی‌کردند)."
+                        : notQueued.TheError;
+                    new Msgwin(false,
+                        "این ارسال به صف سامانه نرفت و کد رهگیری ندارد، پس چیزی برای استعلام نیست.\n\n" +
+                        $"علت ثبت‌شده: {why}\n\n" +
+                        "اگر علت برطرف شده، می‌توانید دوباره بفرستید.").ShowDialog();
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(referenceCode))
                 {
                     new Msgwin(false, "کد رهگیری (UID/Reference) وارد نشده است.").ShowDialog();
@@ -1482,7 +1499,7 @@ namespace Prg_TrackSentInvoice
                 bool allResendable = selectedItems.All(item =>
                 {
                     var s = item.TheStatus?.ToUpper();
-                    return s == "PENDING" || s == "IN_PROGRESS" || s == "FAILED";
+                    return s == "PENDING" || s == "IN_PROGRESS" || s == "FAILED" || s == "EXPIRED";   // EXPIRED = PENDING ِ بیش از ۳۱ روز؛ ارسال مجدد همان taxid است و بی‌خطر
                 });
 
                 RESEND_BTN.IsEnabled = allResendable;

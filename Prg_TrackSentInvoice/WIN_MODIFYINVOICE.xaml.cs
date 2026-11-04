@@ -813,7 +813,7 @@ VALUES
                 {
                     var liveSibling = dbms.DoGetDataSQL<TAXDTL>(
                         "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
-                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING', N'EXPIRED')",
                         new { @ref = irtaxid }).FirstOrDefault();
 
                     if (liveSibling != null)
@@ -832,7 +832,7 @@ VALUES
                 {
                     var siblings = dbms.DoGetDataSQL<TAXDTL>(
                         "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
-                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                        "WHERE Irtaxid = @ref AND Ins IN (2, 4) AND TheStatus IN (N'SUCCESS', N'PENDING', N'EXPIRED')",
                         new { @ref = irtaxid }).FirstOrDefault();
 
                     var chainMsg = "توجه: صورتحساب مرجع خودش یک " + (refInfo.Ins == 2 ? "اصلاحی" : "برگشت از فروش") +
@@ -850,7 +850,7 @@ VALUES
 
                 var previous = dbms.DoGetDataSQL<TAXDTL>(
                     "SELECT TOP 1 Taxid, Ins, TheStatus FROM dbo.TAXDTL " +
-                    "WHERE Irtaxid = @ref AND Ins = 3 AND TheStatus IN (N'SUCCESS', N'PENDING')",
+                    "WHERE Irtaxid = @ref AND Ins = 3 AND TheStatus IN (N'SUCCESS', N'PENDING', N'EXPIRED')",
                     new { @ref = irtaxid }).FirstOrDefault();
 
                 if (previous != null)
