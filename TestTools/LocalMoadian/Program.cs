@@ -33,6 +33,7 @@ internal static class Program
         if (urlArg != null) BaseUrl = urlArg;
         if (args.Contains("--simulate-branches")) return BranchSimulation.Run(BaseUrl);
         if (args.Any(a => a.StartsWith("--sandbox-live="))) return SandboxLive.Run(args);
+        if (args.Any(a => a.StartsWith("--inquiry-live="))) return InquiryLive.Run(args);
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
         Banner("گروه ۱ — سریال صورتحساب (Inno)");
