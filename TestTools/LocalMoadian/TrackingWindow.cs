@@ -181,6 +181,37 @@ internal static class TrackingWindow
                   r10 == "SUCCESS" && st10 == "SUCCESS" && success10 && Statuses(db, $"Taxid=N'{taxid}'") == "SUCCESS",
                   $"ارسال‌های UNKNOWN={second.Count} پاسخ={r10 ?? "(هیچ)"} وضعیت={st10}");
 
+            // ---------------- ۳۴-۱۸ تا ۳۴-۲۰ : سابقهٔ هشدارها در MOADIAN_WARNLOG ----------------
+            // این‌جا target ارسال SUCCESS دارد، پس هر دو مسیر هشدار «قبلاً ارسال شده» می‌دهند.
+            var logSince = db.DoGetDataSQL<DateTime>("SELECT GETDATE()").First();
+            WarningLog.Write("TEST-34", target, SendTag, "آزمایشی", "متن آزمایشی", WarningLog.Continued, false);
+            var direct = db.DoGetDataSQL<(string Decision, string Env, string WinUser)>(
+                "SELECT Decision, Env, WinUser FROM dbo.MOADIAN_WARNLOG WHERE Source=N'TEST-34'").ToList();
+            check("۳۴-۱۸ سابقهٔ هشدار: جدول در اولین نوشتن ساخته می‌شود و ردیف با تصمیم، محیط و کاربر ویندوز ثبت می‌شود",
+                  direct.Count == 1 && direct[0].Decision == WarningLog.Continued && direct[0].Env == "آزمایشی" && !string.IsNullOrEmpty(direct[0].WinUser),
+                  $"ردیف‌ها={direct.Count}");
+
+            var bulkLog = new Prg_Moadian.Bulk.SendInvoiceBulk(db, mockBaseUrl) { OnValidationWarning = _ => false };
+            bulkLog.SendAsync(new[] { target }, SendTag, inty_value: null, setm_value: null).GetAwaiter().GetResult();
+            var bulkRows = db.DoGetDataSQL<(string Source, string Kind, string Decision)>(
+                "SELECT Source, Kind, Decision FROM dbo.MOADIAN_WARNLOG WHERE NUMBER=@n AND CRT>=@s AND Source<>N'TEST-34'",
+                new { n = (double)target, s = logSince }).ToList();
+            check("۳۴-۱۹ ارسال گروهی: جواب «لغو» به هشدار «قبلاً ارسال شده» با شمارهٔ فاکتور ثبت شد",
+                  bulkRows.Any(r => r.Source == WarningLog.SourceBulk && r.Kind == "قبلاً ارسال شده" && r.Decision == WarningLog.Excluded),
+                  string.Join("؛ ", bulkRows.Select(r => $"{r.Source}/{r.Kind}/{r.Decision}")));
+
+            CL_MOADIAN.OnValidationWarning = _ => false;
+            try { CL_MOADIAN.DoSendInvoice(new[] { $"{target}_{SendTag}_m" }); } catch (Exception) { }
+            CL_MOADIAN.OnValidationWarning = _ => true;
+            var singleRows = db.DoGetDataSQL<(string Source, string Decision, string Message)>(
+                "SELECT Source, Decision, CAST(Message AS nvarchar(400)) FROM dbo.MOADIAN_WARNLOG WHERE NUMBER=@n AND CRT>=@s AND Source=@src",
+                new { n = (double)target, s = logSince, src = WarningLog.SourceSingle }).ToList();
+            check("۳۴-۲۰ ارسال تکی: جواب «لغو» به پرسش هسته (از راه AskUser) با متن پرسش ثبت شد",
+                  singleRows.Any(r => r.Decision == WarningLog.Cancelled && !string.IsNullOrEmpty(r.Message)),
+                  string.Join("؛ ", singleRows.Select(r => r.Decision)));
+            db.DoExecuteSQL("DELETE FROM dbo.MOADIAN_WARNLOG WHERE Source=N'TEST-34' OR (NUMBER=@n AND CRT>=@s)",
+                            new { n = (double)target, s = logSince });
+
             // ---------------- ۳۴-۱۷ : خطای سطح درخواست (HTTP 500) بی‌متن نماند ----------------
             // سندباکس ۱۴۰۵/۰۸/۱۳، فاکتور ۹۸۸۴: HTTP 500 با {"code":"5199","message":…}؛ SDK فیلدهای
             // errorCode/detail را می‌خواند و پیام و TheError خالی می‌شدند.

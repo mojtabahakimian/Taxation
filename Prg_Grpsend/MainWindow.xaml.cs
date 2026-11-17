@@ -248,7 +248,10 @@ namespace Prg_Grpsend
 • تمامی اقدامات شما در سیستم ثبت و لاگ می‌شود
 آیا مطمئن هستید که می‌خواهید ادامه دهید؟";
 
-                if (!(new Msgwin(true, warning).ShowDialog() ?? false))
+                bool showSentOk = new Msgwin(true, warning).ShowDialog() ?? false;
+                Prg_Moadian.FUNCTIONS.WarningLog.Write(Prg_Moadian.FUNCTIONS.WarningLog.SourceBulk, null, null, "نمایش ارسال‌شده‌ها", warning,
+                    showSentOk ? Prg_Moadian.FUNCTIONS.WarningLog.Continued : Prg_Moadian.FUNCTIONS.WarningLog.Cancelled, RD_MAINAPI.IsChecked ?? false);
+                if (!showSentOk)
                 {
                     // اگر کاربر انصراف داد، به حالت قبلی برگردان
                     RD_NOT_SENT_ONLY.IsChecked = true;
@@ -317,7 +320,10 @@ namespace Prg_Grpsend
 📝 این عملیات در سیستم لاگ شده و قابل پیگیری است.
 آیا واقعاً می‌خواهید این فاکتورها را مجدداً ارسال کنید؟";
 
-                if (!(new Msgwin(true, criticalWarning).ShowDialog() ?? false))
+                bool resendOk = new Msgwin(true, criticalWarning).ShowDialog() ?? false;
+                Prg_Moadian.FUNCTIONS.WarningLog.Write(Prg_Moadian.FUNCTIONS.WarningLog.SourceBulk, null, null, "ارسال مجدد ارسال‌شده‌ها", criticalWarning,
+                    resendOk ? Prg_Moadian.FUNCTIONS.WarningLog.Continued : Prg_Moadian.FUNCTIONS.WarningLog.Cancelled, RD_MAINAPI.IsChecked ?? false);
+                if (!resendOk)
                     return false;
 
                 // ثبت لاگ در جدول AMALIAT
@@ -674,10 +680,15 @@ namespace Prg_Grpsend
                 var pc = new System.Globalization.PersianCalendar();
                 var today = DateTime.Today;
                 long todayYmd = pc.GetYear(today) * 10000L + pc.GetMonth(today) * 100 + pc.GetDayOfMonth(today);
-                if (long.Parse(ymd) > todayYmd &&
-                    !(new Msgwin(true, $"تاریخ سفارشی {TXT_CUSTOM_DATE.Text} از امروز جلوتر است و سامانه معمولاً صورتحساب با تاریخ آینده را رد می‌کند.\n\nآیا با این وجود ادامه می‌دهید؟",
-                                 YesBtnText: "ادامه", NoBtnText: "انصراف").ShowDialog() ?? false))
-                    return;
+                if (long.Parse(ymd) > todayYmd)
+                {
+                    string futureMsg = $"تاریخ سفارشی {TXT_CUSTOM_DATE.Text} از امروز جلوتر است و سامانه معمولاً صورتحساب با تاریخ آینده را رد می‌کند.\n\nآیا با این وجود ادامه می‌دهید؟";
+                    bool futureOk = new Msgwin(true, futureMsg, YesBtnText: "ادامه", NoBtnText: "انصراف").ShowDialog() ?? false;
+                    Prg_Moadian.FUNCTIONS.WarningLog.Write(Prg_Moadian.FUNCTIONS.WarningLog.SourceBulk, null, null, "تاریخ سفارشی آینده", futureMsg,
+                        futureOk ? Prg_Moadian.FUNCTIONS.WarningLog.Continued : Prg_Moadian.FUNCTIONS.WarningLog.Cancelled, RD_MAINAPI.IsChecked ?? false);
+                    if (!futureOk)
+                        return;
+                }
             }
 
             if (!CheckAndWarnForAlreadySentInvoices())

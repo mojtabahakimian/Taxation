@@ -35,6 +35,20 @@ namespace Prg_Moadian.FUNCTIONS
 
         public static Func<string, bool>? OnValidationWarning { get; set; }
 
+        /// <summary>منبع ردیف‌های MOADIAN_WARNLOG؛ SingleSendRunner (سفیر) عوضش می‌کند.</summary>
+        public static string LogSource { get; set; } = WarningLog.SourceSingle;
+
+        /// <summary>
+        /// پرسیدن «ادامه می‌دهید؟» از میزبان، و ثبت جواب در MOADIAN_WARNLOG. همهٔ پرسش‌های این کلاس از
+        /// اینجا می‌گذرند؛ صدا زدن مستقیم OnValidationWarning جواب را بی‌سابقه می‌گذارد.
+        /// </summary>
+        private static bool AskUser(string question)
+        {
+            bool ok = OnValidationWarning!(question);
+            WarningLog.Write(LogSource, NUMBER, TAG, null, question, ok ? WarningLog.Continued : WarningLog.Cancelled, WarningLog.IsMain(TaxURL));
+            return ok;
+        }
+
         public static int IDD_OF_TAXDTL { get; set; } = -1;
 
         public static string CALLER_NAME { get; set; }
@@ -343,7 +357,7 @@ namespace Prg_Moadian.FUNCTIONS
                     TaxURL == "https://tp.tax.gov.ir/req/api/");
                 if (prior.Count > 0 &&
                     (OnValidationWarning == null ||
-                     !OnValidationWarning($"{MoadianRules.DescribePriorSends(prior)}\n\nآیا با این وجود ادامه می‌دهید؟")))
+                     !AskUser($"{MoadianRules.DescribePriorSends(prior)}\n\nآیا با این وجود ادامه می‌دهید؟")))
                 {
                     throw new NullyExceptiony($"ارسال فاکتور {NUMBER} لغو شد: قبلاً ارسال شده است.");
                 }
@@ -422,7 +436,7 @@ namespace Prg_Moadian.FUNCTIONS
                 // اقتصادی ۱۴ رقمی به خطای «Over Length 11» می‌خورد و اصلاً ارسال نمی‌شد.
                 if (!MoadianRules.ValidateBuyer(1, _HEAD_EXTENDED?.inp ?? 1, tobValue, ECODE_M, CODEMELI_M, _HEAD_EXTENDED?.bpc, out var buyerError))
                 {
-                    if (OnValidationWarning != null && OnValidationWarning($"{buyerError}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (OnValidationWarning != null && AskUser($"{buyerError}\n\nآیا با این وجود ادامه می‌دهید؟"))
                     {
                         // کاربر آگاهانه ادامه داد
                     }
@@ -430,6 +444,22 @@ namespace Prg_Moadian.FUNCTIONS
                     {
                         RecordFailedInvoiceLocal(NUMBER, TAG, buyerError);
                         throw new NullyExceptiony(buyerError);
+                    }
+                }
+
+                // «حقیقی» ولی با نشانهٔ حقوقی (حوالهٔ ۱۰۲۴۲ یزدسپار). هشدار است، نه بلاک؛
+                // بدون پرسنده فقط لاگ و ادامه (MoadianRules.LooksLikeLegalEntity).
+                var _buyerRow = L_DRV_TBL_US.FirstOrDefault();
+                if (MoadianRules.LooksLikeLegalEntity(tobValue, _buyerRow?.MCODEM, _buyerRow?.HESAB, out var entityWarning))
+                {
+                    bool _goOn = OnValidationWarning == null ||
+                                 AskUser($"{entityWarning}\n\nآیا با این وجود ادامه می‌دهید؟");
+                    if (OnValidationWarning == null)   // پرسیده‌ها را AskUser ثبت کرده است
+                        WarningLog.Write(LogSource, NUMBER, TAG, "نوع شخص خریدار", entityWarning, WarningLog.NoPrompt, WarningLog.IsMain(TaxURL));
+                    if (!_goOn)
+                    {
+                        RecordFailedInvoiceLocal(NUMBER, TAG, entityWarning);
+                        throw new NullyExceptiony(entityWarning);
                     }
                 }
             }
@@ -491,7 +521,7 @@ namespace Prg_Moadian.FUNCTIONS
                     if (remaining < 0)
                     {
                         var retMsg = $"مقدار مرجوعی برای کالا بیشتر از مقدار فروش است (کالا: {item.KALA}).";
-                        if (OnValidationWarning == null || !OnValidationWarning($"{retMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                        if (OnValidationWarning == null || !AskUser($"{retMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
                         {
                             RecordFailedInvoiceLocal(NUMBER, TAG, retMsg);
                             throw new NullyExceptiony(retMsg);
@@ -540,7 +570,7 @@ namespace Prg_Moadian.FUNCTIONS
                     {
                         if (OnValidationWarning != null)
                         {
-                            if (!OnValidationWarning($"{zeroProblem}. آیا مایل به ادامه ارسال هستید؟"))
+                            if (!AskUser($"{zeroProblem}. آیا مایل به ادامه ارسال هستید؟"))
                             {
                                 string errMsg = "ارسال فاکتور به دلیل انصراف کاربر در هشدار قیمت صفر لغو شد.";
                                 RecordFailedInvoiceLocal(NUMBER, TAG, errMsg);
@@ -563,7 +593,7 @@ namespace Prg_Moadian.FUNCTIONS
                 if (!(_HEAD_EXTENDED.ins == 4) && (item.N_MOIN ?? 0) > (item.MABL_K ?? 0))
                 {
                     var disMsg = $"تخفیف کالا/خدمت '{item.KALA}' ({item.N_MOIN}) از مبلغ قبل از تخفیف ({item.MABL_K}) بیشتر است.";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{disMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (OnValidationWarning == null || !AskUser($"{disMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
                     {
                         RecordFailedInvoiceLocal(NUMBER, TAG, disMsg);
                         throw new NullyExceptiony(disMsg);
@@ -575,7 +605,7 @@ namespace Prg_Moadian.FUNCTIONS
                 if ((item.mabkbt ?? 0) > 0 && (item?.vra ?? 0) > 0 && (item.IMBAA ?? 0) <= 0) //نرخ درصد مالیات داره اما خود مبلغ مالیات نداره
                 {
                     var vatMsg2 = $"کالا/خدمت '{item.KALA}' نرخ مالیات {item.vra}٪ دارد ولی مبلغ مالیاتش صفر است.";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{vatMsg2}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (OnValidationWarning == null || !AskUser($"{vatMsg2}\n\nآیا با این وجود ادامه می‌دهید؟"))
                     {
                         RecordFailedInvoiceLocal(NUMBER, TAG, vatMsg2);
                         throw new NullyExceptiony(vatMsg2);
@@ -605,7 +635,7 @@ namespace Prg_Moadian.FUNCTIONS
                 if (!L_DRV_TBL_US.Any())
                 {
                     var emptyMsg = $"صورت حساب برگشتی با شماره {NUMBER} پس از کسر اقلام مرجوعی کالای باقی‌مانده‌ای ندارد؛ معمولا برای برگشت کامل باید ابطالی ثبت شود.";
-                    if (OnValidationWarning == null || !OnValidationWarning($"{emptyMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
+                    if (OnValidationWarning == null || !AskUser($"{emptyMsg}\n\nآیا با این وجود ادامه می‌دهید؟"))
                     {
                         RecordFailedInvoiceLocal(NUMBER, TAG, emptyMsg);
                         throw new NullyExceptiony(emptyMsg);
@@ -803,11 +833,9 @@ namespace Prg_Moadian.FUNCTIONS
                         // هشدار است نه بلاک: سامانه ثبات ندارد و قاعده ممکن است عوض شود. اگر کسی
                         // نیست که بپرسیم (میزبان بی‌پنجره بدون Confirm)، فقط ثبت در لاگ و ادامه.
                         bool _goOn = OnValidationWarning == null ||
-                                     OnValidationWarning($"{_refWarning}\n\nآیا با این وجود ادامه می‌دهید؟");
-                        DoGetwriteAppenLog($"ReferenceConsistency warning, invoice {NUMBER}, ref {irtaxid_RefNum_cancel}, " +
-                                           $"effective {_refRow.Taxid} (hops {_refRow.Hops}): " +
-                                           (OnValidationWarning == null ? "no prompt, continued" : _goOn ? "user continued" : "user cancelled") +
-                                           $"\n{_refWarning}");
+                                     AskUser($"{_refWarning}\n\nآیا با این وجود ادامه می‌دهید؟");
+                        if (OnValidationWarning == null)   // پرسیده‌ها را AskUser ثبت کرده است
+                            WarningLog.Write(LogSource, NUMBER, TAG, "ارجاعیِ ناسازگار با مرجع", _refWarning, WarningLog.NoPrompt, WarningLog.IsMain(TaxURL));
                         if (!_goOn)
                             throw new NullyExceptiony(_refWarning);
                     }

@@ -45,6 +45,14 @@ namespace Prg_Moadian.Bulk
         public string CALLER_NAME { get; set; } = "m";
         public Func<string, bool>? OnValidationWarning { get; set; }
 
+        /// <summary>منبع ردیف‌های MOADIAN_WARNLOG؛ BulkSendRunner (سفیر) عوضش می‌کند.</summary>
+        public string LogSource { get; set; } = WarningLog.SourceBulk;
+
+        private int _logTag = 2;
+
+        private void LogWarning(double? number, string? kind, string? message, string decision) =>
+            WarningLog.Write(LogSource, number, _logTag, kind, message, decision, !_isSandbox);
+
         /// <summary>
         /// هشدارهای ساخت فاکتور را یکجا می‌دهد، نه یکی‌یکی (با ۱۰۰۰ فاکتور، ده‌ها پنجره باز می‌شد
         /// و «لغو» فقط همان یک فاکتور را کنار می‌گذاشت). اگر تنظیم شود، همهٔ فاکتورها بی‌وقفه ساخته
@@ -68,8 +76,14 @@ namespace Prg_Moadian.Bulk
                 _collectedWarnings.Add(new BulkWarning(number, kind, message));
                 return true;
             }
-            return OnValidationWarning != null &&
-                   OnValidationWarning(prompt ?? $"{message}\n\nآیا با این وجود ادامه می‌دهید؟");
+            if (OnValidationWarning == null)
+            {
+                LogWarning(number, kind, message, WarningLog.Excluded + " (بی‌پرسش)");
+                return false;
+            }
+            bool ok = OnValidationWarning(prompt ?? $"{message}\n\nآیا با این وجود ادامه می‌دهید؟");
+            LogWarning(number, kind, message, ok ? WarningLog.Continued : WarningLog.Cancelled);
+            return ok;
         }
 
         /// <summary>
@@ -130,6 +144,7 @@ namespace Prg_Moadian.Bulk
         public async Task<BulkSendResult> SendAsync(IEnumerable<long> invoiceNumbers, int tag, int? inty_value = default, int? setm_value = default,
     IProgress<int>? progress = null, bool useCustomDate = false, string customDateText = null, bool sendOptionalItemName = true)
         {
+            _logTag = tag;
             var cer = new CustomExceptErMsg();
 
             var result = new BulkSendResult();
@@ -152,7 +167,12 @@ namespace Prg_Moadian.Bulk
                 string msg = MoadianRules.DescribePriorSends(prior) +
                              "\n\n«ادامه و ارسال»: این فاکتورها هم دوباره ارسال شوند." +
                              "\n«لغو ارسال»: این فاکتورها کنار گذاشته شوند و بقیه ارسال شوند.";
-                if (OnValidationWarning == null || !OnValidationWarning(msg))
+                bool sendPrior = OnValidationWarning != null && OnValidationWarning(msg);
+                string priorDecision = OnValidationWarning == null ? WarningLog.Excluded + " (بی‌پرسش)"
+                                     : sendPrior ? WarningLog.Continued : WarningLog.Excluded;
+                foreach (var pn in prior.Select(p => p.NUMBER).Distinct())
+                    LogWarning(pn, "قبلاً ارسال شده", msg, priorDecision);
+                if (!sendPrior)
                 {
                     var skip = prior.Select(p => (long)p.NUMBER).ToHashSet();
                     foreach (var n in skip)
@@ -214,6 +234,11 @@ namespace Prg_Moadian.Bulk
                 if (shown.Count > 0)
                 {
                     var excluded = OnValidationWarningsBatch!(shown);
+                    // پاسخ کاربر برای هر هشدار فهرست: ادامه، کنار گذاشته، یا لغو کل.
+                    foreach (var w in shown)
+                        LogWarning(w.Number, w.Kind, w.Message,
+                                   excluded == null ? WarningLog.CancelledAll
+                                   : excluded.Contains(w.Number) ? WarningLog.Excluded : WarningLog.Continued);
                     if (excluded == null)
                     {
                         // لغو کل ارسال: هیچ فاکتوری نمی‌رود و چیزی هم در دیتابیس ثبت نمی‌شود.
@@ -539,6 +564,21 @@ namespace Prg_Moadian.Bulk
                     {
                         RecordFailedInvoiceLocal(number, tag, errMsg);
                         throw new InvoiceValidationException(number, errMsg);
+                    }
+                }
+
+                // «حقیقی» ولی با نشانهٔ حقوقی (حوالهٔ ۱۰۲۴۲ یزدسپار). هشدار است، نه بلاک؛
+                // اگر هیچ callbackی نیست، فقط لاگ و ادامه (MoadianRules.LooksLikeLegalEntity).
+                if (MoadianRules.LooksLikeLegalEntity(tobValue, lines.First().MCODEM, lines.First().HESAB, out var entityWarning))
+                {
+                    string msg = $"فاکتور {number}: {entityWarning}";
+                    bool canAsk = _collectedWarnings != null || OnValidationWarning != null;
+                    if (!canAsk)
+                        LogWarning(number, "نوع شخص خریدار", msg, WarningLog.NoPrompt);
+                    else if (!Warn(number, "نوع شخص خریدار", msg))
+                    {
+                        RecordFailedInvoiceLocal(number, tag, msg);
+                        throw new InvoiceValidationException(number, msg);
                     }
                 }
             }

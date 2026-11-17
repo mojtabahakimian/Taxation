@@ -217,6 +217,7 @@ namespace Prg_Grpsend
             {
                 Baseknow.USERCOD = userRecord.IDD.ToString();
                 Baseknow.UUSER = USERNAME;
+                Prg_Moadian.FUNCTIONS.WarningLog.AppUser = USERNAME;   // نام کاربر در سابقهٔ هشدارها (MOADIAN_WARNLOG)
 
 
 

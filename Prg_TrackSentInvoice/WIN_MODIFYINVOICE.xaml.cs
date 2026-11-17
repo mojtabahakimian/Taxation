@@ -778,6 +778,18 @@ VALUES
             //GetSumHead
             GetHeaderSum();
         }
+
+        /// <summary>هشدار «ادامه می‌دهید؟» و ثبت جواب در MOADIAN_WARNLOG (هشدار است، نه سد؛ ولی سابقه می‌ماند).</summary>
+        private bool AskLogged(string kind, string text)
+        {
+            var w = new Msgwin(true, text);
+            w.ShowDialog();
+            bool ok = w.DialogResult == true;
+            WarningLog.Write(WarningLog.SourceCorrection, TAXDTL_DATA?.FirstOrDefault()?.NUMBER, null, kind, text,
+                             ok ? WarningLog.Continued : WarningLog.Cancelled, WarningLog.IsMain(TaxURL));
+            return ok;
+        }
+
         /// <summary>
         /// هشدار (نه سد) درباره وضعیت زنجیره مرجع.
         ///
@@ -950,12 +962,10 @@ VALUES
                 var badRef = TAXDTL_DATA.FirstOrDefault(x => (x.Irtaxid ?? string.Empty).Trim().Length != 22);
                 if (badRef != null)
                 {
-                    var wRef = new Msgwin(true,
+                    if (!AskLogged("طول شماره مرجع",
                         "هشدار: شماره صورت حساب مرجع (Irtaxid) معمولا باید دقیقا ۲۲ کاراکتر باشد. مقدار فعلی «" +
                         badRef.Irtaxid + "» طول " + (badRef.Irtaxid ?? string.Empty).Trim().Length + " دارد." +
-                        "\n\nآیا با این وجود ادامه می‌دهید؟");
-                    wRef.ShowDialog();
-                    if (wRef.DialogResult != true) return;
+                        "\n\nآیا با این وجود ادامه می‌دهید؟")) return;
                 }
 
                 // فیلد Irtaxid در گرید قابل ویرایش است. اگر کاربر آن را به شناسه‌ای غیر
@@ -965,12 +975,10 @@ VALUES
                 if (!string.IsNullOrEmpty(_referenceTaxid) &&
                     !string.Equals(typedRef, _referenceTaxid.Trim(), StringComparison.OrdinalIgnoreCase))
                 {
-                    var refMsg = new Msgwin(true,
+                    if (!AskLogged("مرجع متفاوت با سند باز",
                         $"شماره مرجع وارد شده ({typedRef}) با صورتحسابی که این فرم از روی آن باز شده " +
                         $"({_referenceTaxid}) یکسان نیست.\n\nاقلام این صورتحساب از سند اول خوانده شده‌اند. " +
-                        "آیا مطمئنید می‌خواهید به شناسه دیگری ارجاع دهید؟");
-                    refMsg.ShowDialog();
-                    if (refMsg.DialogResult != true) return;
+                        "آیا مطمئنید می‌خواهید به شناسه دیگری ارجاع دهید؟")) return;
                 }
 
                 // ص۱۵ V7.9: «هر صورتحساب فقط می‌تواند به عنوان مرجع یک صورتحساب با موضوع
@@ -993,13 +1001,11 @@ VALUES
                 if (customIndatim < _referenceIndatim)
                 {
                     var refDate = DateTimeOffset.FromUnixTimeMilliseconds(_referenceIndatim).ToOffset(new TimeSpan(3, 30, 0));
-                    var wDate = new Msgwin(true,
+                    if (!AskLogged("تاریخ زودتر از مرجع",
                         "هشدار: تاریخ سفارشی (" + normalizedCustomDate + ") از تاریخ صدور صورتحساب مرجع (" +
                         refDate.ToString("yyyy/MM/dd HH:mm") + ") کوچکتر است." +
                         "\n\nطبق ص۲۵ دستورالعمل، تاریخ صورتحساب ارجاعی نباید از مرجع زودتر باشد." +
-                        "\n\nآیا با این وجود ادامه می‌دهید؟");
-                    wDate.ShowDialog();
-                    if (wDate.DialogResult != true) return;
+                        "\n\nآیا با این وجود ادامه می‌دهید؟")) return;
                 }
             }
 
@@ -1020,8 +1026,7 @@ VALUES
             {
                 new Msgwin(false, "قواعد جمع/رُندینگ رعایت نشده: " + why).ShowDialog();
 
-                var msgwin2 = new Msgwin(true, "آیا با این وجود می‌خواهید ادامه دهید؟"); msgwin2.ShowDialog();
-                if (msgwin2.DialogResult != true)
+                if (!AskLogged("قواعد جمع/رُندینگ", "قواعد جمع/رُندینگ رعایت نشده: " + why + "\n\nآیا با این وجود می‌خواهید ادامه دهید؟"))
                 {
                     return;
                 }

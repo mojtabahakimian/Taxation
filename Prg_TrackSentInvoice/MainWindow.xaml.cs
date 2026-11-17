@@ -714,6 +714,19 @@ namespace Prg_TrackSentInvoice
         }
 
         /// <summary>
+        /// هشدار «ادامه می‌دهید؟» و ثبت جواب در MOADIAN_WARNLOG (هشدار است، نه سد؛ ولی سابقه می‌ماند).
+        /// </summary>
+        private bool AskLogged(string kind, string text, double? number)
+        {
+            var w = new Msgwin(true, text);
+            w.ShowDialog();
+            bool ok = w.DialogResult == true;
+            WarningLog.Write(WarningLog.SourceTracking, number, null, kind, text,
+                             ok ? WarningLog.Continued : WarningLog.Cancelled, WarningLog.IsMain(TaxURL));
+            return ok;
+        }
+
+        /// <summary>
         /// حذف هدر/فوتر PEM و تمیزکردن کلید خصوصی
         /// </summary>
         private static string CleanPrivateKey(string pem)
@@ -931,22 +944,20 @@ namespace Prg_TrackSentInvoice
                 // تصمیم نهایی با کاربر است.
                 if (_msgitem?.TheStatus is "UNKNOWN")
                 {
-                    var warnU = new Msgwin(true,
+                    if (!AskLogged("مرجعِ نامعلوم (UNKNOWN)",
                         "هشدار: وضعیت صورتحساب " + _msgitem.Inno + " نامعلوم است؛ پاسخ سامانه دریافت نشده است." +
                         "\n\nممکن است در کارپوشه ثبت شده باشد یا نشده باشد. توصیه می‌شود ابتدا از کارپوشه با شماره مالیاتی بررسی کنید." +
-                        "\n\nآیا با این وجود ادامه می‌دهید؟");
-                    warnU.ShowDialog();
-                    if (warnU.DialogResult != true) { IsOtherProccessingNow = false; return; }
+                        "\n\nآیا با این وجود ادامه می‌دهید؟", _msgitem.NUMBER))
+                    { IsOtherProccessingNow = false; return; }
                 }
 
                 if (_msgitem?.TheStatus is "LOCAL_ERROR")
                 {
-                    var warnL = new Msgwin(true,
+                    if (!AskLogged("مرجعِ ارسال‌نشده (LOCAL_ERROR)",
                         "هشدار: صورتحساب " + _msgitem.Inno + " طبق ثبت محلی به سامانه ارسال نشده و احتمالا مرجع معتبری ندارد." +
                         "\n\nمعمولا برای این مورد باید خود فاکتور دوباره ارسال شود، نه صورتحساب اصلاحی/ابطالی." +
-                        "\n\nآیا با این وجود ادامه می‌دهید؟");
-                    warnL.ShowDialog();
-                    if (warnL.DialogResult != true) { IsOtherProccessingNow = false; return; }
+                        "\n\nآیا با این وجود ادامه می‌دهید؟", _msgitem.NUMBER))
+                    { IsOtherProccessingNow = false; return; }
                 }
 
                 //if (_msgitem?.Ins is 1) //اصلی
@@ -957,9 +968,9 @@ namespace Prg_TrackSentInvoice
                     {
                         if (IsFailed)
                         {
-                            Msgwin MSG0 = new Msgwin(true, $"این صورت حساب {_msgitem.Inno} ناموفق بوده با این حال از ارسال ابطالی/برگشتی/اصلاحی آن اطمینان دارید؟");
-                            MSG0.ShowDialog();
-                            if (MSG0.DialogResult != true)
+                            if (!AskLogged("مرجعِ ناموفق (FAILED)",
+                                    $"این صورت حساب {_msgitem.Inno} ناموفق بوده با این حال از ارسال ابطالی/برگشتی/اصلاحی آن اطمینان دارید؟",
+                                    _msgitem.NUMBER))
                             {
                                 return;
                             }
@@ -1529,6 +1540,9 @@ namespace Prg_TrackSentInvoice
                 $"آیا از ارسال مجدد اطمینان دارید؟");
             msgwin.Height = msgwin.Height + 50;
             msgwin.ShowDialog();
+            WarningLog.Write(WarningLog.SourceTracking, null, null, "ارسال مجدد با همان شماره مالیاتی",
+                             $"{uniqueTaxids.Count} فاکتور: {string.Join("، ", selectedItems.Select(i => i.NUMBER).Distinct())}",
+                             msgwin.DialogResult == true ? WarningLog.Continued : WarningLog.Cancelled, WarningLog.IsMain(TaxURL));
 
             if (msgwin.DialogResult != true)
             {

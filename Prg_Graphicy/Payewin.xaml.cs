@@ -27,6 +27,15 @@ namespace Prg_Graphicy
 
         CL_CCNNMANAGER dbms;
         CL_FUNTIONS TheFunctions = new CL_FUNTIONS();
+        /// <summary>جواب پرسش‌های «قبلاً ارسال شده» در MOADIAN_WARNLOG (پرسش‌های هسته را CL_MOADIAN.AskUser ثبت می‌کند).</summary>
+        private static void LogDupAnswer(string? number, string? tag, string question, bool? answer)
+        {
+            double? n = double.TryParse(number, out var x) ? x : null;
+            double? t = double.TryParse(tag, out var y) ? y : null;
+            WarningLog.Write(WarningLog.SourceSingle, n, t, "قبلاً ارسال شده", question,
+                             answer == true ? WarningLog.Continued : WarningLog.Cancelled, WarningLog.IsMain(CL_MOADIAN.TaxURL));
+        }
+
         private void GoFullExitNow()
         {
             CL_PRC_LOADER.Dispose();
@@ -104,6 +113,7 @@ namespace Prg_Graphicy
                             {
                                 Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال و ثبت شده آیا مایلید مجددا ارسال کنید ؟");
                                 msgwinv.ShowDialog();
+                                LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب از نوع اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال و ثبت شده آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                                 if (msgwinv.DialogResult is false)
                                 {
                                     GoFullExitNow();
@@ -113,6 +123,7 @@ namespace Prg_Graphicy
                             {
                                 Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن هنوز در انتظار (PENDING) است , آیا مایلید مجددا ارسال کنید ؟");
                                 msgwinv.ShowDialog();
+                                LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن هنوز در انتظار (PENDING) است , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                                 if (msgwinv.DialogResult is false)
                                 {
                                     GoFullExitNow();
@@ -122,6 +133,7 @@ namespace Prg_Graphicy
                             {
                                 Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                                 msgwinv.ShowDialog();
+                                LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                                 if (msgwinv.DialogResult is false)
                                 {
                                     GoFullExitNow();
@@ -132,6 +144,7 @@ namespace Prg_Graphicy
                                 // EXPIRED = بیش از ۳۱ روز بی‌تکلیف ماند و دیگر پرسیده نمی‌شود؛ یعنی «نمی‌دانیم»، نه «نرفته».
                                 Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                                 msgwinv.ShowDialog();
+                                LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                                 if (msgwinv.DialogResult is false)
                                 {
                                     GoFullExitNow();
@@ -141,6 +154,7 @@ namespace Prg_Graphicy
                             {
                                 Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
                                 msgwinv.ShowDialog();
+                                LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب اصلی (فروش) به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                                 if (msgwinv.DialogResult is false)
                                 {
                                     GoFullExitNow();
@@ -158,6 +172,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده , اما وضعیت آن هنوز *درانتظار* است, آیا میخواهید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب از نوع اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده , اما وضعیت آن هنوز *درانتظار* است, آیا میخواهید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -167,6 +182,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع اصلاحی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب از نوع اصلاحی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -178,6 +194,7 @@ namespace Prg_Graphicy
                             // سند اصلاحی تکراری سخت‌ترین حالت برای جبران است.
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -188,6 +205,7 @@ namespace Prg_Graphicy
                             // EXPIRED = بیش از ۳۱ روز بی‌تکلیف ماند و دیگر پرسیده نمی‌شود؛ یعنی «نمی‌دانیم»، نه «نرفته».
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -197,6 +215,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب اصلاحی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -220,6 +239,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده , اما وضیعت آن هنوز *درانتظار* است, آیا میخواهید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب از نوع ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده , اما وضیعت آن هنوز *درانتظار* است, آیا میخواهید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -229,6 +249,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع ابطالی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب از نوع ابطالی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -240,6 +261,7 @@ namespace Prg_Graphicy
                             // سند ابطالی تکراری سخت‌ترین حالت برای جبران است.
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -250,6 +272,7 @@ namespace Prg_Graphicy
                             // EXPIRED = بیش از ۳۱ روز بی‌تکلیف ماند و دیگر پرسیده نمی‌شود؛ یعنی «نمی‌دانیم»، نه «نرفته».
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -259,6 +282,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب ابطالی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -280,6 +304,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده , اما وضیعت آن هنوز *درانتظار* است, آیا میخواهید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب از نوع برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده , اما وضیعت آن هنوز *درانتظار* است, آیا میخواهید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -289,6 +314,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب از نوع برگشتی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب از نوع برگشتی به شماره (حواله) {_factornum} قبلا با موفقیت ارسال و در سامانه ثبت شده , آیا میخواهید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -300,6 +326,7 @@ namespace Prg_Graphicy
                             // سند برگشتی تکراری سخت‌ترین حالت برای جبران است.
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده اما پاسخ سامانه دریافت نشده و وضعیتش نامعلوم است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -310,6 +337,7 @@ namespace Prg_Graphicy
                             // EXPIRED = بیش از ۳۱ روز بی‌تکلیف ماند و دیگر پرسیده نمی‌شود؛ یعنی «نمی‌دانیم»، نه «نرفته».
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن بیش از ۳۱ روز روشن نشد و منقضی (EXPIRED) شده است. ممکن است در کارپوشه ثبت شده باشد. توصیه میشود ابتدا با شماره مالیاتی در کارپوشه جستجو کنید , آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
@@ -319,6 +347,7 @@ namespace Prg_Graphicy
                         {
                             Msgwin msgwinv = new Msgwin(true, $"این صورت حساب برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟");
                             msgwinv.ShowDialog();
+                            LogDupAnswer(_NUMBER_, _TAG_, $"این صورت حساب برگشتی به شماره (حواله) {_factornum} قبلا ارسال شده اما وضعیت آن در ناموفق (FAILED) شده است , گاهی اوقات به دلیل اشکالات سامانه , میتواند صورت حسابی که ناموفق خورده نیز در کارپوشه ثبت شده باشد لزا پیشنهاد میشود قبل از ارسال , با شماره مالیاتی در کارپوشه جستجو کنید ,آیا مایلید مجددا ارسال کنید ؟", msgwinv.DialogResult);
                             if (msgwinv.DialogResult is false)
                             {
                                 GoFullExitNow();
