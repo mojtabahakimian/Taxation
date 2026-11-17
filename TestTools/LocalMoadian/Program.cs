@@ -531,6 +531,23 @@ internal static class Program
                   3, 1, 1, "61385341333", null, null, 2, 1, "", null, null, out _) &&
               !MoadianRules.ValidateReferenceConsistency(
                   4, 1, 1, "61385341333", null, null, 2, 1, "", null, null, out _));
+
+        // --- خریدار «حقیقی» با نشانهٔ حقوقی (یزدسپار، حوالهٔ ۱۰۲۴۲، ۱۴۰۵/۰۸/۱۹) ---
+        // ValidateBuyer این را رد نمی‌کند: ۱۴ رقم برای حقیقی طول درستی است.
+        const string sahel = "شرکت ساحل پروتئین شرق منطقه آزادچابهار (سهامی خاص)PSC";
+        Check("۲-۶۰ حوالهٔ ۱۰۲۴۲: طول شماره اقتصادی برای حقیقی درست است و ValidateBuyer ایرادی نمی‌گیرد",
+              MoadianRules.ValidateBuyer(1, 1, 1, "14014347496364", null, null, out _));
+        Check("۲-۶۱ حوالهٔ ۱۰۲۴۲: حقیقی با شناسهٔ ملی ۱۱ رقمی و نام «شرکت … سهامی» هشدار می‌گیرد",
+              MoadianRules.LooksLikeLegalEntity(1, "14014347496", sahel, out var w61) &&
+              w61.Contains("14014347496") && w61.Contains("شرکت") && w61.Contains("عدم نیاز به واکنش"));
+        Check("۲-۶۲ هر نشانه به‌تنهایی کافی است: فقط شناسهٔ ۱۱ رقمی، یا فقط نام شرکتی",
+              MoadianRules.LooksLikeLegalEntity(1, "10860013723", "صنایع شیر دهنگ", out _) &&
+              MoadianRules.LooksLikeLegalEntity(1, "", "شرکت صنعت و معدن یزد یوتاب", out _));
+        Check("۲-۶۳ حقیقیِ عادی (کد ملی ۱۰ رقمی، نام شخص) و هر نوع شخص دیگر هشدار نمی‌گیرد",
+              !MoadianRules.LooksLikeLegalEntity(1, "3071799578", "آقای علی قنبری", out _) &&
+              !MoadianRules.LooksLikeLegalEntity(1, null, null, out _) &&
+              !MoadianRules.LooksLikeLegalEntity(2, "14014347496", sahel, out _) &&
+              !MoadianRules.LooksLikeLegalEntity(4, "14014347496", sahel, out _));
     }
 
     // ================================================================ گروه ۳

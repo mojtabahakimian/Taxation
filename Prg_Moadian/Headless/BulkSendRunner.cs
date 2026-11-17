@@ -97,7 +97,8 @@ namespace Prg_Moadian.Headless
                     {
                         CALLER_NAME = request.Caller,
                         OnValidationWarning = request.Confirm ?? (_ => false),
-                        OnValidationWarningsBatch = request.ReviewWarnings
+                        OnValidationWarningsBatch = request.ReviewWarnings,
+                        LogSource = WarningLog.SourceSafirBulk
                     };
                 }
                 catch (Exception ex)

@@ -116,13 +116,23 @@ namespace Prg_Moadian.Headless
                 if (head?.inty is null)
                     throw new NullyExceptiony("HEAD_EXTENDED is null");
 
-                if (CL_MOADIAN.TaxURL == MainUrl && !PriorSendsConfirmed(dbms, head, number, tag, factorNum, Ask))
+                // پرسش‌های «قبلاً ارسال شده» در هسته نیستند؛ جوابشان را همین‌جا ثبت می‌کنیم.
+                // پرسش‌های هسته را خود CL_MOADIAN.AskUser ثبت می‌کند.
+                bool AskAndLog(string q)
+                {
+                    bool ok = Ask(q);
+                    WarningLog.Write(WarningLog.SourceSafirSingle, number, tag, "قبلاً ارسال شده", q,
+                                     ok ? WarningLog.Continued : WarningLog.Cancelled, WarningLog.IsMain(CL_MOADIAN.TaxURL));
+                    return ok;
+                }
+                if (CL_MOADIAN.TaxURL == MainUrl && !PriorSendsConfirmed(dbms, head, number, tag, factorNum, AskAndLog))
                 {
                     result.Question = unanswered;
                     return result;
                 }
 
                 CL_MOADIAN.OnValidationWarning = Ask;
+                CL_MOADIAN.LogSource = WarningLog.SourceSafirSingle;
                 CL_MOADIAN.DoSendInvoice(new[] { $"{number}_{tag}_{request.Caller}" });
             }
             catch (Exception er)
@@ -139,6 +149,7 @@ namespace Prg_Moadian.Headless
             finally
             {
                 CL_MOADIAN.OnValidationWarning = null;
+                CL_MOADIAN.LogSource = WarningLog.SourceSingle;
                 CL_MOADIAN.TaxURL = savedUrl;
                 CL_Generaly.MrCorrect = savedMode;
             }
