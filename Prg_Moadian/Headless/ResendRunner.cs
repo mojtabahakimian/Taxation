@@ -96,12 +96,14 @@ namespace Prg_Moadian.Headless
                                                 ", new { taxid, api = Convert.ToInt32(isMainApi) }).FirstOrDefault();
                         }
 
-                        var originalInvoiceRows = dbms.DoGetDataSQL<FULL_TAXDTL>(@"
+                        var originalInvoiceRows = !string.IsNullOrEmpty(baseUid)
+                            ? dbms.DoGetDataSQL<FULL_TAXDTL>(@"
                                                 SELECT *
                                                 FROM dbo.TAXDTL
                                                 WHERE Taxid = @taxid AND ApiTypeSent = @api AND Uid = @baseUid
                                                 ORDER BY CRT, IDD
-                                            ", new { taxid, api = Convert.ToInt32(isMainApi), baseUid });
+                                            ", new { taxid, api = Convert.ToInt32(isMainApi), baseUid })
+                            : AttemptRowsWithoutUid(dbms, taxid, isMainApi);
 
                         if (!originalInvoiceRows.Any())
                         {
@@ -143,6 +145,31 @@ namespace Prg_Moadian.Headless
                 }
                 return result;
             }
+        }
+
+        /// <summary>
+        /// ارسالی که سامانه UID نداد (مثلا خطای HTTP 500 ِ کلِ بسته در ارسالِ گروهی): ردیف‌ها UID ِ NULL دارند و
+        /// «Uid = @baseUid» چیزی پیدا نمی‌کرد («ردیفی از این ارسال در TAXDTL پیدا نشد»). اینجا ردیف‌های همان تلاش
+        /// را برمی‌داریم: از اولین ردیفِ بی‌UID ِ این Taxid، ردیف‌های پشتِ‌سرِ همِ همان تلاش (IDD ِ پیوسته؛ هر ردیفِ دیگری
+        /// در میانه — فاکتورِ دیگر، ارسالِ مجدد، ردیفِ UID‌دار — پایانِ تلاش است). PersistChunk هر قلم را با GetNewIDD
+        /// (MAX+1) پشتِ هم درج می‌کند و Taxid هر تلاش تازه است (RequestTaxId تصادفی)، پس این همان اقلامِ یک بار ارسال است.
+        /// </summary>
+        internal static List<FULL_TAXDTL> AttemptRowsWithoutUid(CL_CCNNMANAGER dbms, string taxid, bool isMainApi)
+        {
+            const string attempt = @"ISNULL(Taxid,'') = @taxid AND ISNULL(CAST(ApiTypeSent AS int), -1) = @api AND Uid IS NULL
+                                     AND ISNULL(REMARKS,'') NOT LIKE 'ResendDuplicate%'";
+            var args = new { taxid, api = Convert.ToInt32(isMainApi) };
+            var firstIdd = dbms.DoGetDataSQL<int?>($@"
+                SELECT TOP (1) IDD FROM dbo.TAXDTL WHERE {attempt} ORDER BY CRT ASC, IDD ASC", args).FirstOrDefault();
+            if (firstIdd is null) return new List<FULL_TAXDTL>();
+            return dbms.DoGetDataSQL<FULL_TAXDTL>($@"
+                SELECT * FROM dbo.TAXDTL t
+                WHERE {attempt} AND t.IDD >= @firstIdd
+                  AND t.IDD < ISNULL((SELECT MIN(o.IDD) FROM dbo.TAXDTL o
+                                      WHERE o.IDD > @firstIdd AND NOT (ISNULL(o.Taxid,'') = @taxid
+                                            AND ISNULL(CAST(o.ApiTypeSent AS int), -1) = @api AND o.Uid IS NULL
+                                            AND ISNULL(o.REMARKS,'') NOT LIKE 'ResendDuplicate%')), 2147483647)
+                ORDER BY t.CRT, t.IDD", new { args.taxid, args.api, firstIdd }).ToList();
         }
 
         /// <summary>#region Cleaning_RestoreValiding ِ همان حلقه.</summary>

@@ -104,8 +104,12 @@ namespace Prg_Moadian.Headless
             }
         }
 
-        /// <summary>ارسالی که هنوز تکلیفش روشن نیست (همان فیلترِ UndecidedData ِ Prg_TrackSentInvoice؛ UNKNOWN عمداً بیرون است).</summary>
-        public static bool Undecided(string? status) => status is null or "" or "NULL" or "PENDING";
+        /// <summary>
+        /// ارسالی که هنوز تکلیفش روشن نیست (فیلترِ UndecidedData ِ Prg_TrackSentInvoice؛ UNKNOWN عمداً بیرون است، کدِ رهگیری ندارد).
+        /// تفاوتِ عمدی: IN_PROGRESS هم، که استعلام می‌نویسد و کدِ رهگیری دارد؛ بی آن هیچ‌وقت منقضی نمی‌شد و «استعلامِ همه» ِ سفیر
+        /// (که آن را بی‌تکلیف می‌شمارد) دوباره نمی‌پرسیدش.
+        /// </summary>
+        public static bool Undecided(string? status) => status is null or "" or "NULL" or "PENDING" or "IN_PROGRESS";
 
         /// <summary>خطایی که فقط همان یک کدِ رهگیری را می‌گیرد، نه کلِ استعلام را.</summary>
         private static bool ReferenceLevel(Exception ex) => ex is not SqlException && ex is not HttpRequestException && ex is not NullyExceptiony;
